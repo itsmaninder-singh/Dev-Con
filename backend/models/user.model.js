@@ -100,7 +100,7 @@ const userSchema = new mongoose.Schema(
         default:"newcomer",
     },
  },
-
+ 
     
     
 
