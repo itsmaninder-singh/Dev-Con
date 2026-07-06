@@ -14,3 +14,35 @@ const calculateSkillScore = (skillsA = [], skillsB = [])=>{
     return Math.round(overLapRatio * 50);
 
 }
+const calculateReputationScore =(reputationScore = 0)=>{
+    const capped = Math.min(reputationScore, 1000);
+    return Math.round((capped / 1000) * 25);
+};
+
+const calculatePastProjectScore = ({
+    completedProjectsCount = 0,
+    sharedPastCollaboratores = 0,
+    techStackOverlapWithPastProjects = 0,
+    })=>{
+        const experiencePoints = Math.min(completedProjectsCount * 3,12);
+        const collaboratorPoints = Math.min(sharedPastCollaboratores * 4, 8);
+        const stackFamiliarity = Math.min(techStackOverlapWithPastProjects * 1, 5);
+        return Math.round(experiencePoints + collaboratorPoints + stackFamiliarity);
+};
+export const computeMatchScore = (candidate, target) =>{
+    const SkillScore = calculateSkillScore(candidate.skills, target.skills);
+    const ReputationScore = calculateReputationScore(candidate.reputationScore);
+    const PastProjectScore = calculatePastProjectScore({
+        completedProjectsCount: candidate.completedProjectsCount,
+        sharedPastCollaboratores: candidate.sharedPastCollaboratores,
+        techStackOverlapWithPastProjects: candidate.techStackOverlapWithPastProjects,
+    });
+    const totalScore = SkillScore + ReputationScore + PastProjectScore;
+
+    return {
+        totalScore: Math.min(totalScore, 100),
+        breakdown:{skillscore,reputationScore,pastProjectScore},
+
+    };
+
+};
