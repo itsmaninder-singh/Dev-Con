@@ -46,3 +46,11 @@ export const computeMatchScore = (candidate, target) =>{
     };
 
 };
+export const rankMatches = (candidates = [], target, limit = 10) => {
+  const scored = candidates.map((candidate) => {
+    const { totalScore, breakdown } = computeMatchScore(candidate, target);
+    return { ...candidate, matchScore: totalScore, matchBreakdown: breakdown };
+  });
+
+  return scored.sort((a, b) => b.matchScore - a.matchScore).slice(0, limit);
+};
