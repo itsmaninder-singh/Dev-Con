@@ -57,3 +57,28 @@ const getRecommendedTeams = asyncHandler(async(req,res)=>{
     .status(200)
     .json(new ApiResponse(200,"Recommended teams fetched successfully",ranked));
 });
+const getRecommendedProjects = asyncHandler(async(req,res)=>{
+    const me = req.user;
+    const projects = await Project.find({status:"recruiting"})
+    .populate("owner","name username profilePicture reputation")
+    .select("title description techStack rolesNeeded maxTeamSize members owner type");
+
+    const formatted = projects.map((p)=>({
+        p,
+        skills:p.techStack,
+        reputationScore:p.owner?.reputation?.score || 0,
+        completedProjectsCount:0,
+    }));
+    const target = {
+        skills: me.skills,
+        sharedPastCollaborators:0,
+        techStackOverlapwithPastProjects:0, 
+
+    }
+    const ranked = rankMatches(formatted,target,20);
+    return res
+    .status(200)
+    .json(new ApiResponse(200,"Recommended projects fetched successfully",ranked));
+});
+
+export {GetRecommendedUsers,getRecommendedTeams,getRecommendedProjects};
