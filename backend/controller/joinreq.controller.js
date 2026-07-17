@@ -77,5 +77,63 @@ const acceptJoinReq= asyncHandler(async(req,res)=>{
         if(team.members.length >= team.maxMembers){
             throw new ApiError(400,"Team is already full");
         }
+        const alreadyMember = team.members.some((m)=>m.user.toString()===joinReq.sender.toString());
+        if(!alreadyMember){
+            team.members.push({
+                user: joinReq.sender,
+                role: joinReq.roleAppliedFor || "Member",
+            });
+            team.refreshStatus();
+            await team.save();
+        }
+    }else{
+        const project = await Project.findById(joinReq.project);
+        if(!project) throw new ApiError(404, "Project no longer exist");
+
+        if(project.members.length >= project.maxTeamSize){
+            throw new ApiError(400,"Project team ois already full");
+        }
+        const alreadyMember = project.members.some((m)=>m.user.toString() === joinReq.sender.toString())
+         if (!alreadyMember) {
+      project.members.push({
+        user: joinRequest.sender,
+        role: joinRequest.roleAppliedFor || "Contributor",
+      });
+      if (project.members.length >= project.maxTeamSize) {
+        project.status = "in-progress";
+      }
+      await project.save();
     }
+    }
+    joinReq.status = "accepted";
+    joinReq.respondedAt = new Date();
+    await joinReq.save();
+
+   return res
+    .status(200)
+    .json(new ApiResponse(200, "Request accepted successfully", joinRequest));
 })
+
+const ignoreJoinRequest = asyncHandler(async (req, res) => {
+  const joinRequest = await JoinRequest.findById(req.params.id);
+
+  if (!joinRequest) {
+    throw new ApiError(404, "Join request not found");
+  }
+
+  if (joinRequest.receiver.toString() !== req.user._id.toString()) {
+    throw new ApiError(403, "Not authorized to respond to this request");
+  }
+
+  if (joinRequest.status !== "pending") {
+    throw new ApiError(400, `Request already ${joinRequest.status}`);
+  }
+
+  joinRequest.status = "ignored";
+  joinRequest.respondedAt = new Date();
+  await joinRequest.save();
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Request ignored", joinRequest));
+});
