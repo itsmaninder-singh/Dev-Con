@@ -137,3 +137,40 @@ const ignoreJoinRequest = asyncHandler(async (req, res) => {
     .status(200)
     .json(new ApiResponse(200, "Request ignored", joinRequest));
 });
+const getReceivedRequests = asyncHandler(async(req,res)=>{
+    const {status} = req.body;
+    const filter = {receiver: req.user._id};
+    if(status) filter.status = status;
+
+    const reqs = await JoinRequest.find(filter)
+    .populate("sender", "name username profilePicture skills reputatuion")
+    .populate("team", "name")
+    .populate("project", "title")
+    .sort({ createdAt: -1 });
+     return res
+    .status(200)
+    .json(new ApiResponse(200, "Received requests fetched", reqs));
+});
+const getSentReqs = asyncHandler(async(req,res)=>{
+    const reqs = await JoinRequest.find({
+        sender:req.user._id
+    })
+    .populate("team","name status")
+    .populate("project", "title status")
+    .sort({ createdAt: -1 });
+    return res
+    .status(200)
+    .json(new ApiResponse(200, "Sent requests fetched", reqs));
+})
+export {
+    getSentReqs,
+    getReceivedRequests,
+    ignoreJoinRequest,
+    acceptJoinReq,
+    sendJoinReq
+
+
+
+    
+
+}
