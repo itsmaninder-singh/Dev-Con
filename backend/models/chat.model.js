@@ -9,6 +9,12 @@ const chatSchema = new mongoose.Schema(
         required: true,
       },
     ],
+     participantsMeta: [
+      {
+        user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+        joinedAt: { type: Date, default: Date.now },
+      },
+    ],
     isGroup: { 
         type: Boolean,
          default: false },
@@ -18,6 +24,11 @@ const chatSchema = new mongoose.Schema(
          trim: true,
         default: "" 
     },
+     leader: { 
+      type: mongoose.Schema.Types.ObjectId,
+       ref: "User", 
+       default: null
+       },
     groupAdmin: { 
         type: mongoose.Schema.Types.ObjectId, 
         ref: "User", 
@@ -26,10 +37,27 @@ const chatSchema = new mongoose.Schema(
          type: mongoose.Schema.Types.ObjectId, 
          ref: "Team", 
          default: null },
+    announcementOnly: { 
+      type: Boolean,
+       default: false 
+      },
     project: { 
         type: mongoose.Schema.Types.ObjectId,
         ref: "Project",
         default: null },
+    mutedBy: [{ 
+      type: mongoose.Schema.Types.ObjectId,
+       ref: "User" 
+      }
+    ],
+    inviteCode: { 
+      type: String,
+      default: null 
+      },
+    inviteEnabled: {
+       type: Boolean, 
+       default: false
+      },
 
     status: {
       type: String,
@@ -67,5 +95,9 @@ const chatSchema = new mongoose.Schema(
 chatSchema.index({ participants: 1 });
 chatSchema.index({ team: 1 });
 chatSchema.index({ project: 1 });
+chatSchema.index({ inviteCode: 1 });
 
+chatSchema.methods.topAuthorityLabel = function () {
+  return this.team || this.project ? "Leader" : "Admin";
+};
 export const Chat = mongoose.model("Chat", chatSchema);

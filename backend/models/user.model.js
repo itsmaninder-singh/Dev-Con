@@ -79,6 +79,15 @@ const userSchema = new mongoose.Schema(
         type:Boolean,
         default:true,   
     },
+    lastSeen:{
+        type:Date,
+        deault:Date.now
+    },
+    blockedUsers:[{
+        type: mongoose.Schema.Types.ObjectId,
+        ref:"User"
+    }],
+    isPlatformAdmin: { type: Boolean, default: false },
     AvailableFor:[{
         type:String,
         enum:[
