@@ -19,7 +19,9 @@ import dotenv from "dotenv";
 dotenv.config({ path: "./.env" });
 
 import app from "./app.js";
+import {server} from "socket.io"
 import connectDB from "./db/index.js";
+import { setIO } from "./utils/SocketManager.js";
 
 const PORT = process.env.PORT || 8000;
 
