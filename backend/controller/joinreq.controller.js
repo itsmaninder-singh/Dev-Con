@@ -4,6 +4,8 @@ import { Project } from "../models/project.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import {ApiError} from "../utils/ApiError.js";
+import { SendNotification } from "../utils/notify.js";
+import { addUsertoEntityChat } from "../utils/SynchChatMessage.js";
 
 const sendJoinReq = asyncHandler(async(req,res)=>{
     const {targetType,targetId,message,roleAppliedFor} = req.body;
@@ -52,6 +54,13 @@ const sendJoinReq = asyncHandler(async(req,res)=>{
         message,
         roleAppliedFor,
     });
+    await sendNotification({
+    recipient: receiver,
+    sender: req.user._id,
+    type: "join_request",
+    text: `${req.user.name} wants to join your ${targetType} "${target.name || target.title}"`,
+    joinRequest: joinRequest._id,
+  });
     return res.status(201).json(new ApiResponse(201,"Join Request SenT Successfully", JOINREQUEST))
 
 });
@@ -85,6 +94,7 @@ const acceptJoinReq= asyncHandler(async(req,res)=>{
             });
             team.refreshStatus();
             await team.save();
+            await addUsertoEntityChat("team",team.id,joinReq.sender);
         }
     }else{
         const project = await Project.findById(joinReq.project);
@@ -103,11 +113,21 @@ const acceptJoinReq= asyncHandler(async(req,res)=>{
         project.status = "in-progress";
       }
       await project.save();
+      await addUserToEntityChat("project", project._id, joinRequest.sender);
+
     }
     }
     joinReq.status = "accepted";
     joinReq.respondedAt = new Date();
     await joinReq.save();
+
+    await sendNotification({
+    recipient: joinRequest.sender,
+    sender: req.user._id,
+    type: "join_request_accepted",
+    text: `${req.user.name} accepted your request to join`,
+    joinRequest: joinRequest._id,
+  });
 
    return res
     .status(200)
