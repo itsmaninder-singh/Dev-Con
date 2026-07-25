@@ -5,7 +5,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-   "start":"node index.js",
+    "start": "node index.js",
     "dev": "nodemon src/index.js"
   },
   "keywords": [
@@ -26,7 +26,8 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.7.0",
     "mysql2": "^3.22.5",
-    "redis": "^6.1.0"
+    "redis": "^6.1.0",
+    "xss": "^1.0.15"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"
