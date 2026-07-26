@@ -17,10 +17,13 @@ connectDB().then(()=>{
 */
 import dotenv from "dotenv";
 dotenv.config({ path: "./.env" });
-
+import http from "http";
+import {Server} from "socket.io";
+import { createAdapter } from "@socket.io/redis-adapter";
 import app from "./app.js";
 import {server} from "socket.io"
 import connectDB from "./db/index.js";
+import initSocket from "./socket/index.js";
 import { setIO } from "./utils/SocketManager.js";
 import { connectRedis } from "./config/redis.js";
 
