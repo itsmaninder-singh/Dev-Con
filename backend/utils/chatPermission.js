@@ -2,7 +2,7 @@ export const isLeader = (chat, userId) =>
   !!chat.leader && chat.leader.toString() === userId.toString();
 
 export const isAdmin = (chat, userId) =>
-  caht.admins.sone((e) => e.toString() === userId.toString());
+  chat.admins.sone((e) => e.toString() === userId.toString());
 
 export const canKick = (chat, actorId, targetId) => {
   if (actorId.toString() === targetId.toString()) return false;

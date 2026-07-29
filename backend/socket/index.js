@@ -50,6 +50,43 @@ const initSocket = (io) =>{
 
     io.on("connection", (socket)=>{
         const  userId = socket.user._id.toString();
-        console.log(`socket con establish : ${userId}`);
+        console.log(`socket-con established : ${userId}`);
+
+        socket.join(userId);
+        redisClient.sAdd("online_users",userId);
+        io.emit("presence:online",{ userId});
+
+        socket.on("chat:join",async (chatId,callback)=>{
+            try {
+                const chat = await Chat.findById(chatId);
+                if(!chat) return callback?.({ok:false,
+                    error: "chat not found"
+                });
+                const isParticipant = chat.participants.some((p)=> p.toString()=== userId);
+                if(!isParticipant){
+                    return callback?.({ ok: false,
+                    error: "Not a participant" });
+                }  
+                socket.join(chatId);  
+                const result = await Message.updateMany({
+                    chat: chatId,
+                    sender: {$ne: socket.user._id},
+                    deliveredTo: { $ne: socket.user._id }
+            },
+        {
+            $addToSet: {deliveredTo: socket.user._id}
+        });
+        if(result.modifiedCount > 0)  {
+            io.to(chatId).emit("message:delivered", {chatId, userId});
+
+        }    
+        callback?.({ ok: true });
+            } catch (error) {
+                callback?.({ ok: false, error: "Server error" });
+                
+            }
+        })
+
+
     })
 }
