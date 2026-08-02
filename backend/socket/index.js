@@ -85,8 +85,47 @@ const initSocket = (io) =>{
                 callback?.({ ok: false, error: "Server error" });
                 
             }
-        })
+        });
+
+        socket.on("chat:read", async(chatId, callback) => {
+            try{
+                const chat = await Chat.findById(chatId);
+                if(!chat) {
+                    return callback?.({ok:false,error:"chat not found"});
+
+                    const isParticipant = chat.participants.some((p)=>p.toString()=== userId);
+                    if(!isParticipant){
+                        return callback?.({ok:false,error: "not a participant"});
+                    }
+
+                    const result = await Message.updateMany({
+                        chat:chatId,
+                        sender:{$ne: socket.user._id},
+                        readBy:{$ne: socket.user._id}
+                    },{
+                        $addToSet:{ readBy: socket.user._id,
+                            deliveredTo: socket.user._id
+                        }
+                    });
+                    if(result.modifiedCount > 0){
+                        await invaliddatechatCaches(chat);
+                        io.to(chatId).emit("message:read",{chatId,userId});
+                    }
+                    callback?.({ok:true, modifiedCount:result.modifiedCount});
+                }
+                    }catch(err){
+                        callback?.({ ok: false, error: "Server error" });
+
+                    }
+                });
+
+                socket.on("message:send",async(chatId, content, mentions=[],callback)=>{
+                    
+                })
 
 
-    })
-}
+            });
+        };
+        
+
+    
