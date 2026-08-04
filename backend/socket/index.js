@@ -120,7 +120,45 @@ const initSocket = (io) =>{
                 });
 
                 socket.on("message:send",async(chatId, content, mentions=[],callback)=>{
-                    
+                    try{
+                        if(await isRateLimited(userId)){
+                            return callback?.({ok:false, error: "Slow Down - too many message at once"});
+
+                        }
+                        if(!content || !content.trim()){
+                            return callback?.({ok:false,error: "Message can not be empty"});
+
+                        }
+                        if(content.length > 2000){
+                            return callback?.({ok:false, error :"Message too long"});
+                        }
+                        const chat = await Chat.findById(chatId);
+
+                        if(!chat) return callback?.({ok:false, error:" chat not found"});
+                        const isParticipant = caht.participants.some((p)=> p.toString()=== userId);
+                        if (!isParticipant) {
+                            return callback?.({ ok: false, error: "Not a participant" });
+                        }
+                        if(chat.isGroup){
+                            if(!canSendInGroup(chat, socket.user._id)){
+                                return callback?.({ ok: false, error: "Only the leader/admins can send messages right now" });
+
+                            }
+                        }else{
+                            const otherId = chat.participants.find((p)=> p.toString()!== userId);
+                            if(otherId && (await isBlocked(socekt.user._id,otherId))){
+                                return callback?.({ ok: false, error: "This message could not be sent" });
+                            }
+                        }
+                        const permission = evaluateSendPermission(chat,socket.user._id);
+                        if (!permission.allowed) {
+                            return callback?.({ ok: false, error: permission.reason });
+                        }
+                        
+
+                    }catch(error){
+
+                    }
                 })
 
 
