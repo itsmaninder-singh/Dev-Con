@@ -14,7 +14,6 @@ import {
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-// Builds the object we're willing to send back to the client - never the password hash.
 const toSafeUser = (user) => ({
   _id: user._id,
   name: user.name,
@@ -34,8 +33,7 @@ const toSafeUser = (user) => ({
   createdAt: user.createdAt,
 });
 
-// Issues both tokens for a user, sets the refresh token as an httpOnly cookie,
-// and sends the access token + user back in the response body.
+
 const sendAuthResponse = (res, statusCode, user, message) => {
   const accessToken = generateAccessToken(user._id);
   const refreshToken = generateRefreshToken(user._id);
@@ -50,7 +48,7 @@ const sendAuthResponse = (res, statusCode, user, message) => {
   );
 };
 
-// Turns "some name" / "some.name@mail.com" into a unique, schema-valid username.
+
 const generateUniqueUsername = async (seed) => {
   const base = seed
     .toLowerCase()
@@ -66,7 +64,7 @@ const generateUniqueUsername = async (seed) => {
   return candidate;
 };
 
-// POST /api/v1/auth/register
+
 const register = asyncHandler(async (req, res) => {
   const { name, username, email, password, phoneNumber } = req.body;
 
@@ -96,7 +94,6 @@ const register = asyncHandler(async (req, res) => {
   return sendAuthResponse(res, 201, user, "Account created successfully");
 });
 
-// POST /api/v1/auth/login
 const login = asyncHandler(async (req, res) => {
   const { identifier, password } = req.body; // identifier = email or username
 
@@ -115,8 +112,7 @@ const login = asyncHandler(async (req, res) => {
   return sendAuthResponse(res, 200, user, "Logged in successfully");
 });
 
-// POST /api/v1/auth/google
-// Body: { idToken } - the credential string from Google Identity Services on the frontend
+
 const googleAuth = asyncHandler(async (req, res) => {
   const { idToken } = req.body;
   if (!idToken) {
@@ -153,7 +149,7 @@ const googleAuth = asyncHandler(async (req, res) => {
       profilePicture: payload.picture || "",
     });
   } else if (!user.googleId) {
-    // Existing local/github account signing in with Google for the first time -> link it
+    
     user.googleId = payload.sub;
     await user.save({ validateModifiedOnly: true });
   }
@@ -161,8 +157,6 @@ const googleAuth = asyncHandler(async (req, res) => {
   return sendAuthResponse(res, 200, user, "Logged in with Google successfully");
 });
 
-// POST /api/v1/auth/github
-// Body: { code } - the ?code= query param GitHub redirected back to the frontend with
 const githubAuth = asyncHandler(async (req, res) => {
   const { code } = req.body;
   if (!code) {
@@ -241,8 +235,7 @@ const githubAuth = asyncHandler(async (req, res) => {
   return sendAuthResponse(res, 200, user, "Logged in with GitHub successfully");
 });
 
-// POST /api/v1/auth/refresh
-// Reads the refresh token cookie and issues a fresh access token (and rotates the refresh token).
+
 const refreshAccessToken = asyncHandler(async (req, res) => {
   const incomingToken = req.cookies?.[REFRESH_COOKIE_NAME];
   if (!incomingToken) {
@@ -264,7 +257,6 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
   return sendAuthResponse(res, 200, user, "Access token refreshed");
 });
 
-// POST /api/v1/auth/logout
 const logout = asyncHandler(async (req, res) => {
   res.clearCookie(REFRESH_COOKIE_NAME, refreshCookieOptions());
   return res.status(200).json(new ApiResponse(200, "Logged out successfully"));
