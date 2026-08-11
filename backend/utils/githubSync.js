@@ -78,11 +78,62 @@ const fetchContributionStreak = async(githubUsername)=>{
     if (days[i].count > 0) {
       current += 1;
     } else if (i === days.length - 1) {
-      continue; // today with 0 contributions yet - don't break the streak on this alone
+      continue; 
     } else {
       break;
     }
   }
 
   return { current, longest };
+};
+
+export const syncGithubProfileForUser = async(userId,githubUsername)=>{
+  try{
+    const[profile,repos,streak]= await Promise.all([
+      githubFetch(`/users/${githubUsername}`),
+      githubFetch(`/users/${githubUsername}/repos?per_page=100&sort=updated`),
+      fetchContributionStreak(githubUsername),
+    ]);
+    const topRepos = repos
+    .filter((r)=>!r.fork)
+    .sort((a,b)=>b.stargazers_count-a.stargazers_count)
+    .slice(0,MAX_TOP_REPOS)
+    .map((r)=>({
+      name:r.name,
+      description:r.description,
+      url:r.html_url,
+      stars:r.stargazers_count,
+      language:r.language || "",
+    }));
+    const githubProfile = {
+      publicRepoCount: profile.public_repos ||0,
+      topRepos,
+      streak,
+      lastSyncedAt: new Date(),
+    };
+    const githubBadges = computeGithubBadges({
+      streak,
+      publicRepoCount: githubProfile.publicRepoCount,
+
+    });
+    const devconnectActivityBadge = await computeDevconnectActivityBadge(userId);
+
+    await User.findByIdAndUpdate(userId,{
+      githubProfile,
+      "badges.github": githubBadges.streak,
+      "badges.devconnectActivity": devconnectActivityBadge,
+      "badges.projectCount": githubBadges.projectCount,
+
+    });
+    return githubProfile;
+
+  }
+  catch(err){
+    if(err.code==="NOT_FOUND" || err.code==="RATE_LIMITED" || err.code==="API_ERROR"){
+      console.warn(`Failed to sync GitHub profile for user ${userId}: ${err.message}`);
+      return null;
+
+  }
+  throw err;
+}
 };
