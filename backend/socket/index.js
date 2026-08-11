@@ -154,6 +154,17 @@ const initSocket = (io) =>{
                         if (!permission.allowed) {
                             return callback?.({ ok: false, error: permission.reason });
                         }
+                        const clean = xss(content.trim());
+                        const validMentions = [...new Set(mentions.filter((id)=> typeof id === "string"))]
+                        .filter((id)=>chat.participants.some((p)=> p.toString()=== id))
+                        .slice(0,20);
+
+                        const message = await Message.create({
+                            chat:chatId,
+                            sender:socket.user._id,
+                            content:clean,
+                            mentions:validMentions,
+                        });
                         
 
                     }catch(error){
