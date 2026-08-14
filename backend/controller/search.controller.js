@@ -21,7 +21,7 @@ const searchUsers = asyncHandler(async (req, res) => {
 
   const filter = {};
 
-  if (q) {
+  if (q && q.length > 100) {
     const safe = escapeRegex(q.trim());
     filter.$or = [
       { name: { $regex: safe, $options: "i" } },
@@ -46,14 +46,14 @@ const searchUsers = asyncHandler(async (req, res) => {
   if (experience) {
     if (!ALLOWED_EXPERIENCE.includes(experience)) {
       return res
-        .status(200)
-        .json(new ApiResponse(200, "No results - invalid experience filter", { results: [], total: 0 }));
+        .status(400)
+        .json(new ApiResponse(400, "No results - invalid experience filter", { results: [], total: 0 }));
     }
     filter.experience = experience;
   }
 
-  if (availableFor) {
-    const list = availableFor.split(",").map((s) => s.trim()).filter(Boolean);
+  if (AvailableFor) {
+    const list = AvailableFor.split(",").map((s) => s.trim()).filter(Boolean);
     if (list.length) filter.AvailableFor = { $in: list };
   }
 
