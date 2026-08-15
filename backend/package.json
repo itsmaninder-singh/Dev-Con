@@ -1,35 +1,62 @@
 {
-  "name": "devconnect",
-  "version": "1.0.0",
-  "description": "a developers friendly place",
-  "main": "index.js",
-  "type": "module",
-  "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon src/index.js"
-  },
-  "keywords": [
-    "ai",
-    "driven",
-    "developers"
-  ],
-  "author": "maninder singh",
-  "license": "ISC",
-  "dependencies": {
-    "bcrypt": "^6.0.0",
-    "cors": "^2.8.6",
-    "dotenv": "^17.4.2",
-    "express": "^5.2.1",
-    "express-mongo-sanitize": "^2.2.0",
-    "express-rate-limit": "^8.6.0",
-    "helmet": "^8.3.0",
-    "jsonwebtoken": "^9.0.3",
-    "mongoose": "^9.7.0",
-    "mysql2": "^3.22.5",
-    "redis": "^6.1.0",
-    "xss": "^1.0.15"
-  },
-  "devDependencies": {
-    "nodemon": "^3.1.14"
-  }
+	"name": "devconnect",
+	"version": "1.0.0",
+	"description": "a developers friendly place",
+	"main": "index.js",
+	"type": "module",
+	"scripts": {
+		"start": "node index.js",
+		"dev": "nodemon src/index.js"
+	},
+	"keywords": [
+		"ai",
+		"driven",
+		"developers"
+	],
+	"author": "maninder singh",
+	"license": "ISC",
+	"dependencies": {
+		"bcrypt": "^6.0.0",
+		"cors": "^2.8.6",
+		"dotenv": "^17.4.2",
+		"express": "^5.2.1",
+		"express-mongo-sanitize": "^2.2.0",
+		"express-rate-limit": "^8.6.0",
+		"helmet": "^8.3.0",
+		"jsonwebtoken": "^9.0.3",
+		"mongoose": "^9.7.0",
+		"multer": "^2.2.0",
+		"mysql2": "^3.22.5",
+		"redis": "^6.1.0",
+		"xss": "^1.0.15"
+	},
+	"devDependencies": {
+		"nodemon": "^3.1.14"
+	},
+	"Resources": {
+		"UserPoolClient": {
+			"Type": "AWS::Cognito::UserPoolClient"
+		},
+		"Table": {
+			"Type": "AWS::DynamoDB::Table",
+			"Properties": {
+				"AttributeDefinitions": [
+					{
+						"AttributeName": "id",
+						"AttributeType": "S"
+					}
+				],
+				"BillingMode": "PAY_PER_REQUEST",
+				"KeySchema": [
+					{
+						"AttributeName": "id",
+						"KeyType": "HASH"
+					}
+				],
+				"StreamSpecification": {
+					"StreamViewType": "NEW_AND_OLD_IMAGES"
+				}
+			}
+		}
+	}
 }

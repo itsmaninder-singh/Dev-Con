@@ -95,7 +95,7 @@ const register = asyncHandler(async (req, res) => {
 });
 
 const login = asyncHandler(async (req, res) => {
-  const { identifier, password } = req.body; // identifier = email or username
+  const { identifier, password } = req.body; 
 
   if (!identifier || !password) {
     throw new ApiError(400, "email/username and password are required");
