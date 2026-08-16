@@ -26,6 +26,7 @@ import connectDB from "./db/index.js";
 import initSocket from "./socket/index.js";
 import { setIO } from "./utils/SocketManager.js";
 import { connectRedis } from "./config/redis.js";
+import { startGithubSyncCron } from "./cron-job/syncGithub.cron.js";
 
 const PORT = process.env.PORT || 8000;
 
@@ -51,6 +52,7 @@ const startServer = async () => {
   });
   initSocket(io);
   setIO(io);
+  startGithubSyncCron();
   server = httpServer.listen(PORT, () => {
     console.log(
       `Server is running in ${process.env.NODE_ENV || "development"} mode on port ${PORT}`

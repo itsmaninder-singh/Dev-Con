@@ -25,9 +25,19 @@ const teamSchema = new mongoose.Schema({
 
     },
     members:[{
+        user:{
+            type:mongoose.Schema.Types.ObjectId,
+            ref:"User",
+        },
+        role: String,
+        joinedAt:{
+            type:Date,
+            default:Date.now
+        },
+    }],
+    skillsNeeded:[{
         type:String,
         trim:true,
-
     }],
     maxMembers:{
         type:Number,

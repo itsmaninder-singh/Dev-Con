@@ -33,6 +33,10 @@ const chatSchema = new mongoose.Schema(
         type: mongoose.Schema.Types.ObjectId, 
         ref: "User", 
         default: null },
+    admins: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+    }],
     team: {
          type: mongoose.Schema.Types.ObjectId, 
          ref: "Team", 

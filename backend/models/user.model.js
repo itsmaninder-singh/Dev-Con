@@ -42,6 +42,14 @@ const userSchema = new mongoose.Schema(
         type:String,//cloudinary
         default:"",
     },
+    profilePicturePublicId:{
+        type:String,
+        default:"",
+    },
+    coverPicturePublicId:{
+        type:String,
+        default:"",
+    },
     coverPicture:{
         type:String,//cloudinary
         default:"",
@@ -66,6 +74,11 @@ const userSchema = new mongoose.Schema(
         default:"",
         maxlength:200,
     },
+    college:{
+        type:String,
+        default:"",
+        trim:true,
+    },
     skills:[{
         type:String,
         trim:true,
@@ -74,6 +87,26 @@ const userSchema = new mongoose.Schema(
         type:String,
         enum:["Fresher","1-2 years","2-5 years","5+ years"],
         default:"Fresher",
+    },
+    experienceLevel:{
+        type:String,
+        default:"",
+    },
+    timezone:{
+        type:String,
+        default:"",
+    },
+    availability:{
+        type:String,
+        default:"",
+    },
+    preferredRole:{
+        type:String,
+        default:"",
+    },
+    personality:{
+        type:String,
+        default:"",
     },
     isAvailable:{
         type:Boolean,
@@ -108,6 +141,26 @@ const userSchema = new mongoose.Schema(
         enum:["newcomer","ccontributor","builder","expert","legend"],
         default:"newcomer",
     },
+ },
+  githubProfile:{
+    publicRepoCount:{ type:Number, default:0 },
+    topRepos:[{
+        name:String,
+        description:String,
+        url:String,
+        stars:Number,
+        language:String,
+    }],
+    streak:{
+        current:{ type:Number, default:0 },
+        longest:{ type:Number, default:0 },
+    },
+    lastSyncedAt:{ type:Date, default:null },
+ },
+ badges:{
+    github:{ type:Number, default:0 },
+    devconnectActivity:{ type:Number, default:0 },
+    projectCount:{ type:Number, default:0 },
  },
  
     

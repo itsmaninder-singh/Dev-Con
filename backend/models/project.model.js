@@ -74,7 +74,7 @@ github:{
 tags:[String],
 likes:[{
     type:mongoose.Schema.Types.ObjectId,
-    ref:User
+    ref:"User"
 }],
 views:{
     type:Number,
