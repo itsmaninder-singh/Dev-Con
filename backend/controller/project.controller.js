@@ -23,7 +23,7 @@ const createProject = asyncHandler(async(req,res)=>{
     members: [{ user: req.user._id, role: "Owner" }],
 
     });
-    return res.status(200).json(new ApiResponse(201,"Project created succesfully !", project));
+    return res.status(201).json(new ApiResponse(201,"Project created succesfully !", project));
 
 });
 
@@ -44,13 +44,13 @@ const editProject = asyncHandler(async(req,res)=>{
     return res.status(200).json(new ApiResponse(200,"Project updated successfully", project));
 });
 
-const getProjectDetails = asynchHandlr(async(req,res)=>{
-    const project = Project.findById(req.params.id)
+const getProjectDetails = asyncHandler(async(req,res)=>{
+    const project = await Project.findById(req.params.id)
     .populate("owner","name username profilePicture reputation")
     .populate("members.user","name username profilePicture skills reputation");
 
     if(!project){
-        throw new ApiError(402,"Project Not Found");
+        throw new ApiError(404,"Project Not Found");
 
     }
     project.views+=1;
@@ -59,8 +59,8 @@ const getProjectDetails = asynchHandlr(async(req,res)=>{
     .json(new ApiResponse(200, "Project details fetched",project));
 
 });
-const getProjects = aysncHandler(async(req,res)=>{
-    const {type, status, tech, status} =  req.body;
+const getProjects = asyncHandler(async(req,res)=>{
+    const {type, status, tech, search, page=1, limit=20} =  req.query;
     const filter = {};
     if(type) filter.type = type;
     if(status) filter.status = status;
@@ -71,26 +71,37 @@ const getProjects = aysncHandler(async(req,res)=>{
         $regex: search,
         $options: "i"
     };
-    const projects = await Project.find(filter)
-    .populate("owner", "name username profilePicture")
-    .sort({createdAt: -1});
-    
+    const pageNum = Math.max(Number(page) || 1, 1);
+    const limitNum = Math.min(Math.max(Number(limit) || 20, 1), 50);
+
+    const [projects, total] = await Promise.all([
+        Project.find(filter)
+            .populate("owner", "name username profilePicture")
+            .sort({createdAt: -1})
+            .skip((pageNum - 1) * limitNum)
+            .limit(limitNum),
+        Project.countDocuments(filter),
+    ]);
+
     return res
     .status(200)
-    .json(new ApiResponse(200,"Project fetched succesfully",projects));
+    .json(new ApiResponse(200,"Project fetched succesfully",{
+        projects,
+        pagination: { page: pageNum, limit: limitNum, total, pages: Math.ceil(total / limitNum) },
+    }));
 });
 const joinProject  = asyncHandler(async(req,res)=>{
-    const project = Project.findById(req.params.id);
+    const project = await Project.findById(req.params.id);
     if(!project){
         throw new ApiError(404,"Project Not Found");
     }
-    if(!project.status!=="recruiting"){
+    if(project.status!=="recruiting"){
         throw new ApiError(403,"this project is not currently recruiting any members");
     }
-    const alreadyMember = project.members.some((m)=> m.user.toString() ===req.users._id.toString()
+    const alreadyMember = project.members.some((m)=> m.user.toString() ===req.user._id.toString()
     );
     if(alreadyMember){
-        throw new ApiError(440,"you are already a member of this project");
+        throw new ApiError(400,"you are already a member of this project");
     }
     if(project.members.length>=project.maxTeamSize){
         throw new ApiError(400,"project team is already full");
@@ -115,7 +126,7 @@ export {
     getProjectDetails,
     getProjects,
     joinProject
-    
+
 
 
 

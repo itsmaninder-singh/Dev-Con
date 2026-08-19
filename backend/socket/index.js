@@ -1,18 +1,19 @@
 import jwt from "jsonwebtoken";
 import xss from "xss";
-import { User } from "../model/user.model.js";
-import { Chat } from "../model/chat.model.js";
-import { Message } from "../model/message.model.js";
+import { User } from "../models/user.model.js";
+import { Chat } from "../models/chat.model.js";
+import { Message } from "../models/message.model.js";
 import { evaluateSendPermission } from "../utils/chatGuard.js";
-import { canSendInGroup } from "../utils/chatPermissions.js";
+import { canSendInGroup } from "../utils/chatPermission.js";
 import { isBlocked } from "../utils/blockGuard.js";
 import { notifyForNewMessage } from "../controller/chat.controller.js";
+import { encryptText } from "../utils/crypto.js";
 import redisClient from "../config/redis.js";
 
 const MAX_MESSAGES = 10;
 const WINDOW_SECONDS = 10;
 const isRateLimited = async (userId) => {
-  const key = `ratelimit:msg${userId}`;
+  const key = `ratelimit:msg:${userId}`;
   const count = await redisClient.incr(key);
   if (count === 1) {
     await redisClient.expire(key, WINDOW_SECONDS);
@@ -21,7 +22,7 @@ const isRateLimited = async (userId) => {
 };
 
 const chatListKey = (userId) => `chatlist:${userId}`;
-const invaliddatechatCaches = async (chat) => {
+const invalidateChatCaches = async (chat) => {
   const keys = chat.participants.map((p) => chatListKey(p.toString()));
   keys.push(`messages:${chat._id.toString()}:p1:l30`);
   if (keys.length) await redisClient.del(keys);
@@ -89,33 +90,33 @@ const initSocket = (io) => {
         const chat = await Chat.findById(chatId);
         if (!chat) {
           return callback?.({ ok: false, error: "chat not found" });
-
-          const isParticipant = chat.participants.some(
-            (p) => p.toString() === userId,
-          );
-          if (!isParticipant) {
-            return callback?.({ ok: false, error: "not a participant" });
-          }
-
-          const result = await Message.updateMany(
-            {
-              chat: chatId,
-              sender: { $ne: socket.user._id },
-              readBy: { $ne: socket.user._id },
-            },
-            {
-              $addToSet: {
-                readBy: socket.user._id,
-                deliveredTo: socket.user._id,
-              },
-            },
-          );
-          if (result.modifiedCount > 0) {
-            await invaliddatechatCaches(chat);
-            io.to(chatId).emit("message:read", { chatId, userId });
-          }
-          callback?.({ ok: true, modifiedCount: result.modifiedCount });
         }
+
+        const isParticipant = chat.participants.some(
+          (p) => p.toString() === userId,
+        );
+        if (!isParticipant) {
+          return callback?.({ ok: false, error: "not a participant" });
+        }
+
+        const result = await Message.updateMany(
+          {
+            chat: chatId,
+            sender: { $ne: socket.user._id },
+            readBy: { $ne: socket.user._id },
+          },
+          {
+            $addToSet: {
+              readBy: socket.user._id,
+              deliveredTo: socket.user._id,
+            },
+          },
+        );
+        if (result.modifiedCount > 0) {
+          await invalidateChatCaches(chat);
+          io.to(chatId).emit("message:read", { chatId, userId });
+        }
+        callback?.({ ok: true, modifiedCount: result.modifiedCount });
       } catch (err) {
         callback?.({ ok: false, error: "Server error" });
       }
@@ -140,7 +141,7 @@ const initSocket = (io) => {
           const chat = await Chat.findById(chatId);
 
           if (!chat) return callback?.({ ok: false, error: " chat not found" });
-          const isParticipant = caht.participants.some(
+          const isParticipant = chat.participants.some(
             (p) => p.toString() === userId,
           );
           if (!isParticipant) {
@@ -157,7 +158,7 @@ const initSocket = (io) => {
             const otherId = chat.participants.find(
               (p) => p.toString() !== userId,
             );
-            if (otherId && (await isBlocked(socekt.user._id, otherId))) {
+            if (otherId && (await isBlocked(socket.user._id, otherId))) {
               return callback?.({
                 ok: false,
                 error: "This message could not be sent",
@@ -178,7 +179,7 @@ const initSocket = (io) => {
           const message = await Message.create({
             chat: chatId,
             sender: socket.user._id,
-            content: clean,
+            content: encryptText(clean), // stored encrypted at rest
             mentions: validMentions,
           });
           const roomSockets = await io.in(chatId).fetchSockets();
@@ -211,7 +212,7 @@ const initSocket = (io) => {
           io.to(chatId).emit("message:new", populated);
           callback?.({ ok: true, message: populated });
         } catch (error) {
-          console.error("message:send error:", err);
+          console.error("message:send error:", error);
           callback?.({ ok: false, error: "Server error" });
         }
       },
@@ -223,17 +224,17 @@ const initSocket = (io) => {
     socket.on("typing:stop", (chatId) => {
       socket.to(chatId).emit("typing:stop", { chatId, userId });
     });
-    socket.on("disconnet", async () => {
+    socket.on("disconnect", async () => {
       const remaining = await io.in(userId).fetchSockets();
       if (remaining.length === 0) {
         await redisClient.sRem("online_users", userId);
         await User.findByIdAndUpdate(socket.user._id, {
           lastSeen: new Date(),
         });
-        io.on("presence:offline", { userId, lastSeen: new Date() });
+        io.emit("presence:offline", { userId, lastSeen: new Date() });
       }
     });
   });
 };
 
-export default initSockets;
+export default initSocket;
