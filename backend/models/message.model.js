@@ -15,8 +15,7 @@ const messageSchema = new mongoose.Schema({
     content:{
         type:String,
         required:true,
-        trim: true,
-        maxlength: 2000
+        maxlength: 4200
     },
      mentions: [{
          type: mongoose.Schema.Types.ObjectId, 
