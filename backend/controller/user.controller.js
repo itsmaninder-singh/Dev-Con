@@ -1,8 +1,9 @@
-import User from '../models/user.model.js';
+import { User } from '../models/user.model.js';
 import { ApiError } from '../utils/ApiError.js';
 import {asyncHandler} from "../utils/asyncHandler.js"
 import {ApiResponse} from "../utils/ApiResponse.js"
 import { toSafeUser } from "./auth.controller.js";
+import { uploadOnCloudinary, deleteFromCloudinary } from "../utils/cloudinary.js";
 
 const ALLOWED_EXPERIENCE = ["Fresher", "1-2 years", "2-5 years", "5+ years"];
 const ALLOWED_AVAILABLE_FOR = [
@@ -14,12 +15,12 @@ const ALLOWED_AVAILABLE_FOR = [
 ];
 
 const getMe = asyncHandler(async(req,res)=>{
-    const user = await User.findbyId(req.user._id);
+    const user = await User.findById(req.user._id);
     if(!user){
         throw new ApiError(404,"User Not Found");
 
     }
-    return res.status(200).json(new ApiResponse(200,"Profile fetched successfully",user));
+    return res.status(200).json(new ApiResponse(200,"Profile fetched successfully",toSafeUser(user)));
 });
 
 const getUserByUsername = asyncHandler(async (req, res) => {
@@ -37,8 +38,6 @@ const updateProfile = asyncHandler(async (req, res) => {
     "college",
     "skills",
     "experience",
-    "profilePicture",
-    "coverPicture",
     "phoneNumber",
   ];
 
@@ -101,7 +100,7 @@ const updateAvailableFor = asyncHandler(async (req, res) => {
 
   const user = await User.findByIdAndUpdate(
     req.user._id,
-    { AvailableFor: availableFor },
+    { availableFor },
     { new: true, runValidators: true }
   );
   if (!user) {
@@ -110,7 +109,63 @@ const updateAvailableFor = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .json(new ApiResponse(200, "Available-for options updated", { AvailableFor: user.AvailableFor }));
+    .json(new ApiResponse(200, "Available-for options updated", { availableFor: user.availableFor }));
+});
+
+const uploadProfilePicture = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    throw new ApiError(400, "No image file uploaded");
+  }
+  const user = await User.findById(req.user._id);
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  const result = await uploadOnCloudinary(req.file.path, "devconnect/profile-pictures");
+  if (!result) {
+    throw new ApiError(500, "Failed to upload image, please try again");
+  }
+
+  const oldPublicId = user.profilePicturePublicId;
+  user.profilePicture = result.url;
+  user.profilePicturePublicId = result.publicId;
+  await user.save({ validateModifiedOnly: true });
+
+  if (oldPublicId) {
+    await deleteFromCloudinary(oldPublicId);
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Profile picture updated", { profilePicture: user.profilePicture }));
+});
+
+const uploadCoverPicture = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    throw new ApiError(400, "No image file uploaded");
+  }
+  const user = await User.findById(req.user._id);
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  const result = await uploadOnCloudinary(req.file.path, "devconnect/cover-pictures");
+  if (!result) {
+    throw new ApiError(500, "Failed to upload image, please try again");
+  }
+
+  const oldPublicId = user.coverPicturePublicId;
+  user.coverPicture = result.url;
+  user.coverPicturePublicId = result.publicId;
+  await user.save({ validateModifiedOnly: true });
+
+  if (oldPublicId) {
+    await deleteFromCloudinary(oldPublicId);
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Cover picture updated", { coverPicture: user.coverPicture }));
 });
 
 
@@ -119,5 +174,7 @@ export{
     getUserByUsername,
     updateProfile,
     toggleAvailability,
-    updateAvailableFor
+    updateAvailableFor,
+    uploadProfilePicture,
+    uploadCoverPicture
 };

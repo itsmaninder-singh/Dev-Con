@@ -80,6 +80,8 @@ import {
 export const router = express.Router();
 
 
+
+
 router.post("/auth/register", register);
 router.post("/auth/login", login);
 router.post("/auth/google", googleAuth);
@@ -141,3 +143,4 @@ router.get("/chats", protect, getMyChats);
 router.get("/chats/direct/:userId", protect, getOrCreateDirectChat);
 router.get("/chats/:chatId/messages", protect, getMessages);
 router.post("/chats/group", protect, createGroupChat);
+

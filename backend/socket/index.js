@@ -179,7 +179,7 @@ const initSocket = (io) => {
           const message = await Message.create({
             chat: chatId,
             sender: socket.user._id,
-            content: encryptText(clean), // stored encrypted at rest
+            content: encryptText(clean), 
             mentions: validMentions,
           });
           const roomSockets = await io.in(chatId).fetchSockets();

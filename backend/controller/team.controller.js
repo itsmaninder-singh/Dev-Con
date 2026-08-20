@@ -20,22 +20,22 @@ const createTeam = asyncHandler(async(req,res)=>{
     members: [{ user: req.user._id, role: "Creator" }],
 
     });
-    return res.status(200).json(new ApiResponse(200,"Team created successfully",team));
+    return res.status(201).json(new ApiResponse(201,"Team created successfully",team));
 });
 
 const editTeams = asyncHandler(async(req,res)=>{
-    const team = Team.findById(req.params.id);
+    const team = await Team.findById(req.params.id);
     if(!team){
         throw new ApiError(404,"Team Not found");
     }
-    if(!team.creator.toString()!==req.user._id.toString()){
+    if(team.creator.toString()!==req.user._id.toString()){
         throw new ApiError(403,"Only the team creator can edit this team");
     }
     const allowedFields = ["name","description","skillsNeeded", "maxMembers", "visibility", "tags", "status"]
     allowedFields.forEach((field)=>{
         if(req.body[field]!==undefined) team[field]= req.body[field];
     });
-    team.refershStatus();
+    team.refreshStatus();
     await team.save();
     return res.status(200).json(new ApiResponse(200,"Team updated successfully",team));
 });
@@ -53,30 +53,41 @@ const getTeamDetails = asyncHandler(async(req,res)=>{
 });
 
 const getTeams = asyncHandler(async(req,res)=>{
-    const {status , skill , search} = req.query;
+    const {status , skill , search, page=1, limit=20} = req.query;
     const filter = {visibility: "public"};
-    
+
     if(status) filter.status = status;
     if(skill) filter.skillsNeeded = {
-        $in:[new RegExpI(skill, "i")]
+        $in:[new RegExp(skill, "i")]
     };
     if (search) filter.name = {
         $regex: search ,
         $options: "i"
     };
-    const teams = await Team.find(filter)
-    .populate("creator","name username profilePicture")
-    .sort({createdAt: -1});
+    const pageNum = Math.max(Number(page) || 1, 1);
+    const limitNum = Math.min(Math.max(Number(limit) || 20, 1), 50);
 
-    return res.status(200).json(new ApiResponse(200,"Teams fetched successfully",teams));
+    const [teams, total] = await Promise.all([
+        Team.find(filter)
+            .populate("creator","name username profilePicture")
+            .sort({createdAt: -1})
+            .skip((pageNum - 1) * limitNum)
+            .limit(limitNum),
+        Team.countDocuments(filter),
+    ]);
+
+    return res.status(200).json(new ApiResponse(200,"Teams fetched successfully",{
+        teams,
+        pagination: { page: pageNum, limit: limitNum, total, pages: Math.ceil(total / limitNum) },
+    }));
 });
 
 const joinTeam = asyncHandler(async(req,res)=>{
     const team = await Team.findById(req.params.id);
     if(!team){
-        throw new ApiError(405,"Team not found");
+        throw new ApiError(404,"Team not found");
     }
-    if(team.status!=="open"){
+    if(team.status!=="recruiting"){
         throw new ApiError(400, "This team is not open for joining");
     }
     const alreadyMember = team.members.some(
@@ -92,7 +103,7 @@ const joinTeam = asyncHandler(async(req,res)=>{
     team.members.push({user: req.user._id,
         role : req.body.role || "Member"
     })
-    team.refershStatus();
+    team.refreshStatus();
     await team.save();
 
     return res.status(200).json(new ApiResponse(200,"Joined team successfully",team));
