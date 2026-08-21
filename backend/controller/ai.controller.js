@@ -2,9 +2,9 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { callLLMForJSON } from "../utils/llm.js";
-import { Team } from "../model/team.model.js";
-import { Project } from "../model/project.model.js";
-import { User } from "../model/user.model.js";
+import { Team } from "../models/team.model.js";
+import { Project } from "../modelschat.model.js";
+import { User } from "../models/user.model.js";
 import mongoose from "mongoose";
 
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);

@@ -1,5 +1,5 @@
 import cron from "node-cron";
-import { User } from "../model/user.model.js";
+import { User } from "../models/user.model.js";
 import { syncGithubProfileForUser } from "../utils/githubSync.js";
 
 const SYNC_INTERVAL = 24*60*60*60*1000;

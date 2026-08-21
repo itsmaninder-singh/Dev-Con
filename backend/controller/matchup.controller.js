@@ -1,6 +1,6 @@
-import { User } from "../model/user.model.js";
-import { Team } from "../model/team.model.js";
-import { Project } from "../model/project.model.js";
+import { User } from "../models/user.model.js";
+import { Team } from "../models/team.model.js";
+import { Project } from "../models/project.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { rankMatches } from "../utils/matchingEngine.js";

@@ -30,8 +30,6 @@ import { startGithubSyncCron } from "./cron-job/syncGithub.cron.js";
 
 const PORT = process.env.PORT || 8000;
 
-let server;
-
 const startServer = async () => {
   await connectDB();
   await connectRedis();
