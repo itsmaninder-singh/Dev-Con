@@ -4,7 +4,7 @@ import { Project } from "../models/project.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import {ApiError} from "../utils/ApiError.js";
-import { SendNotification } from "../utils/notify.js";
+import { sendNotification } from "../utils/notify.js";
 import { addUsertoEntityChat } from "../utils/SynchChatMessage.js";
 
 const sendJoinReq = asyncHandler(async(req,res)=>{

@@ -8,6 +8,7 @@ import { sendNotification } from "../utils/notify.js";
 import { decryptText } from "../utils/crypto.js";
 import { isBlocked } from "../utils/blockGuard.js";
 
+
 const getMyChats = asyncHandler(async (req, res) => {
   const chats = await Chat.find({ participants: req.user._id })
     .populate("participants", "name username profilePicture lastSeen")

@@ -2,69 +2,38 @@
 	"name": "devconnect",
 	"version": "1.0.0",
 	"description": "a developers friendly place",
-	"main": "index.js",
+	"main": "server.js",
 	"type": "module",
 	"scripts": {
-		"start": "node index.js",
-		"dev": "nodemon src/index.js"
+		"start": "node server.js",
+		"dev": "nodemon server.js"
 	},
-	"keywords": [
-		"ai",
-		"driven",
-		"developers"
-	],
+	"keywords": ["ai", "driven", "developers"],
 	"author": "maninder singh",
 	"license": "ISC",
 	"dependencies": {
 		"@socket.io/redis-adapter": "^8.3.0",
-		"axios": "^1.19.0",
-		"bcrypt": "^6.0.0",
-		"bcryptjs": "^3.0.3",
-		"cloudinary": "^2.10.1",
+		"axios": "^1.7.9",
+		"bcryptjs": "^2.4.3",
+		"cloudinary": "^2.5.1",
 		"cookie-parser": "^1.4.7",
 		"cors": "^2.8.6",
-		"dotenv": "^17.4.2",
-		"express": "^5.2.1",
+		"dotenv": "^16.4.7",
+		"express": "^4.21.2",
 		"express-mongo-sanitize": "^2.2.0",
-		"express-rate-limit": "^8.6.2",
-		"google-auth-library": "^11.0.2",
-		"helmet": "^8.3.0",
-		"jsonwebtoken": "^9.0.3",
-		"mongoose": "^9.9.3",
-		"multer": "^2.2.0",
-		"mysql2": "^3.23.4",
-		"node-cron": "^4.6.0",
-		"redis": "^6.2.1",
-		"socket.io": "^4.8.3",
+		"express-rate-limit": "^7.5.0",
+		"google-auth-library": "^9.15.0",
+		"helmet": "^8.0.0",
+		"jsonwebtoken": "^9.0.2",
+		"mongoose": "^8.9.5",
+		"multer": "^2.0.1",
+		"mysql2": "^3.12.0",
+		"node-cron": "^3.0.3",
+		"redis": "^4.7.0",
+		"socket.io": "^4.8.1",
 		"xss": "^1.0.15"
 	},
 	"devDependencies": {
-		"nodemon": "^3.1.14"
-	},
-	"Resources": {
-		"UserPoolClient": {
-			"Type": "AWS::Cognito::UserPoolClient"
-		},
-		"Table": {
-			"Type": "AWS::DynamoDB::Table",
-			"Properties": {
-				"AttributeDefinitions": [
-					{
-						"AttributeName": "id",
-						"AttributeType": "S"
-					}
-				],
-				"BillingMode": "PAY_PER_REQUEST",
-				"KeySchema": [
-					{
-						"AttributeName": "id",
-						"KeyType": "HASH"
-					}
-				],
-				"StreamSpecification": {
-					"StreamViewType": "NEW_AND_OLD_IMAGES"
-				}
-			}
-		}
+		"nodemon": "^3.1.9"
 	}
 }

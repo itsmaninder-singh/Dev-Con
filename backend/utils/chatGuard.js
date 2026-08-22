@@ -1,8 +1,8 @@
-import { ApiError } from "./ApiError";
+import { ApiError } from "./ApiError.js";
 
 
 export const evaluateSendPermission = (chat,senderId)=>{
-    const SenderStr = senderId.toString();
+    const senderStr = senderId.toString();
 
     if(chat.isGroup){
         return {allowed:true,updates:{}};
@@ -37,4 +37,3 @@ export const assertSendAllowed = (chat, senderId) => {
   }
   return result.updates;
 };
-

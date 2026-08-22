@@ -10,7 +10,7 @@ const teamSchema = new mongoose.Schema({
     description:{
         type:String,
         maxlength: 500,
-        deafult:"",
+        default:"",
     },
     creator:{
         type:mongoose.Schema.Types.ObjectId,
@@ -21,7 +21,7 @@ const teamSchema = new mongoose.Schema({
     {
         type:mongoose.Schema.Types.ObjectId,
         ref:"Project",
-        deafult:null,
+        default:null,
 
     },
     members:[{

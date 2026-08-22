@@ -37,7 +37,7 @@ export const callLLM = async(systemPrompt, userPrompt,tier = "fast")=>{
     const data = await res.json();
     return data.choices?.[0]?.message?.content || "";
 };
-export const callLLMforJSON = async(systemPrompt, userPrompt , tier = "fast")=>{
+export const callLLMForJSON = async(systemPrompt, userPrompt , tier = "fast")=>{
     const jsonSystemPrompt = `${systemPrompt}\n\nRespond with only valid JSON -no prose, no explanation , no markdowns code fences. Just the raw JSON. Thats it.`;
     
     const raw = await callLLM(jsonSystemPrompt, userPrompt, tier);

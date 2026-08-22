@@ -1,6 +1,6 @@
 import {Notification } from "../models/notification.model.js";
 import { getIO } from "./SocketManager.js";
-export const SendNotification = async({
+export const sendNotification = async({
     recipient,
     sender=null,
     type,
@@ -36,7 +36,6 @@ export const SendNotification = async({
     }
 
 
-    
 };
 export const sendNotificationToMany = async (recipients, payload, excludeIds = []) => {
   const excludeSet = new Set(excludeIds.map((id) => id.toString()));

@@ -21,19 +21,19 @@ const projectSchema = new mongoose.Schema({
         type:String,
         enum:["hackathon" ,"open-source","startup","college-project","freelance","other"],
         required: true,
-        
+
     },
     status:{
-        typre: String,
+        type: String,
         enum: ["recruiting","in-progress","completed","on-hold"],
         default: "recruiting",
     },
     techStack:[{
-        typre:String,
+        type:String,
         trim:true,
     }],
     rolesNeeded:[{
-        role:{ 
+        role:{
             type:String,
             required:true
         },

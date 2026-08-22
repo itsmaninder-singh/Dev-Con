@@ -1,4 +1,4 @@
-const normalizeSkills = (skills=>[]) =
+const normalizeSkills = (skills = []) =>
     skills.map((s)=> s.toLowerCase().trim()).filter(Boolean);
 
 const calculateSkillScore = (skillsA = [], skillsB = [])=>{
@@ -9,7 +9,7 @@ const calculateSkillScore = (skillsA = [], skillsB = [])=>{
 
     const intersection = [...a].filter((skill)=> b.has(skill));
     const union = new Set([...a, ...b]);
-    const overLapRatio = intesection.length / union.size;
+    const overLapRatio = intersection.length / union.size;
 
     return Math.round(overLapRatio * 50);
 
@@ -21,27 +21,27 @@ const calculateReputationScore =(reputationScore = 0)=>{
 
 const calculatePastProjectScore = ({
     completedProjectsCount = 0,
-    sharedPastCollaboratores = 0,
+    sharedPastCollaborators = 0,
     techStackOverlapWithPastProjects = 0,
     })=>{
         const experiencePoints = Math.min(completedProjectsCount * 3,12);
-        const collaboratorPoints = Math.min(sharedPastCollaboratores * 4, 8);
+        const collaboratorPoints = Math.min(sharedPastCollaborators * 4, 8);
         const stackFamiliarity = Math.min(techStackOverlapWithPastProjects * 1, 5);
         return Math.round(experiencePoints + collaboratorPoints + stackFamiliarity);
 };
 export const computeMatchScore = (candidate, target) =>{
-    const SkillScore = calculateSkillScore(candidate.skills, target.skills);
-    const ReputationScore = calculateReputationScore(candidate.reputationScore);
-    const PastProjectScore = calculatePastProjectScore({
+    const skillScore = calculateSkillScore(candidate.skills, target.skills);
+    const reputationScore = calculateReputationScore(candidate.reputationScore);
+    const pastProjectScore = calculatePastProjectScore({
         completedProjectsCount: candidate.completedProjectsCount,
-        sharedPastCollaboratores: candidate.sharedPastCollaboratores,
+        sharedPastCollaborators: candidate.sharedPastCollaborators,
         techStackOverlapWithPastProjects: candidate.techStackOverlapWithPastProjects,
     });
-    const totalScore = SkillScore + ReputationScore + PastProjectScore;
+    const totalScore = skillScore + reputationScore + pastProjectScore;
 
     return {
         totalScore: Math.min(totalScore, 100),
-        breakdown:{skillscore,reputationScore,pastProjectScore},
+        breakdown:{skillScore,reputationScore,pastProjectScore},
 
     };
 

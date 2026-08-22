@@ -3,7 +3,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { callLLMForJSON } from "../utils/llm.js";
 import { Team } from "../models/team.model.js";
-import { Project } from "../modelschat.model.js";
+import { Project } from "../models/project.model.js";
 import { User } from "../models/user.model.js";
 import mongoose from "mongoose";
 

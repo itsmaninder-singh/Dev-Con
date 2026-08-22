@@ -41,5 +41,5 @@ export const startGithubSyncCron = ()=>{
             console.error("intial github cron failed", err.message)
         });
     },10_000);
-    console.log("scheduled plus initaial cron for github passed")
+    console.log("scheduled plus initaial cron for github passed-- ghar jake sutti babu")
 }

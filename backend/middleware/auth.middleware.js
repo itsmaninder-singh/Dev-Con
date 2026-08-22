@@ -1,7 +1,7 @@
 import jwt from "jsonwebtoken";
 import {User} from "../models/user.model.js"
-import {ApiError} from "./utils/ApiError.js"
-import {asyncHandler} from "./utils/asyncHandler.js";
+import {ApiError} from "../utils/ApiError.js"
+import {asyncHandler} from "../utils/asyncHandler.js";
 //verify jwt mtlb we will check whehter the user has already loginned or not!!
 
 const protect = asyncHandler(async (req,res,next) => {
