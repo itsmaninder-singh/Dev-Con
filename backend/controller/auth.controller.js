@@ -261,5 +261,28 @@ const logout = asyncHandler(async (req, res) => {
   res.clearCookie(REFRESH_COOKIE_NAME, refreshCookieOptions());
   return res.status(200).json(new ApiResponse(200, "Logged out successfully"));
 });
+const changePassword = asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) {
+    throw new ApiError(400, "currentPassword and newPassword are required");
+  }
+  if (newPassword.length < 8) {
+    throw new ApiError(400, "newPassword must be at least 8 characters");
+  }
 
-export { register, login, googleAuth, githubAuth, refreshAccessToken, logout, toSafeUser };
+  const user = await User.findById(req.user._id).select("+password");
+  if (!user || !user.password) {
+    throw new ApiError(400, "Password change is not available for this account");
+  }
+  const matches = await user.matchPassword(currentPassword);
+  if (!matches) {
+    throw new ApiError(401, "Current password is incorrect");
+  }
+
+  user.password = newPassword;
+  await user.save();
+
+  return res.status(200).json(new ApiResponse(200, "Password updated successfully"));
+});
+
+export { register, login, googleAuth, githubAuth, refreshAccessToken, logout, toSafeUser ,changePassword};
