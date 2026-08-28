@@ -1,7 +1,23 @@
 import {Team } from "../models/team.model.js"
+import {Project } from "../models/project.model.js"
+import {User } from "../models/user.model.js"
 import {ApiError} from "../utils/ApiError.js"
 import {ApiResponse} from "../utils/ApiResponse.js"
 import  {asyncHandler} from "../utils/asyncHandler.js"
+
+const isSihTeam = async (team) => {
+    if (!team.project) return false;
+    const project = await Project.findById(team.project).select("event");
+    return project?.event === "SIH";
+};
+
+const hasFemaleMember = async (memberUserIds) => {
+    const femaleCount = await User.countDocuments({
+        _id: { $in: memberUserIds },
+        gender: "female",
+    });
+    return femaleCount > 0;
+};
 
 const createTeam = asyncHandler(async(req,res)=>{
     const {name, description, project, skillsNeeded, maxMembers, visibility, tags} = req.body;
@@ -100,6 +116,14 @@ const joinTeam = asyncHandler(async(req,res)=>{
     if(team.members.length >= team.maxMembers){
         throw new ApiError(400,"Team is already full");
     }
+    const willBeFull = team.members.length + 1 >= team.maxMembers;
+    if (willBeFull && (await isSihTeam(team))) {
+        const memberIdsAfterJoin = [...team.members.map((m) => m.user), req.user._id];
+        if (!(await hasFemaleMember(memberIdsAfterJoin))) {
+            throw new ApiError(400, "SIH requires at least one female teammate before the team can be finalized. Add a female teammate before this team fills up.");
+        }
+    }
+
     team.members.push({user: req.user._id,
         role : req.body.role || "Member"
     })
@@ -122,6 +146,14 @@ const removeMember = asyncHandler(async(req,res)=>{
   if (!isCreator && !isSelf) {
     throw new ApiError(403, "Not authorized to remove this member");
   }
+  if (team.status === "full" && (await isSihTeam(team))) {
+    const remainingIds = team.members
+      .filter((m) => m.user.toString() !== req.params.userId)
+      .map((m) => m.user);
+    if (!(await hasFemaleMember(remainingIds))) {
+      throw new ApiError(400, "Can't remove the only female teammate from a finalized SIH team");
+    }
+}
 
   team.members = team.members.filter((m) => m.user.toString() !== req.params.userId);
   team.refreshStatus();

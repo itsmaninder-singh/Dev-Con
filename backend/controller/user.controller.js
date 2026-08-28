@@ -39,15 +39,19 @@ const updateProfile = asyncHandler(async (req, res) => {
     "skills",
     "experience",
     "phoneNumber",
+    "gender",
   ];
+  const ALLOWED_GENDER = ["male", "female", "other", "prefer-not-to-say"];
 
   const updates = {};
   for (const field of editable) {
     if (req.body[field] !== undefined) updates[field] = req.body[field];
   }
-
   if (updates.experience && !ALLOWED_EXPERIENCE.includes(updates.experience)) {
     throw new ApiError(400, `experience must be one of: ${ALLOWED_EXPERIENCE.join(", ")}`);
+  }
+  if (updates.gender && !ALLOWED_GENDER.includes(updates.gender)) {
+    throw new ApiError(400, `gender must be one of: ${ALLOWED_GENDER.join(", ")}`);
   }
   if (updates.skills && !Array.isArray(updates.skills)) {
     throw new ApiError(400, "skills must be an array of strings");

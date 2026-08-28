@@ -76,6 +76,11 @@ const userSchema = new mongoose.Schema(
         default:"",
         maxlength:200,
     },
+    gender:{
+        type:String,
+        enum:["male","female","other"],
+        default:"other",
+    },
     college:{
         type:String,
         default:"",

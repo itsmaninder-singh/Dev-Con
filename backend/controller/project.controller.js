@@ -4,7 +4,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js"
 
 const createProject = asyncHandler(async(req,res)=>{
-    const {title, description, type, techStack, rolesNeeded, maxTeamSize, deadline, github, tags} = req.body;
+    const {title, description, type, event, techStack, rolesNeeded, maxTeamSize, deadline, github, tags} = req.body;
     if(!title || !description || !type){
         throw new ApiError(400,"These are mandatory fields. Please fill to proceed :)");
 
@@ -14,6 +14,7 @@ const createProject = asyncHandler(async(req,res)=>{
     description,
     owner: req.user._id,
     type,
+    event: event || "none",
     techStack,
     rolesNeeded,
     maxTeamSize,
@@ -36,7 +37,7 @@ const editProject = asyncHandler(async(req,res)=>{
     if(project.owner.toString() !==req.user._id.toString()){
         throw new ApiError(403,"Sorry, Only the project owner can edit this project :)")
     }
-    const allowedFields = ["title", "description","type","status","techStack","rolesNeeded","maxTeamSize","deadline","github","tags"];
+    const allowedFields = ["title", "description","type","event","status","techStack","rolesNeeded","maxTeamSize","deadline","github","tags"];
     allowedFields.forEach((field)=>{
         if(req.body[field] !== undefined) project[field]=req.body[field];
     });
@@ -60,9 +61,10 @@ const getProjectDetails = asyncHandler(async(req,res)=>{
 
 });
 const getProjects = asyncHandler(async(req,res)=>{
-    const {type, status, tech, search, page=1, limit=20} =  req.query;
+    const {type, event, status, tech, search, page=1, limit=20} =  req.query;
     const filter = {};
     if(type) filter.type = type;
+    if(event) filter.event = event;
     if(status) filter.status = status;
     if(tech) filter.techStack = {
         $in:[new RegExp(tech, "i")]
