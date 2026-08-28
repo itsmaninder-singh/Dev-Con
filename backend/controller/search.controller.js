@@ -52,8 +52,8 @@ const searchUsers = asyncHandler(async (req, res) => {
     filter.experience = experience;
   }
 
-  if (AvailableFor) {
-    const list = AvailableFor.split(",").map((s) => s.trim()).filter(Boolean);
+  if (availableFor) {
+    const list = availableFor.split(",").map((s) => s.trim()).filter(Boolean);
     if (list.length) filter.AvailableFor = { $in: list };
   }
 

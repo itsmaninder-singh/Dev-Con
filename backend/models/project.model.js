@@ -23,13 +23,18 @@ const projectSchema = new mongoose.Schema({
         required: true,
         
     },
+    event:{
+        type:String,
+        enum:["SIH","Gsoc","none"],
+        default:"none",
+    },
     status:{
-        typre: String,
+        type: String,
         enum: ["recruiting","in-progress","completed","on-hold"],
         default: "recruiting",
     },
     techStack:[{
-        typre:String,
+        type:String,
         trim:true,
     }],
     rolesNeeded:[{
@@ -88,5 +93,6 @@ views:{
 projectSchema.index({ techStack: 1 });
 projectSchema.index({ status: 1 });
 projectSchema.index({ type: 1 });
+projectSchema.index({ event: 1 });
 projectSchema.index({ owner: 1 });
 export const Project= mongoose.model("Project",projectSchema);
