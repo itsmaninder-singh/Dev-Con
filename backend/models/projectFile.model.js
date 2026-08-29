@@ -65,7 +65,7 @@ const projectFileSchema = new mongoose.Schema(
       trim: true,
       maxlength: 100,
     },
-    // This is a durable snapshot. Yjs will own live, concurrent document state.
+
     content: {
       type: String,
       default: "",

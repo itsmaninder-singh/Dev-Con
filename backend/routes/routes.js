@@ -2,7 +2,7 @@ import express from "express";
 import { protect } from "../middleware/auth.middleware.js";
 import { requirePlatformAdmin } from "../middleware/isPlatformAdmin.middleware.js";
 import { upload } from "../middleware/upload.middleware.js";
-import { authLimiter, sensitiveActionLimiter } from "../middleware/rateLimit.middleware.js";
+import { authLimiter, sensitiveActionLimiter } from "../middleware/rateLimiter.middleware.js";
 
 import {
   register,
