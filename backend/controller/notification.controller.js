@@ -17,6 +17,14 @@ const getNotifications = asyncHandler(async (req, res) => {
   const [notifications, total] = await Promise.all([
     Notification.find(filter)
       .populate("sender", "name username profilePicture")
+      .populate({
+        path: "joinRequest",
+        select: "message roleAppliedFor status team project",
+        populate: [
+          { path: "team", select: "name" },
+          { path: "project", select: "title" },
+        ],
+      })
       .sort({ createdAt: -1 })
       .skip((pageNum - 1) * limitNum)
       .limit(limitNum),

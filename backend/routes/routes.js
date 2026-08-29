@@ -2,6 +2,7 @@ import express from "express";
 import { protect } from "../middleware/auth.middleware.js";
 import { requirePlatformAdmin } from "../middleware/isPlatformAdmin.middleware.js";
 import { upload } from "../middleware/upload.middleware.js";
+import { authLimiter, sensitiveActionLimiter } from "../middleware/rateLimiter.middleware.js";
 
 import {
   register,
@@ -10,6 +11,7 @@ import {
   githubAuth,
   refreshAccessToken,
   logout,
+  changePassword,
 } from "../controller/auth.controller.js";
 
 import {
@@ -79,16 +81,13 @@ import {
 
 export const router = express.Router();
 
-
-
-
-router.post("/auth/register", register);
-router.post("/auth/login", login);
-router.post("/auth/google", googleAuth);
-router.post("/auth/github", githubAuth);
-router.post("/auth/refresh", refreshAccessToken);
+router.post("/auth/register", authLimiter, register);
+router.post("/auth/login", authLimiter, login);
+router.post("/auth/google", authLimiter, googleAuth);
+router.post("/auth/github", authLimiter, githubAuth);
+router.post("/auth/refresh", authLimiter, refreshAccessToken);
 router.post("/auth/logout", protect, logout);
-
+router.post("/auth/change-password", protect, sensitiveActionLimiter, changePassword);
 
 router.get("/users/me", protect, getMe);
 router.get("/users/:username", getUserByUsername);
@@ -97,7 +96,6 @@ router.patch("/users/me/availability", protect, toggleAvailability);
 router.patch("/users/me/available-for", protect, updateAvailableFor);
 router.post("/users/me/profile-picture", protect, upload.single("profilePicture"), uploadProfilePicture);
 router.post("/users/me/cover-picture", protect, upload.single("coverPicture"), uploadCoverPicture);
-
 
 router.post("/teams", protect, createTeam);
 router.get("/teams", getTeams);
@@ -120,7 +118,7 @@ router.post("/join-requests/:id/ignore", protect, ignoreJoinRequest);
 
 router.get("/matchup/users", protect, getRecommendedUsers);
 router.get("/matchup/teams", protect, getRecommendedTeams);
-router.get("/matchup/aprojects", protect, getRecommendedProjects);
+router.get("/matchup/projects", protect, getRecommendedProjects);
 
 router.get("/notifications", protect, getNotifications);
 router.get("/notifications/unread-count", protect, getUnreadCount);
@@ -128,8 +126,7 @@ router.patch("/notifications/:id/read", protect, markAsRead);
 router.patch("/notifications/read-all", protect, markAllAsRead);
 router.delete("/notifications/:id", protect, deleteNotification);
 
-
-router.post("/reports", protect, createReport);
+router.post("/reports", protect, sensitiveActionLimiter, createReport);
 router.get("/reports/mine", protect, getMyReports);
 router.get("/reports", protect, requirePlatformAdmin, getAllReports);
 router.patch("/reports/:id/status", protect, requirePlatformAdmin, updateReportStatus);
@@ -143,4 +140,3 @@ router.get("/chats", protect, getMyChats);
 router.get("/chats/direct/:userId", protect, getOrCreateDirectChat);
 router.get("/chats/:chatId/messages", protect, getMessages);
 router.post("/chats/group", protect, createGroupChat);
-

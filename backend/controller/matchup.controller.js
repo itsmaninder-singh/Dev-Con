@@ -1,24 +1,24 @@
-import { User } from "../model/user.model.js";
-import { Team } from "../model/team.model.js";
-import { Project } from "../model/project.model.js";
+import { User } from "../models/user.model.js";
+import { Team } from "../models/team.model.js";
+import { Project } from "../models/project.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { rankMatches } from "../utils/matchingEngine.js";
 
 
-const GetRecommendedUsers = asyncHandler(async(req,res)=>{
+const getRecommendedUsers = asyncHandler(async(req,res)=>{
     const me = req.user;
 
     const candidates = await User.find({
         _id: {$ne: me._id},
-        isAvialable: true,
+        isAvailable: true,
 
     }).select("name username profilePicture skills reputation bio college");
 
     const formatted =  candidates.map((u)=>({
         user:u,
         skills: u.skills,
-        reputation: u.reputation?.score || 0,
+        reputationScore: u.reputation?.score || 0,
         completedProjectsCount: 0,
 
 
@@ -26,22 +26,22 @@ const GetRecommendedUsers = asyncHandler(async(req,res)=>{
     const target ={
         skills: me.skills,
         sharedPastCollaborators: 0,
-        techStackOverlapwithPastProjects: 0,
+        techStackOverlapWithPastProjects: 0,
     };
     const ranked = rankMatches(formatted,target,20);
-    
+
     return res
     .status(200)
     .json(new ApiResponse(200,"Recommended users fetched successfully",ranked));
 });
 const getRecommendedTeams = asyncHandler(async(req,res)=>{
     const me = req.user;
-    const teams = await Team.find({status:"open", visibility:"public"})
+    const teams = await Team.find({status:"recruiting", visibility:"public"})
     .populate("creator","name username profilePicture reputation")
     .select("name description skillsNeeded maxMembers members creator");
 
     const formatted = teams.map((t)=>({
-        t,
+        team:t,
         skills:t.skillsNeeded,
         reputationScore:t.creator?.reputation?.score || 0,
         completedProjectsCount:0,
@@ -50,7 +50,7 @@ const getRecommendedTeams = asyncHandler(async(req,res)=>{
     const target = {
         skills: me.skills,
         sharedPastCollaborators:0,
-        techStackOverlapwithPastProjects:0,
+        techStackOverlapWithPastProjects:0,
     }
     const ranked = rankMatches(formatted,target,20);
     return res
@@ -64,7 +64,7 @@ const getRecommendedProjects = asyncHandler(async(req,res)=>{
     .select("title description techStack rolesNeeded maxTeamSize members owner type");
 
     const formatted = projects.map((p)=>({
-        p,
+        project:p,
         skills:p.techStack,
         reputationScore:p.owner?.reputation?.score || 0,
         completedProjectsCount:0,
@@ -72,7 +72,7 @@ const getRecommendedProjects = asyncHandler(async(req,res)=>{
     const target = {
         skills: me.skills,
         sharedPastCollaborators:0,
-        techStackOverlapwithPastProjects:0, 
+        techStackOverlapWithPastProjects:0,
 
     }
     const ranked = rankMatches(formatted,target,20);
@@ -81,4 +81,4 @@ const getRecommendedProjects = asyncHandler(async(req,res)=>{
     .json(new ApiResponse(200,"Recommended projects fetched successfully",ranked));
 });
 
-export {GetRecommendedUsers,getRecommendedTeams,getRecommendedProjects};
+export {getRecommendedUsers,getRecommendedTeams,getRecommendedProjects};

@@ -1,9 +1,10 @@
 import mongoose from "mongoose";
-import { Report } from "../model/report.model.js";
-import { User } from "../model/user.model.js";
+import { Report } from "../models/report.model.js";
+import { User } from "../models/user.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+
 
 const isValidId = (id) =>mongoose.Types.ObjectId.isValid(id);
 const VALID_REASONS=["harrasment", "fake_profile", "spam", "inappropriate_content", "other"];

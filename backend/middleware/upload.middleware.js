@@ -1,7 +1,7 @@
 import multer from "multer";
 import fs from "fs";
 import path from "path";
-import {ApiError } from "../utils/ApiError/js"
+import {ApiError } from "../utils/ApiError.js"
 
 const TEMP_DIR = path.resolve("temp");
 if(!fs.existsSync(TEMP_DIR)){

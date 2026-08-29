@@ -21,7 +21,7 @@ const projectSchema = new mongoose.Schema({
         type:String,
         enum:["hackathon" ,"open-source","startup","college-project","freelance","other"],
         required: true,
-        
+
     },
     event:{
         type:String,
@@ -38,7 +38,7 @@ const projectSchema = new mongoose.Schema({
         trim:true,
     }],
     rolesNeeded:[{
-        role:{ 
+        role:{
             type:String,
             required:true
         },

@@ -18,7 +18,7 @@ const userSchema = new mongoose.Schema(
     phoneNumber:{
         type:Number,
         unique:true,
-        sparse:true, 
+        sparse:true,
     },
     password:{
         type:String,
@@ -26,10 +26,8 @@ const userSchema = new mongoose.Schema(
         required:function(){
             return !this.googleId && !this.githubId;
         },
-        unique:true,
         minlength:8,
         trim:true,
-
     },
     username:{
         type:String,
@@ -46,20 +44,24 @@ const userSchema = new mongoose.Schema(
         type:String,
         default:"",
     },
-    coverPicturePublicId:{
-        type:String,
-        default:"",
-    },
     coverPicture:{
         type:String,//cloudinary
         default:"",
     },
+    coverPicturePublicId:{
+        type:String,
+        default:"",
+    },
     //Oauths
-    googleId:{ 
+    googleId:{
         type:String,
         default:null,
     },
     githubId:{
+        type:String,
+        default:null,
+    },
+    githubUsername:{
         type:String,
         default:null,
     },
@@ -115,21 +117,21 @@ const userSchema = new mongoose.Schema(
     },
     isAvailable:{
         type:Boolean,
-        default:true,   
+        default:true,
     },
     lastSeen:{
         type:Date,
-        deault:Date.now
+        default:Date.now
     },
     blockedUsers:[{
         type: mongoose.Schema.Types.ObjectId,
         ref:"User"
     }],
     isPlatformAdmin: { type: Boolean, default: false },
-    AvailableFor:[{
+    availableFor:[{
         type:String,
         enum:[
-            "Hackarthon",
+            "Hackathon",
             "open source contribution",
             "college project",
             "startup",
@@ -143,11 +145,11 @@ const userSchema = new mongoose.Schema(
     },
     level:{
         type:String,
-        enum:["newcomer","ccontributor","builder","expert","legend"],
+        enum:["newcomer","contributor","builder","expert","legend"],
         default:"newcomer",
     },
  },
-  githubProfile:{
+ githubProfile:{
     publicRepoCount:{ type:Number, default:0 },
     topRepos:[{
         name:String,
@@ -167,12 +169,7 @@ const userSchema = new mongoose.Schema(
     devconnectActivity:{ type:Number, default:0 },
     projectCount:{ type:Number, default:0 },
  },
- 
-    
-    
 
-
-    
 },{
     timestamps:true
 });

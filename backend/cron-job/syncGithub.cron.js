@@ -1,5 +1,5 @@
 import cron from "node-cron";
-import { User } from "../model/user.model.js";
+import { User } from "../models/user.model.js";
 import { syncGithubProfileForUser } from "../utils/githubSync.js";
 
 const SYNC_INTERVAL = 24*60*60*60*1000;
@@ -41,5 +41,5 @@ export const startGithubSyncCron = ()=>{
             console.error("intial github cron failed", err.message)
         });
     },10_000);
-    console.log("scheduled plus initaial cron for github passed")
+    console.log("scheduled plus initaial cron for github passed-- ghar jake sutti babu")
 }
