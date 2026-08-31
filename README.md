@@ -79,6 +79,19 @@ It combines social networking, project collaboration, messaging, and AI into one
 - Mutual Connections
 
 ---
+## 💻 Live Collaborative Coding
+
+Collaborate with your team in real time inside DevConnect.
+
+### Features
+
+- ⚡ Real-time collaborative code editor
+- 👥 Multiple users can code simultaneously
+- 🔄 Instant code synchronization
+- 👀 Live cursor visibility
+- 🔗 Join rooms with a shareable invite link
+
+---
 
 ## 💬 Real-Time Messaging
 
