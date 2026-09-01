@@ -6,6 +6,7 @@ import { createAdapter } from "@socket.io/redis-adapter";
 import app from "./app.js";
 import connectDB from "./db/index.js";
 import initSocket from "./socket/index.js";
+import { initCollabNamespace } from "./socket/collab.namespace.js";
 import { setIO } from "./utils/SocketManager.js";
 import { connectRedis } from "./config/redis.js";
 import redisClient from "./config/redis.js";
@@ -34,6 +35,7 @@ const startServer = async () => {
 
   });
   initSocket(io);
+  initCollabNamespace(io);
   setIO(io);
   startGithubSyncCron();
   httpServerInstance = httpServer.listen(PORT, () => {
@@ -49,3 +51,4 @@ startServer().catch((error) => {
 });
 
 export { httpServerInstance as server };
+
