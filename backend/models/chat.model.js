@@ -9,59 +9,65 @@ const chatSchema = new mongoose.Schema(
         required: true,
       },
     ],
-     participantsMeta: [
+    participantsMeta: [
       {
         user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
         joinedAt: { type: Date, default: Date.now },
+      
+        lastReadAt: { type: Date, default: Date.now },
       },
     ],
-    isGroup: { 
-        type: Boolean,
-         default: false },
-
-    
-    name: { type: String,
-         trim: true,
-        default: "" 
+    isGroup: {
+      type: Boolean,
+      default: false,
     },
-     leader: { 
+
+    name: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    leader: {
       type: mongoose.Schema.Types.ObjectId,
-       ref: "User", 
-       default: null
-       },
-    groupAdmin: { 
-        type: mongoose.Schema.Types.ObjectId, 
-        ref: "User", 
-        default: null },
+      ref: "User",
+      default: null,
+    },
+    groupAdmin: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
     admins: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
     }],
     team: {
-         type: mongoose.Schema.Types.ObjectId, 
-         ref: "Team", 
-         default: null },
-    announcementOnly: { 
-      type: Boolean,
-       default: false 
-      },
-    project: { 
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Project",
-        default: null },
-    mutedBy: [{ 
       type: mongoose.Schema.Types.ObjectId,
-       ref: "User" 
-      }
+      ref: "Team",
+      default: null,
+    },
+    announcementOnly: {
+      type: Boolean,
+      default: false,
+    },
+    project: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Project",
+      default: null,
+    },
+    mutedBy: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    }
     ],
-    inviteCode: { 
+    inviteCode: {
       type: String,
-      default: null 
-      },
+      default: null,
+    },
     inviteEnabled: {
-       type: Boolean, 
-       default: false
-      },
+      type: Boolean,
+      default: false,
+    },
 
     status: {
       type: String,
@@ -71,26 +77,28 @@ const chatSchema = new mongoose.Schema(
       },
     },
 
-    initiator: { 
-        type: mongoose.Schema.Types.ObjectId,
-         ref: "User",
-          default: null },
-  
+    initiator: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+
     awaitingReply: {
-         type: Boolean,
-          default: false
-         },
+      type: Boolean,
+      default: false,
+    },
 
     lastMessage: {
-      text: { 
-        type: String, default: "" 
-    },
-      sender: { 
+      text: {
+        type: String, default: ""
+      },
+      sender: {
         type: mongoose.Schema.Types.ObjectId,
-         ref: "User" },
+        ref: "User"
+      },
       sentAt: {
-         type: Date 
-        },
+        type: Date
+      },
     },
   },
   { timestamps: true }

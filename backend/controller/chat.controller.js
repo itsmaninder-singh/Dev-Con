@@ -8,20 +8,35 @@ import { sendNotification } from "../utils/notify.js";
 import { decryptText } from "../utils/crypto.js";
 import { isBlocked } from "../utils/blockGuard.js";
 
+const PARTICIPANT_FIELDS = "name username profilePicture lastSeen";
 
 const getMyChats = asyncHandler(async (req, res) => {
   const chats = await Chat.find({ participants: req.user._id })
-    .populate("participants", "name username profilePicture lastSeen")
+    .populate("participants", PARTICIPANT_FIELDS)
     .populate("lastMessage.sender", "name username")
     .sort({ updatedAt: -1 });
 
-  const decorated = chats.map((chat) => {
-    const obj = chat.toObject();
-    if (obj.lastMessage?.text) {
-      obj.lastMessage.text = decryptText(obj.lastMessage.text) || obj.lastMessage.text;
-    }
-    return obj;
-  });
+  const decorated = await Promise.all(
+    chats.map(async (chat) => {
+      const obj = chat.toObject();
+      if (obj.lastMessage?.text) {
+        obj.lastMessage.text = decryptText(obj.lastMessage.text) || obj.lastMessage.text;
+      }
+
+      const myMeta = chat.participantsMeta.find(
+        (pm) => pm.user.toString() === req.user._id.toString()
+      );
+      const lastReadAt = myMeta?.lastReadAt || chat.createdAt;
+
+      obj.unreadCount = await Message.countDocuments({
+        chat: chat._id,
+        sender: { $ne: req.user._id },
+        createdAt: { $gt: lastReadAt },
+      });
+
+      return obj;
+    })
+  );
 
   return res.status(200).json(new ApiResponse(200, "Chats fetched", decorated));
 });
@@ -54,6 +69,8 @@ const getOrCreateDirectChat = asyncHandler(async (req, res) => {
       isGroup: false,
     });
   }
+
+  chat = await chat.populate("participants", PARTICIPANT_FIELDS);
 
   return res.status(200).json(new ApiResponse(200, "Chat ready", chat));
 });
@@ -97,7 +114,7 @@ const createGroupChat = asyncHandler(async (req, res) => {
     throw new ApiError(400, "A group needs at least 2 participants");
   }
 
-  const chat = await Chat.create({
+  let chat = await Chat.create({
     name: name.trim(),
     isGroup: true,
     participants: uniqueParticipants,
@@ -108,7 +125,27 @@ const createGroupChat = asyncHandler(async (req, res) => {
     project,
   });
 
+  chat = await chat.populate("participants", PARTICIPANT_FIELDS);
+
   return res.status(201).json(new ApiResponse(201, "Group chat created", chat));
+});
+
+
+const markChatAsRead = asyncHandler(async (req, res) => {
+  const { chatId } = req.params;
+
+  const chat = await Chat.findById(chatId);
+  if (!chat) throw new ApiError(404, "Chat not found");
+
+  const isParticipant = chat.participants.some((p) => p.toString() === req.user._id.toString());
+  if (!isParticipant) throw new ApiError(403, "Not a participant of this chat");
+
+  await Chat.updateOne(
+    { _id: chatId, "participantsMeta.user": req.user._id },
+    { $set: { "participantsMeta.$.lastReadAt": new Date() } }
+  );
+
+  return res.status(200).json(new ApiResponse(200, "Marked as read", { chatId }));
 });
 
 const notifyForNewMessage = async (chat, message, sender, mentionedUserIds = []) => {
@@ -137,5 +174,6 @@ export {
   getOrCreateDirectChat,
   getMessages,
   createGroupChat,
+  markChatAsRead,
   notifyForNewMessage,
 };
