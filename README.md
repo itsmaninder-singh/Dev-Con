@@ -35,6 +35,8 @@ Connect • Collaborate • Build • Network • Ship 🚀
 Coming Soon
 
 ### 📷 Screenshots
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/60a2e3ab-6ffd-4557-9d15-be9f2becb238" />
+
 
 Coming Soon
 
@@ -77,6 +79,19 @@ It combines social networking, project collaboration, messaging, and AI into one
 - Suggested Developers
 - AI Recommendations
 - Mutual Connections
+
+---
+## 💻 Live Collaborative Coding
+
+Collaborate with your team in real time inside DevConnect.
+
+### Features
+
+- ⚡ Real-time collaborative code editor
+- 👥 Multiple users can code simultaneously
+- 🔄 Instant code synchronization
+- 👀 Live cursor visibility
+- 🔗 Join rooms with a shareable invite link
 
 ---
 

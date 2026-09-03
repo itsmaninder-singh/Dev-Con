@@ -9,6 +9,7 @@ import { isBlocked } from "../utils/blockGuard.js";
 import { notifyForNewMessage } from "../controller/chat.controller.js";
 import { encryptText } from "../utils/crypto.js";
 import redisClient from "../config/redis.js";
+import { initCollabNamespace } from "./socket/collab.namespace.js";
 
 const MAX_MESSAGES = 10;
 const WINDOW_SECONDS = 10;
