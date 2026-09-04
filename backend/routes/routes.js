@@ -3,6 +3,7 @@ import { protect } from "../middleware/auth.middleware.js";
 import { requirePlatformAdmin } from "../middleware/isPlatformAdmin.middleware.js";
 import { upload } from "../middleware/upload.middleware.js";
 import { authLimiter, sensitiveActionLimiter } from "../middleware/rateLimiter.middleware.js";
+import { projectFileRouter } from "./projectFile.routes.js";
 
 import {
   register,
@@ -141,3 +142,4 @@ router.get("/chats/direct/:userId", protect, getOrCreateDirectChat);
 router.get("/chats/:chatId/messages", protect, getMessages);
 router.post("/chats/group", protect, createGroupChat);
 router.patch("/chats/:chatId/read", protect, markChatAsRead);
+router.use("/projects", projectFileRouter);
