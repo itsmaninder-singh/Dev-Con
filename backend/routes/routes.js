@@ -3,6 +3,8 @@ import { protect } from "../middleware/auth.middleware.js";
 import { requirePlatformAdmin } from "../middleware/isPlatformAdmin.middleware.js";
 import { upload } from "../middleware/upload.middleware.js";
 import { authLimiter, sensitiveActionLimiter } from "../middleware/rateLimiter.middleware.js";
+import { projectFileRouter } from "./projectFile.routes.js";
+import { searchRouter } from "./search.routes.js";
 
 import {
   register,
@@ -77,6 +79,7 @@ import {
   getOrCreateDirectChat,
   getMessages,
   createGroupChat,
+  markChatAsRead,
 } from "../controller/chat.controller.js";
 
 export const router = express.Router();
@@ -120,6 +123,8 @@ router.get("/matchup/users", protect, getRecommendedUsers);
 router.get("/matchup/teams", protect, getRecommendedTeams);
 router.get("/matchup/projects", protect, getRecommendedProjects);
 
+router.use("/search", searchRouter);
+
 router.get("/notifications", protect, getNotifications);
 router.get("/notifications/unread-count", protect, getUnreadCount);
 router.patch("/notifications/:id/read", protect, markAsRead);
@@ -141,3 +146,4 @@ router.get("/chats/direct/:userId", protect, getOrCreateDirectChat);
 router.get("/chats/:chatId/messages", protect, getMessages);
 router.post("/chats/group", protect, createGroupChat);
 router.patch("/chats/:chatId/read", protect, markChatAsRead);
+router.use("/projects", projectFileRouter);

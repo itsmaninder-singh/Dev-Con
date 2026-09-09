@@ -21,8 +21,8 @@ const searchUsers = asyncHandler(async (req, res) => {
 
   const filter = {};
 
-  if (q && q.length > 100) {
-    const safe = escapeRegex(q.trim());
+  if (q && q.trim()) {
+    const safe = escapeRegex(q.trim().slice(0, 100));
     filter.$or = [
       { name: { $regex: safe, $options: "i" } },
       { username: { $regex: safe, $options: "i" } },
