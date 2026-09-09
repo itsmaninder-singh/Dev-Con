@@ -4,10 +4,7 @@ import { requirePlatformAdmin } from "../middleware/isPlatformAdmin.middleware.j
 import { upload } from "../middleware/upload.middleware.js";
 import { authLimiter, sensitiveActionLimiter } from "../middleware/rateLimiter.middleware.js";
 import { projectFileRouter } from "./projectFile.routes.js";
-<<<<<<< HEAD
 import { searchRouter } from "./search.routes.js";
-=======
->>>>>>> 32b2c0807e68b745228401b05698420578468ec4
 
 import {
   register,
