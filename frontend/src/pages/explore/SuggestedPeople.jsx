@@ -1,13 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { UserPlus, Code2, ChevronRight, Check, Flag, ShieldBan } from 'lucide-react';
 import useUISound from '../../hooks/useUISound.js';
 import { useProfile } from '../../context/ProfileContext.jsx';
+import { matchupApi } from '../../lib/api.js';
 import ReportUserModal from '../../components/ReportUserModal.jsx';
 
 const PEOPLE_DATA = [
   {
     id: 'u1',
     name: 'Yusuf Sheikh',
+    username: 'yusufsheikh',
     initials: 'YS',
     role: 'Full-Stack Developer',
     reason: 'Works with your stack',
@@ -18,6 +21,7 @@ const PEOPLE_DATA = [
   {
     id: 'u2',
     name: 'Meera Pillai',
+    username: 'meerapillai',
     initials: 'MP',
     role: 'UI Designer & Frontend',
     reason: 'Design & Creative Lead',
@@ -28,6 +32,7 @@ const PEOPLE_DATA = [
   {
     id: 'u3',
     name: 'Kabir Mehta',
+    username: 'kabirmehta',
     initials: 'KM',
     role: 'Fintech Specialist',
     reason: 'Backend-leaning generalist',
@@ -38,6 +43,7 @@ const PEOPLE_DATA = [
   {
     id: 'u4',
     name: 'Rohan Iyer',
+    username: 'rohaniyer',
     initials: 'RI',
     role: 'Mobile & Cloud Hacker',
     reason: 'Active hackathon builder',
@@ -48,6 +54,7 @@ const PEOPLE_DATA = [
   {
     id: 'u5',
     name: 'Simran Kaur',
+    username: 'simrankaur',
     initials: 'SK',
     role: 'Systems Engineer',
     reason: 'Matches your performance criteria',
@@ -58,6 +65,7 @@ const PEOPLE_DATA = [
   {
     id: 'u6',
     name: 'Dev Malhotra',
+    username: 'devmalhotra',
     initials: 'DM',
     role: 'Product Designer',
     reason: 'Visual thinker & fast prototyper',
@@ -68,13 +76,42 @@ const PEOPLE_DATA = [
 ];
 
 export default function SuggestedPeople() {
+  const navigate = useNavigate();
   const [followed, setFollowed] = useState(() => new Set());
   const [expandedId, setExpandedId] = useState(null);
   const [reportingUser, setReportingUser] = useState(null);
+  const [dynamicPeople, setDynamicPeople] = useState(null);
   const { playClick } = useUISound();
   const { isUserBlocked, blockUser } = useProfile();
 
-  const visiblePeople = PEOPLE_DATA.filter((p) => !isUserBlocked(p.id) && !isUserBlocked(p.name));
+  useEffect(() => {
+    matchupApi
+      .getRecommendedUsers()
+      .then((data) => {
+        const list = Array.isArray(data) ? data : data?.users || [];
+        if (list.length > 0) {
+          const mapped = list.map((m, idx) => {
+            const u = m.user || m;
+            return {
+              id: u._id || `rec_${idx}`,
+              name: u.name || 'Developer',
+              username: u.username || u.name?.toLowerCase().replace(/\s+/g, '') || `user_${idx}`,
+              initials: (u.name || 'DV').split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase(),
+              role: u.role || (u.skills?.[0] ? `${u.skills[0]} Developer` : 'Builder'),
+              reason: m.matchPercentage ? `${m.matchPercentage}% match on skills` : 'Matches your stack',
+              matchScore: m.matchPercentage || Math.round(m.score || 85),
+              skills: u.skills || ['React', 'TypeScript'],
+              highlight: u.bio || 'Active builder on DevConnect',
+            };
+          });
+          setDynamicPeople(mapped);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const peopleSource = dynamicPeople || PEOPLE_DATA;
+  const visiblePeople = peopleSource.filter((p) => !isUserBlocked(p.id) && !isUserBlocked(p.name));
 
   const toggleFollow = (id, e) => {
     e.stopPropagation();
@@ -113,6 +150,12 @@ export default function SuggestedPeople() {
               className={`suggested-item-card ${isExpanded ? 'expanded' : ''}`}
               style={{ animationDelay: `${idx * 40}ms` }}
               onClick={() => handleCardClick(item.id)}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                const target = item.username || (item.name ? item.name.toLowerCase().replace(/\s+/g, '') : item.id);
+                navigate(`/profile/${target}`);
+              }}
+              title="Double-click to view profile"
               onMouseMove={(e) => {
                 const rect = e.currentTarget.getBoundingClientRect();
                 const x = e.clientX - rect.left;

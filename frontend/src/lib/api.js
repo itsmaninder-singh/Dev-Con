@@ -573,3 +573,31 @@ export const joinRequestApi = {
     }
   },
 };
+
+export const matchupApi = {
+  getRecommendedUsers: async () => {
+    try {
+      const { data } = await api.get("/matchup/users");
+      return data.data;
+    } catch (err) {
+      throw new Error(extractMessage(err));
+    }
+  },
+  getRecommendedTeams: async () => {
+    try {
+      const { data } = await api.get("/matchup/teams");
+      return data.data;
+    } catch (err) {
+      throw new Error(extractMessage(err));
+    }
+  },
+  getRecommendedProjects: async () => {
+    try {
+      const { data } = await api.get("/matchup/projects");
+      return data.data;
+    } catch (err) {
+      throw new Error(extractMessage(err));
+    }
+  },
+};
+

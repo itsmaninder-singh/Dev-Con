@@ -4,6 +4,7 @@ import gsap from 'gsap';
 import { useProfile } from '../context/ProfileContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useTeams } from '../context/TeamsContext.jsx';
+import { useChatUI } from '../context/ChatUIContext.jsx';
 import { userApi } from '../lib/api.js';
 import { ProfileHeader } from './profile/components/ProfileHeader';
 import { ProfilePanels } from './profile/components/ProfilePanels';
@@ -23,6 +24,7 @@ export default function ProfilePage() {
   const { profile, blockUser, unblockUser, isUserBlocked } = useProfile();
   const { user } = useAuth() || {};
   const { teams: userTeams } = useTeams() || {};
+  const { openDirectChatWith } = useChatUI();
   const navigate = useNavigate();
   const { username } = useParams();
 
@@ -90,16 +92,8 @@ export default function ProfilePage() {
   const targetUserId = activeUser?._id || activeUser?.id;
 
   const handleMessage = () => {
-    // Direct message to target person - automatically pop open DM thread
-    window.dispatchEvent(
-      new CustomEvent('devconnect:open-chat', {
-        detail: {
-          userId: targetUserId,
-          name: name,
-          initial: initials,
-        },
-      })
-    );
+    // Jump straight into DM with this person via ChatUIContext
+    openDirectChatWith(targetUserId, { name, initial: initials });
   };
 
   const [activeTab, setActiveTab] = useState('teams');

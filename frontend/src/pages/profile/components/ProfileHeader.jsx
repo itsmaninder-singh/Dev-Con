@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MoreHorizontal, Flag, ShieldBan, ShieldCheck } from 'lucide-react';
+import { useChatUI } from '../../../context/ChatUIContext.jsx';
 
 export function ProfileHeader({
   coverRef,
@@ -24,6 +25,7 @@ export function ProfileHeader({
   isOwnProfile = false,
   onMessage,
 }) {
+  const { openDirectChatWith } = useChatUI();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
@@ -94,15 +96,14 @@ export function ProfileHeader({
             <button
               className="btn btn-ghost"
               id="messageBtn"
-              onClick={() => {
+              data-chat-trigger="true"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 if (onMessage) {
                   onMessage();
                 } else {
-                  window.dispatchEvent(
-                    new CustomEvent('devconnect:open-chat', {
-                      detail: { userId: targetUserId, name, initial: initials },
-                    })
-                  );
+                  openDirectChatWith(targetUserId, { name, initial: initials });
                 }
               }}
             >

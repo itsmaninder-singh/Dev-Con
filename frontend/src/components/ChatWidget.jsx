@@ -1,17 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { chatApi } from "../lib/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
-
-/* ============================================================
-   MOCK DATA
-   ============================================================ */
-const AVATAR_COLORS = [
-  'linear-gradient(145deg, #ff98a2, #e17a92)',
-  'linear-gradient(145deg, #f0a3ac, #c97f8c)',
-  'linear-gradient(145deg, #ffb59a, #d98a6f)',
-  'linear-gradient(145deg, #b39ad6, #7d6f9c)',
-  'linear-gradient(145deg, #9fc4c0, #5f8f89)',
-];
+import { useChatUI, AVATAR_COLORS } from "../context/ChatUIContext.jsx";
 
 const INITIAL_CONVERSATIONS = [
   {
@@ -109,17 +99,26 @@ const GlobalStyle = () => (
     }
 
     .cw-root .panel{
-      position:fixed; right:32px; bottom:32px; z-index:30;
+      position:fixed; right:32px; bottom:32px; z-index:9999;
       width:376px; max-width:calc(100vw - 40px); height:580px; max-height:calc(100vh - 64px);
-      border-radius:24px; background:rgba(14,14,16,0.82); border:1px solid var(--glass-border);
+      border-radius:24px; background:rgba(14,14,16,0.88); border:1px solid var(--glass-border);
       backdrop-filter:blur(28px) saturate(160%); -webkit-backdrop-filter:blur(28px) saturate(160%);
-      box-shadow:var(--shadow-deep), inset 0 1px 0 rgba(255,255,255,.06); overflow:hidden;
+      box-shadow:var(--shadow-deep), 0 0 40px rgba(255,152,162,0.18), inset 0 1px 0 rgba(255,255,255,.08); overflow:hidden;
       transform-origin:bottom right; transform:scale(0.2) translateY(40px); opacity:0; pointer-events:none;
-      transition:transform .45s cubic-bezier(.16,1,.3,1), opacity .3s ease,
-        width .4s cubic-bezier(.16,1,.3,1), height .4s cubic-bezier(.16,1,.3,1),
-        right .4s cubic-bezier(.16,1,.3,1), bottom .4s cubic-bezier(.16,1,.3,1), border-radius .4s ease;
+      transition:transform .4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity .25s ease,
+        width .35s ease, height .35s ease, right .35s ease, bottom .35s ease;
     }
-    .cw-root .panel.open{ transform:scale(1) translateY(0); opacity:1; pointer-events:all; }
+    .cw-root .panel.open{
+      transform:scale(1) translateY(0);
+      opacity:1;
+      pointer-events:all;
+      animation:panelPop 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+    @keyframes panelPop{
+      0%{ transform:scale(0.3) translateY(40px); opacity:0; }
+      75%{ transform:scale(1.03) translateY(-4px); opacity:1; }
+      100%{ transform:scale(1) translateY(0); opacity:1; }
+    }
     .cw-root .panel.fullscreen{
       width:calc(100vw - 40px); height:calc(100vh - 40px);
       max-width:calc(100vw - 40px); max-height:calc(100vh - 40px);
@@ -281,165 +280,24 @@ export function openDirectMessage({ userId, name, initial }) {
 
 export default function ChatWidget() {
   const { user } = useAuth() || {};
-  const [open, setOpen] = useState(false);
-  const [fullscreen, setFullscreen] = useState(false);
-  const [view, setView] = useState('inbox'); // 'inbox' | 'chat'
-  const [conversations, setConversations] = useState(INITIAL_CONVERSATIONS);
-  const [activeId, setActiveId] = useState(null);
+  const {
+    open,
+    setOpen,
+    fullscreen,
+    setFullscreen,
+    view,
+    setView,
+    conversations,
+    setConversations,
+    activeId,
+    setActiveId,
+  } = useChatUI();
+
   const [inputValue, setInputValue] = useState('');
   const [typing, setTyping] = useState(false);
   const messagesRef = useRef(null);
   const panelRef = useRef(null);
   const textareaRef = useRef(null);
-  const conversationsRef = useRef(conversations);
-
-  useEffect(() => {
-    conversationsRef.current = conversations;
-  }, [conversations]);
-
-  // Listen for direct message open events from anywhere (profiles, teams, explore, etc.)
-  useEffect(() => {
-    const handleOpenChat = async (e) => {
-      const { userId, name, initial, openOnly } = e.detail || {};
-
-      setOpen(true);
-      if (openOnly) return;
-      if (!userId && !name) return;
-
-      // 1. Check if we already have this conversation loaded in state
-      const currentList = conversationsRef.current || [];
-      const existingConv = currentList.find((c) => {
-        if (userId && (c.id === userId || c._id === userId)) return true;
-        if (name && c.name?.toLowerCase() === name.toLowerCase()) return true;
-        return false;
-      });
-
-      if (existingConv) {
-        openChat(existingConv.id);
-        return;
-      }
-
-      // 2. If authenticated & userId looks like a MongoDB ObjectId, fetch or create on server
-      if (user?._id && userId && typeof userId === 'string' && userId.length === 24 && userId !== user._id) {
-        try {
-          const res = await chatApi.getOrCreateDirectChat(userId);
-          const chat = res?.chat || res;
-          if (chat && chat._id) {
-            const other = chat.participants?.find((p) => (p._id || p) !== user._id) || { name, _id: userId };
-            const chatName = other.name || name || 'Direct Message';
-            const chatInitial = other.name ? other.name[0].toUpperCase() : (initial || (name ? name[0].toUpperCase() : 'D'));
-
-            let msgsFormatted = [];
-            try {
-              const msgsRes = await chatApi.getMessages(chat._id);
-              const list = Array.isArray(msgsRes) ? msgsRes : msgsRes?.messages || [];
-              msgsFormatted = list.map((m) => ({
-                from: m.sender?._id === user._id || m.sender === user._id ? 'me' : 'them',
-                text: m.content || '',
-                time: m.createdAt
-                  ? new Date(m.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
-                  : 'Now',
-              }));
-            } catch (_) {}
-
-            const serverConv = {
-              id: chat._id,
-              _id: chat._id,
-              isServerChat: true,
-              name: chatName,
-              initial: chatInitial,
-              online: true,
-              colorIdx: Math.floor(Math.random() * AVATAR_COLORS.length),
-              unread: 0,
-              messages: msgsFormatted.length > 0 ? msgsFormatted : [
-                { from: 'them', text: `Hi! Let's connect on DevConnect 👋`, time: timeNow() },
-              ],
-            };
-
-            setConversations((prev) => {
-              if (prev.some((c) => c.id === chat._id)) {
-                return prev.map((c) => (c.id === chat._id ? { ...c, ...serverConv } : c));
-              }
-              return [serverConv, ...prev];
-            });
-            setActiveId(chat._id);
-            setView('chat');
-            setTimeout(() => textareaRef.current?.focus(), 250);
-            return;
-          }
-        } catch (err) {
-          console.warn('Could not initialize direct chat on server, using local thread:', err);
-        }
-      }
-
-      // 3. Fallback: Create instant local conversation
-      const localId = userId || `dm_${Date.now()}`;
-      const localConv = {
-        id: localId,
-        name: name || 'Direct Message',
-        initial: initial || (name ? name[0].toUpperCase() : 'D'),
-        online: true,
-        colorIdx: Math.floor(Math.random() * AVATAR_COLORS.length),
-        unread: 0,
-        messages: [
-          { from: 'them', text: `Hey! Thanks for reaching out 👋`, time: timeNow() },
-        ],
-      };
-
-      setConversations((prev) => [localConv, ...prev]);
-      setActiveId(localId);
-      setView('chat');
-      setTimeout(() => textareaRef.current?.focus(), 250);
-    };
-
-    window.addEventListener('devconnect:open-chat', handleOpenChat);
-    return () => window.removeEventListener('devconnect:open-chat', handleOpenChat);
-  }, [user?._id]);
-
-  // Sync chats from backend
-  useEffect(() => {
-    if (user?._id) {
-      chatApi
-        .getMyChats()
-        .then((res) => {
-          const serverChats = Array.isArray(res) ? res : res?.chats || [];
-          if (serverChats.length > 0) {
-            const mapped = serverChats.map((c, idx) => {
-              const other = c.participants?.find((p) => p._id !== user._id) || c.participants?.[0] || {};
-              const name = c.isGroup ? c.name : other.name || 'Chat Member';
-              const initial = name ? name[0].toUpperCase() : '?';
-              const lastMsg = c.lastMessage?.text || 'No messages yet';
-              const lastTime = c.lastMessage?.timestamp
-                ? new Date(c.lastMessage.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
-                : 'Recent';
-              return {
-                id: c._id,
-                _id: c._id,
-                isServerChat: true,
-                name,
-                initial,
-                online: !!other.lastSeen && Date.now() - new Date(other.lastSeen).getTime() < 300000,
-                colorIdx: idx % AVATAR_COLORS.length,
-                unread: c.unreadCount || 0,
-                messages: [
-                  { from: 'them', text: lastMsg, time: lastTime },
-                ],
-              };
-            });
-            setConversations((prev) => {
-              const combined = [...mapped];
-              prev.forEach((p) => {
-                if (!combined.some((item) => item.id === p.id)) combined.push(p);
-              });
-              return combined;
-            });
-          }
-        })
-        .catch(() => {
-          // Keep mock conversations intact
-        });
-    }
-  }, [user?._id]);
 
   const totalUnread = conversations.reduce((sum, c) => sum + (c.unread || 0), 0);
   const active = conversations.find((c) => c.id === activeId) || null;
@@ -449,14 +307,27 @@ export default function ChatWidget() {
   }, [active, typing, view]);
 
   useEffect(() => {
+    if (view === 'chat' && open) {
+      setTimeout(() => textareaRef.current?.focus(), 150);
+    }
+  }, [view, open, activeId]);
+
+  useEffect(() => {
     function onDocClick(e) {
+      if (
+        e.target.closest('#messageBtn') ||
+        e.target.closest('.launcher') ||
+        e.target.closest('[data-chat-trigger]')
+      ) {
+        return;
+      }
       if (open && panelRef.current && !panelRef.current.contains(e.target)) setOpen(false);
     }
     function onKey(e) { if (e.key === 'Escape' && open) setOpen(false); }
     document.addEventListener('click', onDocClick);
     document.addEventListener('keydown', onKey);
     return () => { document.removeEventListener('click', onDocClick); document.removeEventListener('keydown', onKey); };
-  }, [open]);
+  }, [open, setOpen]);
 
   function openChat(id) {
     setConversations((list) => list.map((c) => (c.id === id ? { ...c, unread: 0 } : c)));
@@ -537,6 +408,9 @@ export default function ChatWidget() {
                 <div className="sub">{totalUnread > 0 ? `${totalUnread} new messages` : 'All caught up ✓'}</div>
               </div>
               <FullscreenButton fullscreen={fullscreen} onClick={() => setFullscreen((f) => !f)} />
+              <button className="close-btn" aria-label="Close" onClick={() => setOpen(false)}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+              </button>
             </div>
             <div className="search-box">
               <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke="currentColor"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>

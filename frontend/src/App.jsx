@@ -3,6 +3,7 @@ import { Route, Routes, Navigate } from "react-router-dom";
 
 import { ProfileProvider } from "./context/ProfileContext.jsx";
 import { TeamsProvider } from "./context/TeamsContext.jsx";
+import { ChatUIProvider } from "./context/ChatUIContext.jsx";
 import Layout from "./components/Layout.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
@@ -55,9 +56,10 @@ export default function App() {
   return (
     <ProfileProvider>
       <TeamsProvider>
-        <Suspense fallback={<RouteFallback />}>
-          <Routes>
-            <Route element={<Layout />}>
+        <ChatUIProvider>
+          <Suspense fallback={<RouteFallback />}>
+            <Routes>
+              <Route element={<Layout />}>
               {/* Public Routes */}
               <Route path="/" element={<Landing />} />
               <Route path="/hackathons" element={<Hackathons />} />
@@ -161,6 +163,7 @@ export default function App() {
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
+        </ChatUIProvider>
       </TeamsProvider>
     </ProfileProvider>
   );
