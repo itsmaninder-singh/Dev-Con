@@ -46,19 +46,6 @@ export default function Login() {
     }
   };
 
-  const handleQuickDemo = async () => {
-    setForm({ identifier: "demo@devconnect.io", password: "password123", remember: true });
-    setLoading(true);
-    try {
-      await login({ identifier: "demo@devconnect.io", password: "password123" });
-      navigate(redirectTo, { replace: true });
-    } catch (err) {
-      setError(err.message || "Login failed");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <AuthLayout activeTab="login">
       <div style={styles.header}>
@@ -156,39 +143,6 @@ export default function Login() {
         </div>
       </form>
 
-      {/* Demo Credentials Box */}
-      <div
-        style={{
-          marginTop: "20px",
-          padding: "14px 18px",
-          borderRadius: "14px",
-          background: "rgba(255, 152, 162, 0.04)",
-          border: "1px dashed rgba(255, 152, 162, 0.3)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: "10px",
-        }}
-      >
-        <div>
-          <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--accent, #ff98a2)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "3px" }}>
-            ⚡ Demo Account
-          </div>
-          <div style={{ fontSize: "12px", color: "var(--muted, #c7c8ca)", fontFamily: "monospace" }}>
-            User: <b>demo@devconnect.io</b> · Pass: <b>password123</b>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={handleQuickDemo}
-          disabled={loading}
-          className="chip-btn"
-          style={{ padding: "6px 14px", fontSize: "11.5px" }}
-        >
-          Auto-fill &amp; Sign in
-        </button>
-      </div>
 
       <OAuthButtons onError={setError} onSuccess={() => navigate(redirectTo, { replace: true })} />
 

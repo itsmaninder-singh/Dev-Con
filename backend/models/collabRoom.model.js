@@ -36,7 +36,6 @@ const collabRoomSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-collabRoomSchema.index({ project: 1 });
 collabRoomSchema.index({ status: 1 });
 
 export const CollabRoom = mongoose.model("CollabRoom", collabRoomSchema);

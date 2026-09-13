@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { Chat } from "../models/chat.model.js";
 import { Message } from "../models/message.model.js";
 import { User } from "../models/user.model.js";
@@ -106,23 +107,88 @@ const getMessages = asyncHandler(async (req, res) => {
 const createGroupChat = asyncHandler(async (req, res) => {
   const { name, participantIds = [], team = null, project = null } = req.body;
 
+  // 1. Check if a group chat already exists for this team
+  if (team) {
+    const isTeamObjectId = mongoose.isValidObjectId(team);
+    const query = isTeamObjectId ? { isGroup: true, team } : { isGroup: true, name: name?.trim() };
+    let existingChat = await Chat.findOne(query);
+
+    if (existingChat) {
+      // Sync any missing participants into the existing group chat
+      const currentParticipantIds = new Set(existingChat.participants.map((p) => p.toString()));
+      const incomingParticipants = [...new Set([...participantIds, req.user._id.toString()])]
+        .filter(Boolean)
+        .filter((id) => mongoose.isValidObjectId(id));
+      const newParticipants = incomingParticipants.filter((id) => !currentParticipantIds.has(id.toString()));
+
+      if (newParticipants.length > 0) {
+        existingChat.participants.push(...newParticipants);
+        existingChat.participantsMeta.push(
+          ...newParticipants.map((id) => ({ user: id, joinedAt: new Date(), lastReadAt: new Date() }))
+        );
+        await existingChat.save();
+      }
+
+      existingChat = await existingChat.populate("participants", PARTICIPANT_FIELDS);
+      return res.status(200).json(new ApiResponse(200, "Group chat ready", existingChat));
+    }
+  }
+
+  // 2. Check if a group chat already exists for this project (if project specified without team)
+  if (project && !team) {
+    const isProjectObjectId = mongoose.isValidObjectId(project);
+    const query = isProjectObjectId ? { isGroup: true, project } : { isGroup: true, name: name?.trim() };
+    let existingChat = await Chat.findOne(query);
+
+    if (existingChat) {
+      const currentParticipantIds = new Set(existingChat.participants.map((p) => p.toString()));
+      const incomingParticipants = [...new Set([...participantIds, req.user._id.toString()])]
+        .filter(Boolean)
+        .filter((id) => mongoose.isValidObjectId(id));
+      const newParticipants = incomingParticipants.filter((id) => !currentParticipantIds.has(id.toString()));
+
+      if (newParticipants.length > 0) {
+        existingChat.participants.push(...newParticipants);
+        existingChat.participantsMeta.push(
+          ...newParticipants.map((id) => ({ user: id, joinedAt: new Date(), lastReadAt: new Date() }))
+        );
+        await existingChat.save();
+      }
+
+      existingChat = await existingChat.populate("participants", PARTICIPANT_FIELDS);
+      return res.status(200).json(new ApiResponse(200, "Group chat ready", existingChat));
+    }
+  }
+
   if (!name || !name.trim()) {
     throw new ApiError(400, "Group name is required");
   }
-  const uniqueParticipants = [...new Set([...participantIds, req.user._id.toString()])];
-  if (uniqueParticipants.length < 2) {
+
+  const uniqueParticipants = [...new Set([...participantIds, req.user._id.toString()])]
+    .filter(Boolean)
+    .filter((id) => mongoose.isValidObjectId(id));
+
+  // If it's a standalone group without team/project, require at least 2 participants
+  if (!team && !project && uniqueParticipants.length < 2) {
     throw new ApiError(400, "A group needs at least 2 participants");
   }
+
+  const isTeamObjectId = team && mongoose.isValidObjectId(team);
+  const isProjectObjectId = project && mongoose.isValidObjectId(project);
 
   let chat = await Chat.create({
     name: name.trim(),
     isGroup: true,
-    participants: uniqueParticipants,
-    participantsMeta: uniqueParticipants.map((id) => ({ user: id, joinedAt: new Date() })),
+    participants: uniqueParticipants.length > 0 ? uniqueParticipants : [req.user._id],
+    participantsMeta: (uniqueParticipants.length > 0 ? uniqueParticipants : [req.user._id]).map((id) => ({
+      user: id,
+      joinedAt: new Date(),
+      lastReadAt: new Date(),
+    })),
     leader: req.user._id,
     admins: [req.user._id],
-    team,
-    project,
+    team: isTeamObjectId ? team : null,
+    project: isProjectObjectId ? project : null,
   });
 
   chat = await chat.populate("participants", PARTICIPANT_FIELDS);

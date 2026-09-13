@@ -8,7 +8,7 @@ import connectDB from "./db/index.js";
 import initSocket from "./socket/index.js";
 import { initCollabNamespace } from "./socket/collab.namespace.js";
 import { setIO } from "./utils/SocketManager.js";
-import { connectRedis } from "./config/redis.js";
+import { connectRedis, isRedisAvailable } from "./config/redis.js";
 import redisClient from "./config/redis.js";
 import { startGithubSyncCron } from "./cron-job/syncGithub.cron.js";
 
@@ -20,10 +20,18 @@ const startServer = async () => {
   await connectDB();
   await connectRedis();
 
-  const pubClient = redisClient.duplicate();
-  const subClient = redisClient.duplicate();
-  await pubClient.connect();
-  await subClient.connect();
+  let socketAdapter;
+  if (isRedisAvailable()) {
+    try {
+      const pubClient = redisClient.duplicate();
+      const subClient = redisClient.duplicate();
+      await pubClient.connect();
+      await subClient.connect();
+      socketAdapter = createAdapter(pubClient, subClient);
+    } catch (err) {
+      console.warn("[redis] Redis socket adapter initialization failed, using default adapter:", err.message);
+    }
+  }
 
   const clientOrigins = [
     ...new Set([
@@ -44,7 +52,7 @@ const startServer = async () => {
       origin: clientOrigins,
       credentials: true,
     },
-    adapter: createAdapter(pubClient, subClient),
+    ...(socketAdapter ? { adapter: socketAdapter } : {}),
   });
   initSocket(io);
   initCollabNamespace(io);

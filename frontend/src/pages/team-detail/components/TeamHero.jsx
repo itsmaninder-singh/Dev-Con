@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Crown, MessageCircle, Link as LinkIcon, Check, Volume2, VolumeX } from 'lucide-react';
 import SpotCard from '../../profile/SpotCard.jsx';
+import { useChatUI } from '../../../context/ChatUIContext.jsx';
 
 export function TeamHero({
   team,
@@ -11,6 +12,39 @@ export function TeamHero({
   onShowToast,
 }) {
   const [copiedInvite, setCopiedInvite] = useState(false);
+  const [openingChat, setOpeningChat] = useState(false);
+  const { openGroupChat } = useChatUI();
+
+  async function handleOpenTeamChat() {
+    try {
+      setOpeningChat(true);
+      const teamId = team._id || team.id;
+      const memberUserIds = (members || [])
+        .map((m) => m?.user?._id || m?.user || m?._id || m?.id)
+        .filter(Boolean)
+        .map((id) => id.toString());
+
+      if (team.creator) {
+        const creatorId = (team.creator._id || team.creator).toString();
+        if (!memberUserIds.includes(creatorId)) {
+          memberUserIds.push(creatorId);
+        }
+      }
+
+      await openGroupChat({
+        teamId,
+        name: team.name || 'Team Chat',
+        participantIds: memberUserIds,
+      });
+    } catch (err) {
+      console.error('Error opening team chat:', err);
+      if (onShowToast) {
+        onShowToast('Could not open team chat');
+      }
+    } finally {
+      setOpeningChat(false);
+    }
+  }
 
   function handleCopyInviteLink() {
     const inviteUrl = `${window.location.origin}/teams/${team._id || team.id}?join=true`;
@@ -121,9 +155,11 @@ export function TeamHero({
             <button
               type="button"
               className="apple-btn apple-btn-secondary"
-              onClick={() => alert(`Opening workspace chat for ${team.name}`)}
+              onClick={handleOpenTeamChat}
+              disabled={openingChat}
+              title="Open team group chat"
             >
-              <MessageCircle size={14} /> Team Chat
+              <MessageCircle size={14} /> {openingChat ? 'Opening Chat...' : 'Team Chat'}
             </button>
           </div>
         </div>

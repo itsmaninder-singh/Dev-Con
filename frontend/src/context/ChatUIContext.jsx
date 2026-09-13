@@ -216,12 +216,122 @@ export function ChatUIProvider({ children }) {
     [user?._id]
   );
 
+  /**
+   * openGroupChat:
+   * 1. Calls POST /chats/group with { name, participantIds, team, project } to get or create the group chat.
+   * 2. Immediately pops open the floating chat widget showing this thread directly.
+   */
+  const openGroupChat = useCallback(
+    async ({ teamId = null, projectId = null, name = 'Team Chat', participantIds = [] }) => {
+      // Instantly open widget into chat thread view
+      setOpen(true);
+      setView('chat');
+
+      const targetName = name || 'Team Chat';
+      const targetInitial = targetName ? targetName[0].toUpperCase() : 'T';
+
+      // Check if already in conversations by teamId, _id, or name
+      const currentList = conversationsRef.current || [];
+      const existing = currentList.find(
+        (c) =>
+          (teamId && (c.team === teamId || c.team?._id === teamId || c.id === `team_${teamId}`)) ||
+          (c.name?.toLowerCase() === targetName.toLowerCase())
+      );
+
+      if (existing) {
+        setActiveId(existing.id);
+        setConversations((prev) => prev.map((c) => (c.id === existing.id ? { ...c, unread: 0 } : c)));
+      }
+
+      try {
+        const res = await chatApi.createGroupChat({
+          name: targetName,
+          participantIds,
+          team: teamId,
+          project: projectId,
+        });
+        const chat = res?.chat || res;
+        if (chat && chat._id) {
+          // Fetch message history
+          let msgsFormatted = [];
+          try {
+            const msgsRes = await chatApi.getMessages(chat._id);
+            const list = Array.isArray(msgsRes) ? msgsRes : msgsRes?.messages || [];
+            msgsFormatted = list.map((m) => ({
+              from: m.sender?._id === user?._id || m.sender === user?._id ? 'me' : 'them',
+              text: m.content || '',
+              time: m.createdAt
+                ? new Date(m.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+                : 'Now',
+            }));
+          } catch (_) {}
+
+          const serverConv = {
+            id: chat._id,
+            _id: chat._id,
+            team: teamId,
+            isGroup: true,
+            isServerChat: true,
+            name: chat.name || targetName,
+            initial: targetInitial,
+            online: true,
+            colorIdx: Math.floor(Math.random() * AVATAR_COLORS.length),
+            unread: 0,
+            messages: msgsFormatted.length > 0 ? msgsFormatted : [
+              { from: 'them', text: `Welcome to ${chat.name || targetName}! 💬`, time: timeNow() },
+            ],
+          };
+
+          setConversations((prev) => {
+            const hasExisting = prev.some((c) => c.id === chat._id || (teamId && (c.team === teamId || c.id === `team_${teamId}`)));
+            if (hasExisting) {
+              return prev.map((c) =>
+                c.id === chat._id || (teamId && (c.team === teamId || c.id === `team_${teamId}`))
+                  ? { ...c, ...serverConv, id: chat._id }
+                  : c
+              );
+            }
+            return [serverConv, ...prev];
+          });
+          setActiveId(chat._id);
+          return chat;
+        }
+      } catch (err) {
+        console.warn('POST /chats/group failed, using fallback thread:', err);
+      }
+
+      // Fallback: Create instant local conversation if not already created
+      if (!existing) {
+        const localId = teamId ? `team_${teamId}` : `group_${Date.now()}`;
+        const localConv = {
+          id: localId,
+          team: teamId,
+          name: targetName,
+          initial: targetInitial,
+          online: true,
+          colorIdx: Math.floor(Math.random() * AVATAR_COLORS.length),
+          unread: 0,
+          messages: [
+            { from: 'them', text: `Welcome to ${targetName}! 💬`, time: timeNow() },
+          ],
+        };
+        setConversations((prev) => [localConv, ...prev]);
+        setActiveId(localId);
+      }
+    },
+    [user?._id]
+  );
+
   // Global event listener for 'devconnect:open-chat'
   useEffect(() => {
     const handleEvent = (e) => {
-      const { userId, name, initial, openOnly } = e.detail || {};
+      const { userId, name, initial, openOnly, isGroup, teamId, participantIds } = e.detail || {};
       if (openOnly) {
         setOpen(true);
+        return;
+      }
+      if (isGroup || teamId) {
+        openGroupChat({ teamId, name, participantIds });
         return;
       }
       openDirectChatWith(userId, { name, initial });
@@ -229,7 +339,7 @@ export function ChatUIProvider({ children }) {
 
     window.addEventListener('devconnect:open-chat', handleEvent);
     return () => window.removeEventListener('devconnect:open-chat', handleEvent);
-  }, [openDirectChatWith]);
+  }, [openDirectChatWith, openGroupChat]);
 
   const value = {
     open,
@@ -243,6 +353,7 @@ export function ChatUIProvider({ children }) {
     activeId,
     setActiveId,
     openDirectChatWith,
+    openGroupChat,
   };
 
   return <ChatUIContext.Provider value={value}>{children}</ChatUIContext.Provider>;
