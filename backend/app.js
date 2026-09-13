@@ -9,7 +9,7 @@ app.use(express.urlencoded({extended:true,limit:"5mb"}));
 
 
 export default app;*/
-
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -22,25 +22,29 @@ import { errorHandler } from "./middleware/errorHandler.js";
 const app = express();
 app.use(helmet());
 
-const allowedOrigins = (process.env.CLIENT_URL || "http://localhost:3000")
-  .split(",")
-  .map((o) => o.trim());
+const defaultOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "http://localhost:5174",
+  "http://127.0.0.1:5173",
+];
 
-if (!process.env.CLIENT_URL) {
-  console.warn(
-    "[cors] CLIENT_URL is not set in .env - falling back to http://localhost:3000. Set CLIENT_URL before deploying."
-  );
-}
-
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    return callback(new Error("Not allowed by CORS"));
-  },
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      const envOrigins = (process.env.CLIENT_URL || "")
+        .split(",")
+        .map((o) => o.trim())
+        .filter(Boolean);
+      const allowedOrigins = [...new Set([...envOrigins, ...defaultOrigins])];
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error(`Not allowed by CORS: ${origin}`));
+    },
+    credentials: true,
+  })
+);
 app.use(cookieParser());
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true, limit: "5mb" }));

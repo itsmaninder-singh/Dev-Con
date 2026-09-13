@@ -1,0 +1,189 @@
+.profile-app-root{
+  --bg: #0c0d10;
+  --bg-raised: #121318;
+  --surface: rgba(255, 255, 255, 0.035);
+  --surface-hover: rgba(255, 255, 255, 0.06);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.16);
+  --coral: #ff98a2;
+  --coral-soft: rgba(255, 152, 162, 0.12);
+  --coral-glow: rgba(255, 152, 162, 0.35);
+  --text: #f5f5f7;
+  --text-muted: #86868b;
+  --text-dim: #636366;
+  --success: #ff98a2;
+  --danger: #ff453a;
+  --blue: #0a84ff;
+  --font: var(--font-body, -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif);
+
+  position: relative;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  overflow-x: hidden;
+  transition: background-color var(--transition-smooth), color var(--transition-smooth);
+}
+.profile-app-root, .profile-app-root *{ box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+.profile-app-root canvas{ display: block; }
+
+.profile-app-root .grain {
+  position: fixed; inset: -50%; width: 200%; height: 200%; z-index: 90; pointer-events: none; opacity: .05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+.profile-app-root .cursor-dot,
+.profile-app-root .cursor-ring { display: none !important; }
+
+.profile-app-root .auth-bg { position: fixed; inset: 0; opacity: .35; z-index: 0; pointer-events: none; }
+
+.profile-app-root .shiny {
+  background-image: linear-gradient(110deg, var(--text) 40%, #fff 50%, var(--text) 60%);
+  background-size: 220% 100%;
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  animation: pa-shine 4s linear infinite;
+}
+@keyframes pa-shine { 0% { background-position: 120% 0; } 100% { background-position: -120% 0; } }
+
+.profile-app-root .app-main { position: relative; z-index: 1; max-width: 1020px; margin: 0 auto; padding: 130px 24px 70px; }
+.profile-app-root .wizard-grid { display: grid; grid-template-columns: 1.35fr 1fr; gap: 26px; align-items: start; }
+@media (max-width: 900px) { .profile-app-root .wizard-grid { grid-template-columns: 1fr; } }
+
+.profile-app-root .star-wrap { position: relative; border-radius: 22px; overflow: hidden; }
+.profile-app-root .star-spin {
+  position: absolute;
+  inset: -25%;
+  z-index: -1;
+  background: linear-gradient(115deg,
+    transparent 32%,
+    rgba(255, 152, 162, 0.32) 47%,
+    rgba(255, 255, 255, 0.14) 51%,
+    transparent 68%);
+  filter: blur(20px);
+  animation: pa-sweep 6s ease-in-out infinite;
+}
+@keyframes pa-sweep {
+  0%, 100% { transform: translateX(-22%); opacity: 0.45; }
+  50% { transform: translateX(22%); opacity: 0.95; }
+}
+
+.profile-app-root .spot-card { position: relative; background: var(--surface); border-radius: 21px; border: 1px solid var(--border); overflow: hidden; }
+.profile-app-root .spot-layer { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .3s ease; background: radial-gradient(340px circle at var(--mx, 50%) var(--my, 50%), rgba(255, 152, 162, .14), transparent 70%); }
+.profile-app-root .spot-card:hover .spot-layer { opacity: 1; }
+
+.profile-app-root .detail-title { font-family: var(--font); font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 6px; }
+.profile-app-root .card-sub { font-size: 14px; color: var(--text-muted); margin: 0 0 26px; font-weight: 400; }
+
+.profile-app-root .steps-bar { display: flex; align-items: center; margin-bottom: 30px; }
+.profile-app-root .step-dot { display: flex; align-items: center; gap: 8px; font-family: var(--font); font-size: 12.5px; font-weight: 600; color: var(--text-dim); cursor: pointer; user-select: none; white-space: nowrap; }
+.profile-app-root .step-dot span { width: 25px; height: 25px; border-radius: 50%; border: 1.5px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--text-dim); transition: all .25s ease; flex-shrink: 0; }
+.profile-app-root .step-dot.active { color: var(--text); }
+.profile-app-root .step-dot.active span { border-color: var(--coral); color: var(--coral); background: rgba(255, 152, 162, .1); }
+.profile-app-root .step-dot.done span { border-color: var(--coral); color: var(--coral); background: rgba(255, 152, 162, .1); }
+.profile-app-root .step-line { flex: 1; height: 1px; background: var(--border); margin: 0 8px; position: relative; top: -12px; }
+
+.profile-app-root .step-panel { display: block; animation: pa-fadeIn .35s ease; }
+@keyframes pa-fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+/* photo pickers */
+.profile-app-root .pickers { position: relative; margin: 0 0 52px; }
+.profile-app-root .cover-pick {
+  width: 100%; height: 150px; border-radius: 16px; border: 1.5px dashed var(--border); background: rgba(255, 255, 255, .02);
+  display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; position: relative; transition: all .2s ease;
+}
+.profile-app-root .cover-pick:hover, .profile-app-root .cover-pick.drag { border-color: var(--coral); background: rgba(255, 152, 162, .05); }
+.profile-app-root .cover-pick img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
+.profile-app-root .cover-hint { font-family: var(--font); font-size: 13px; font-weight: 500; color: var(--text-dim); display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.profile-app-root .cover-overlay {
+  position: absolute; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity .2s ease; font-family: var(--font); font-size: 12.5px; font-weight: 600; color: #fff;
+}
+.profile-app-root .cover-pick:hover .cover-overlay { opacity: 1; }
+.profile-app-root .avatar-pick {
+  position: absolute; bottom: -32px; left: 22px; width: 76px; height: 76px; border-radius: 50%; border: 4px solid var(--surface);
+  background: var(--bg-raised); cursor: pointer; overflow: hidden; display: flex; align-items: center; justify-content: center;
+  transition: transform .2s ease; box-shadow: 0 0 0 0 rgba(255,152,162,0);
+}
+.profile-app-root .avatar-pick:hover { transform: scale(1.06); box-shadow: 0 0 0 6px rgba(255,152,162,.12); }
+.profile-app-root .avatar-pick img { width: 100%; height: 100%; object-fit: cover; }
+.profile-app-root .avatar-pick .init { font-family: var(--font); font-size: 26px; font-weight: 700; color: var(--coral); }
+
+.profile-app-root .field { margin-bottom: 18px; position: relative; }
+.profile-app-root .field label { display: block; font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 7px; }
+.profile-app-root .field input[type="text"], .profile-app-root .field input[type="tel"], .profile-app-root .field textarea, .profile-app-root .field select {
+  width: 100%; padding: 11px 13px; border-radius: 12px; border: 1px solid var(--border);
+  background: var(--bg-raised); color: var(--text); font-family: var(--font); font-size: 14.5px; outline: none;
+  transition: border-color .2s ease;
+}
+.profile-app-root .field input:focus, .profile-app-root .field textarea:focus, .profile-app-root .field select:focus { border-color: var(--coral); }
+.profile-app-root .field textarea { resize: vertical; }
+.profile-app-root .char-count { position: absolute; right: 2px; top: 0; font-family: var(--font); font-size: 11px; font-weight: 500; color: var(--text-dim); transition: color .2s ease; }
+.profile-app-root .char-count.warn { color: var(--danger); }
+
+.profile-app-root .choice-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.profile-app-root .choice-chip { padding: 8px 15px; border-radius: 999px; border: 1px solid var(--border); background: var(--bg-raised); color: var(--text-muted); font-family: var(--font); font-size: 12.5px; font-weight: 500; cursor: pointer; transition: all .18s ease; }
+.profile-app-root .choice-chip:hover { border-color: var(--coral-soft); color: var(--text); }
+.profile-app-root .choice-chip.picked { border-color: var(--coral); background: rgba(255, 152, 162, .12); color: var(--coral); }
+
+.profile-app-root .suggest-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.profile-app-root .suggest-chip { padding: 7px 14px; border-radius: 999px; border: 1px dashed var(--border); background: none; color: var(--text-muted); font-family: var(--font); font-size: 12.5px; font-weight: 500; cursor: pointer; transition: all .18s ease; }
+.profile-app-root .suggest-chip:hover { border-color: var(--coral-soft); color: var(--text); }
+.profile-app-root .suggest-chip.picked { border: 1px solid var(--coral); background: rgba(255, 152, 162, .12); color: var(--coral); }
+
+.profile-app-root .tag-box { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; padding: 10px 11px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-raised); min-height: 46px; }
+.profile-app-root .tag-box input { flex: 1; min-width: 120px; border: none; outline: none; background: transparent; color: var(--text); font-family: var(--font); font-size: 14px; padding: 4px 2px; }
+.profile-app-root .picked-chip { display: flex; align-items: center; gap: 7px; padding: 5px 6px 5px 12px; border-radius: 999px; background: rgba(255, 152, 162, .12); color: var(--coral); font-family: var(--font); font-size: 13px; font-weight: 500; }
+.profile-app-root .picked-chip button { background: none; border: none; color: inherit; cursor: pointer; font-size: 15px; line-height: 1; padding: 0; }
+
+.profile-app-root .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--border); background: var(--bg-raised); margin-top: 4px; }
+.profile-app-root .toggle-row .label-text { font-family: var(--font); font-size: 13.5px; font-weight: 600; }
+.profile-app-root .toggle-row .sub-text { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.profile-app-root .switch { width: 44px; height: 26px; border-radius: 999px; background: var(--border); position: relative; cursor: pointer; flex-shrink: 0; transition: background .25s ease; border: none; }
+.profile-app-root .switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: translate .25s cubic-bezier(.3,.8,.3,1); }
+.profile-app-root .switch.on { background: var(--success); }
+.profile-app-root .switch.on::after { translate: 18px 0; }
+
+.profile-app-root .wizard-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 28px; }
+.profile-app-root .cancel-link { background: none; border: none; color: var(--text-muted); font-family: var(--font); font-size: 14px; font-weight: 500; cursor: pointer; }
+.profile-app-root .save-btn { padding: 12px 26px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, .15); background: linear-gradient(135deg, #525252, #525252dd); color: #f5f5f5; font-family: var(--font); font-weight: 600; font-size: 14.5px; letter-spacing: -0.01em; cursor: pointer; text-decoration: none; display: inline-block; }
+.profile-app-root .save-btn.ready { background: linear-gradient(135deg, var(--coral), #ff98a2dd); color: #1a0d0f; }
+
+.profile-app-root .preview-card-wrap { position: sticky; top: 100px; }
+.profile-app-root .preview-kicker { display: block; font-family: var(--font); font-size: 12px; font-weight: 700; color: var(--coral); letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 10px; }
+.profile-app-root .pv-cover { width: 100%; height: 90px; background: linear-gradient(135deg, rgba(255,152,162,.18), rgba(132,0,255,.18)); position: relative; }
+.profile-app-root .pv-cover img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
+.profile-app-root .pv-body { padding: 0 22px 24px; }
+.profile-app-root .pv-avatar-wrap { margin-top: -32px; }
+.profile-app-root .pv-avatar { width: 62px; height: 62px; border-radius: 50%; border: 4px solid var(--surface); background: var(--bg-raised); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.profile-app-root .pv-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.profile-app-root .pv-avatar .init { font-family: var(--font); font-size: 22px; font-weight: 700; color: var(--coral); }
+.profile-app-root .pv-name { font-family: var(--font); font-size: 19px; font-weight: 700; letter-spacing: -0.015em; margin: 14px 0 2px; transition: opacity .2s ease; }
+.profile-app-root .pv-college { font-size: 12.5px; color: var(--text-dim); margin: 0 0 10px; }
+.profile-app-root .pv-bio { font-size: 13px; line-height: 1.55; color: var(--text-muted); margin: 0 0 14px; min-height: 36px; }
+.profile-app-root .pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); font-family: var(--font); font-size: 11.5px; font-weight: 600; margin-bottom: 4px; }
+.profile-app-root .pill-dot { display: none; }
+.profile-app-root .section-label { display: block; font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--text-muted); margin: 14px 0 8px; }
+.profile-app-root .chip-row { display: flex; flex-wrap: wrap; gap: 7px; min-height: 26px; }
+.profile-app-root .chip { padding: 5px 12px; border-radius: 999px; border: 1px solid var(--border); font-size: 12px; font-weight: 500; background: rgba(255, 255, 255, .02); animation: pa-popIn .25s ease; text-transform: capitalize; }
+@keyframes pa-popIn { from { transform: scale(0.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.profile-app-root .chip.coral { border-color: var(--coral-soft); color: var(--coral); }
+.profile-app-root .chip.placeholder { opacity: .35; border-style: dashed; }
+
+/* ================= PROFILE VIEW PAGE (full page, not the sticky sidebar preview) ================= */
+.profile-app-root .profile-view-main { max-width: 720px; }
+.profile-app-root .profile-view-card { border-radius: 24px; }
+.profile-app-root .profile-view-cover { height: 200px; }
+.profile-app-root .profile-view-body { padding: 0 34px 34px; }
+.profile-app-root .profile-view-avatar-wrap { margin-top: -44px; }
+.profile-app-root .profile-view-avatar { width: 92px; height: 92px; border-width: 5px; }
+.profile-app-root .profile-view-avatar .init { font-size: 32px; }
+.profile-app-root .profile-view-headrow { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-top: 16px; flex-wrap: wrap; }
+.profile-app-root .profile-view-name { font-size: 26px; margin: 0 0 4px; }
+.profile-app-root .profile-view-bio { font-size: 14.5px; max-width: 480px; margin: 16px 0 16px; }
+.profile-app-root .profile-edit-btn { flex-shrink: 0; }
+.profile-app-root .profile-view-actions { display: flex; gap: 10px; flex-shrink: 0; }
+.profile-app-root .profile-settings-btn { background: var(--bg-raised); color: var(--text-muted); border: 1px solid var(--border); }
+
+@media (max-width: 600px) {
+  .profile-app-root .profile-view-headrow { flex-direction: column; }
+}

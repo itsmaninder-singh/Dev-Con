@@ -9,7 +9,6 @@ import { isBlocked } from "../utils/blockGuard.js";
 import { notifyForNewMessage } from "../controller/chat.controller.js";
 import { encryptText } from "../utils/crypto.js";
 import redisClient from "../config/redis.js";
-import { initCollabNamespace } from "./socket/collab.namespace.js";
 
 const MAX_MESSAGES = 10;
 const WINDOW_SECONDS = 10;
@@ -28,6 +27,8 @@ const invalidateChatCaches = async (chat) => {
   keys.push(`messages:${chat._id.toString()}:p1:l30`);
   if (keys.length) await redisClient.del(keys);
 };
+const roomCodeState = {};
+
 const initSocket = (io) => {
   io.use(async (socket, next) => {
     try {
@@ -35,16 +36,33 @@ const initSocket = (io) => {
         socket.handshake.auth?.token ||
         socket.handshake.headers?.authorization?.split(" ")[1];
       if (!token) {
-        return next(new Error("Not authorized, no token"));
+        const guestName = socket.handshake.auth?.name || `Dev_${socket.id.slice(0, 4)}`;
+        socket.user = {
+          _id: `guest_${socket.id}`,
+          name: guestName,
+          isGuest: true,
+        };
+        return next();
       }
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const user = await User.findById(decoded.id).select("-password");
-      if (!user) return next(new Error("User not found"));
 
-      socket.user = user;
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const user = await User.findById(decoded.id).select("-password");
+        if (user) {
+          socket.user = user;
+          return next();
+        }
+      } catch {}
+
+      const guestName = socket.handshake.auth?.name || `Dev_${socket.id.slice(0, 4)}`;
+      socket.user = {
+        _id: `guest_${socket.id}`,
+        name: guestName,
+        isGuest: true,
+      };
       next();
     } catch (err) {
-      next(new Error("Not authorized, invalid token"));
+      next();
     }
   });
 
@@ -225,13 +243,107 @@ const initSocket = (io) => {
     socket.on("typing:stop", (chatId) => {
       socket.to(chatId).emit("typing:stop", { chatId, userId });
     });
+    // Real-time Collaborative Coding Rooms
+    socket.on("room:join", ({ roomCode, user: userInfo }, callback) => {
+      const code = (roomCode || "DEFAULT").toUpperCase();
+      socket.join(`room:${code}`);
+      socket.roomCode = code;
+
+      const member = {
+        id: socket.id,
+        userId: socket.user?._id?.toString() || socket.id,
+        name: userInfo?.name || socket.user?.name || "Developer",
+        initials: userInfo?.initials || (userInfo?.name ? userInfo.name.slice(0, 2).toUpperCase() : "DV"),
+        color: userInfo?.color || "#8fd6ff",
+        state: "editing this file",
+      };
+
+      socket.roomMember = member;
+
+      // Broadcast to others in the room
+      socket.to(`room:${code}`).emit("room:user-joined", member);
+
+      // Collect all active members in room
+      const roomSockets = io.sockets.adapter.rooms.get(`room:${code}`) || new Set();
+      const members = [];
+      for (const sId of roomSockets) {
+        const s = io.sockets.sockets.get(sId);
+        if (s?.roomMember) members.push(s.roomMember);
+      }
+      if (!members.some((m) => m.id === member.id)) members.push(member);
+
+      callback?.({
+        ok: true,
+        members,
+        currentCode: roomCodeState[code] || null,
+      });
+    });
+
+    socket.on("room:code-change", ({ roomCode, file, code, cursorLine }) => {
+      const codeKey = (roomCode || socket.roomCode || "DEFAULT").toUpperCase();
+      if (!roomCodeState[codeKey]) roomCodeState[codeKey] = {};
+      roomCodeState[codeKey][file] = code;
+
+      socket.to(`room:${codeKey}`).emit("room:code-update", {
+        file,
+        code,
+        fromUser: socket.roomMember?.name || socket.user?.name || "Collaborator",
+        fromId: socket.id,
+        cursorLine,
+      });
+    });
+
+    socket.on("room:cursor", ({ roomCode, file, line, col }) => {
+      const codeKey = (roomCode || socket.roomCode || "DEFAULT").toUpperCase();
+      socket.to(`room:${codeKey}`).emit("room:cursor-update", {
+        fromUser: socket.roomMember?.name || socket.user?.name || "Collaborator",
+        fromId: socket.id,
+        color: socket.roomMember?.color || "#ff98a2",
+        file,
+        line,
+        col,
+      });
+    });
+
+    socket.on("room:chat", ({ roomCode, message: msgText }) => {
+      const codeKey = (roomCode || socket.roomCode || "DEFAULT").toUpperCase();
+      const chatPayload = {
+        id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        who: socket.id,
+        userName: socket.roomMember?.name || socket.user?.name || "Collaborator",
+        initials: socket.roomMember?.initials || "CB",
+        color: socket.roomMember?.color || "#ffd58c",
+        text: msgText,
+        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      };
+      io.to(`room:${codeKey}`).emit("room:chat-message", chatPayload);
+    });
+
+    socket.on("room:leave", (roomCode) => {
+      const codeKey = (roomCode || socket.roomCode || "DEFAULT").toUpperCase();
+      socket.leave(`room:${codeKey}`);
+      socket.to(`room:${codeKey}`).emit("room:user-left", {
+        id: socket.id,
+        name: socket.roomMember?.name,
+      });
+      socket.roomCode = null;
+    });
+
     socket.on("disconnect", async () => {
+      if (socket.roomCode) {
+        socket.to(`room:${socket.roomCode}`).emit("room:user-left", {
+          id: socket.id,
+          name: socket.roomMember?.name,
+        });
+      }
       const remaining = await io.in(userId).fetchSockets();
       if (remaining.length === 0) {
         await redisClient.sRem("online_users", userId);
-        await User.findByIdAndUpdate(socket.user._id, {
-          lastSeen: new Date(),
-        });
+        if (!socket.user.isGuest) {
+          await User.findByIdAndUpdate(socket.user._id, {
+            lastSeen: new Date(),
+          });
+        }
         io.emit("presence:offline", { userId, lastSeen: new Date() });
       }
     });

@@ -25,14 +25,26 @@ const startServer = async () => {
   await pubClient.connect();
   await subClient.connect();
 
+  const clientOrigins = [
+    ...new Set([
+      ...(process.env.CLIENT_URL || "")
+        .split(",")
+        .map((o) => o.trim())
+        .filter(Boolean),
+      "http://localhost:5173",
+      "http://localhost:3000",
+      "http://localhost:5174",
+      "http://127.0.0.1:5173",
+    ]),
+  ];
+
   const httpServer = http.createServer(app);
   const io = new Server(httpServer, {
     cors: {
-      origin: process.env.CLIENT_URL,
+      origin: clientOrigins,
       credentials: true,
     },
     adapter: createAdapter(pubClient, subClient),
-
   });
   initSocket(io);
   initCollabNamespace(io);

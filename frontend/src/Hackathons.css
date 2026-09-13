@@ -1,0 +1,90 @@
+.hk-root, .hk-root * { margin: 0; padding: 0; box-sizing: border-box; }
+
+.hk-root {
+  position: relative;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+  display: flex;
+  transition: background-color var(--transition-smooth), color var(--transition-smooth);
+}
+
+.hk-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 900px;
+  height: 900px;
+  max-width: 140vw;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--coral-glow) 0%, var(--coral-soft) 45%, transparent 72%);
+  filter: blur(60px);
+  pointer-events: none;
+  animation: hk-glow-pulse 5s ease-in-out infinite;
+}
+
+@keyframes hk-glow-pulse {
+  0%, 100% { opacity: 0.7; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+}
+
+.hk-hero {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0 5%;
+}
+
+.hk-heading {
+  font-family: 'Anton', sans-serif;
+  text-transform: uppercase;
+  font-size: clamp(52px, 12vw, 160px);
+  line-height: 1;
+  text-shadow: 0 4px 40px rgba(0,0,0,0.8);
+}
+
+/* Color-shift on the whole word (not a background-clip gradient — that
+   technique breaks once child letters have their own transform, since each
+   transformed child gets its own compositing layer and stops receiving the
+   parent's clipped background paint, which was rendering the text invisible). */
+.hk-letters {
+  display: inline-block;
+  color: #e7e6e2;
+  transform-origin: center;
+  animation: hk-color-shift 3.5s ease-in-out infinite, hk-heartbeat 1.8s ease-in-out infinite;
+  animation-delay: 1.2s, 1.6s;
+}
+
+@keyframes hk-heartbeat {
+  0%, 100% { transform: scale(1); }
+  14% { transform: scale(1.045); }
+  28% { transform: scale(1); }
+  42% { transform: scale(1.045); }
+  70% { transform: scale(1); }
+}
+
+.hk-letter {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(24px);
+  animation: hk-letter-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes hk-letter-in {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes hk-color-shift {
+  0%, 100% { color: #e7e6e2; }
+  50% { color: #ff98a2; }
+}
+
+@media (max-width: 640px) {
+  .hk-glow { width: 600px; height: 600px; }
+}

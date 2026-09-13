@@ -8,7 +8,11 @@
 		"start": "node server.js",
 		"dev": "nodemon server.js"
 	},
-	"keywords": ["ai", "driven", "developers"],
+	"keywords": [
+		"ai",
+		"driven",
+		"developers"
+	],
 	"author": "maninder singh",
 	"license": "ISC",
 	"dependencies": {
@@ -31,7 +35,8 @@
 		"node-cron": "^3.0.3",
 		"redis": "^4.7.0",
 		"socket.io": "^4.8.1",
-		"xss": "^1.0.15"
+		"xss": "^1.0.15",
+		"yjs": "^13.6.32"
 	},
 	"devDependencies": {
 		"nodemon": "^3.1.9"

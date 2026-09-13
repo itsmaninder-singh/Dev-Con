@@ -1,0 +1,125 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;1,9..144,500&family=Lora:ital,wght@0,400;0,500;1,400&family=JetBrains+Mono:wght@500;700&display=swap');
+
+.sk-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  width: 100%;
+}
+.sk-wrap {
+  --sk-serif: 'Fraunces', 'Iowan Old Style', Georgia, serif;
+  --sk-body: 'Lora', Georgia, serif;
+}
+
+.sk-book {
+  position: relative;
+  width: 100%;
+  max-width: 940px;
+  aspect-ratio: 8 / 5;
+  perspective: 2400px;
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.sk-stack {
+  position: absolute;
+  inset: 6px;
+  background: #d8cdb8;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  box-shadow: 0 10px 24px -12px rgba(0, 0, 0, 0.5);
+}
+.sk-stack.s1 { transform: translate(3px, 4px) rotate(0.4deg); z-index: 0; }
+.sk-stack.s2 { transform: translate(6px, 8px) rotate(-0.35deg); z-index: -1; opacity: 0.82; }
+.sk-stack.s3 { transform: translate(9px, 12px) rotate(0.55deg); z-index: -2; opacity: 0.6; }
+
+/* the two static pages of the current spread — warm ivory "paper" tone */
+.sk-half {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  z-index: 2;
+  background: #f2ece1;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 30px 70px -25px rgba(0, 0, 0, 0.65);
+  overflow: hidden;
+  cursor: pointer;
+}
+.sk-half.sk-left { left: 0; border-radius: 8px 0 0 8px; }
+.sk-half.sk-right { left: 50%; border-radius: 0 8px 8px 0; }
+
+/* the fold down the middle */
+.sk-spine {
+  position: absolute;
+  top: 0; bottom: 0;
+  left: calc(50% - 14px);
+  width: 28px;
+  z-index: 4;
+  pointer-events: none;
+  background: linear-gradient(90deg,
+    rgba(0,0,0,0) 0%, rgba(0,0,0,0.16) 46%, rgba(0,0,0,0.16) 54%, rgba(0,0,0,0) 100%);
+}
+
+/* the turning leaf — half-width, pivoting at the spine */
+.sk-leaf { position: absolute; top: 0; bottom: 0; width: 50%; z-index: 5; transform-style: preserve-3d; will-change: transform; }
+.sk-leaf.leaf-next { left: 50%; transform-origin: left center; animation: sk-turn-next 0.7s cubic-bezier(0.45, 0, 0.2, 1) forwards; }
+.sk-leaf.leaf-prev { left: 0; transform-origin: right center; animation: sk-turn-prev 0.7s cubic-bezier(0.45, 0, 0.2, 1) forwards; }
+@keyframes sk-turn-next { from { transform: rotateY(0deg); } to { transform: rotateY(-180deg); } }
+@keyframes sk-turn-prev { from { transform: rotateY(0deg); } to { transform: rotateY(180deg); } }
+
+.sk-face {
+  position: absolute; inset: 0;
+  background: #f2ece1;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 30px 70px -25px rgba(0, 0, 0, 0.65), 0 0 30px rgba(0,0,0,0.15);
+  overflow: hidden;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.sk-leaf.leaf-next .sk-face.front { border-radius: 0 8px 8px 0; }
+.sk-leaf.leaf-next .sk-face.back { border-radius: 8px 0 0 8px; transform: rotateY(180deg); }
+.sk-leaf.leaf-prev .sk-face.front { border-radius: 8px 0 0 8px; }
+.sk-leaf.leaf-prev .sk-face.back { border-radius: 0 8px 8px 0; transform: rotateY(180deg); }
+
+.sk-content {
+  height: 100%;
+  padding: 48px 42px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.sk-kicker {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #c2515f;
+  margin-bottom: 16px;
+}
+.sk-title {
+  font-family: var(--sk-serif);
+  font-style: italic;
+  font-weight: 500;
+  text-transform: none;
+  font-size: clamp(28px, 3.8vw, 40px);
+  letter-spacing: -0.01em;
+  line-height: 1.12;
+  color: #221c15;
+  margin: 0 0 20px;
+}
+.sk-body {
+  font-family: var(--sk-body);
+  font-size: 16.5px;
+  line-height: 1.8;
+  color: rgba(34, 28, 21, 0.74);
+}
+
+@media (max-width: 640px) {
+  .sk-content { padding: 26px 22px; }
+  .sk-title { font-size: 21px; margin-bottom: 12px; }
+  .sk-body { font-size: 13.5px; line-height: 1.6; }
+  .sk-kicker { font-size: 10px; margin-bottom: 10px; }
+}
