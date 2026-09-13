@@ -271,6 +271,14 @@ function FullscreenButton({ fullscreen, onClick }) {
   );
 }
 
+export function openDirectMessage({ userId, name, initial }) {
+  window.dispatchEvent(
+    new CustomEvent('devconnect:open-chat', {
+      detail: { userId, name, initial },
+    })
+  );
+}
+
 export default function ChatWidget() {
   const { user } = useAuth() || {};
   const [open, setOpen] = useState(false);
@@ -283,6 +291,110 @@ export default function ChatWidget() {
   const messagesRef = useRef(null);
   const panelRef = useRef(null);
   const textareaRef = useRef(null);
+  const conversationsRef = useRef(conversations);
+
+  useEffect(() => {
+    conversationsRef.current = conversations;
+  }, [conversations]);
+
+  // Listen for direct message open events from anywhere (profiles, teams, explore, etc.)
+  useEffect(() => {
+    const handleOpenChat = async (e) => {
+      const { userId, name, initial, openOnly } = e.detail || {};
+
+      setOpen(true);
+      if (openOnly) return;
+      if (!userId && !name) return;
+
+      // 1. Check if we already have this conversation loaded in state
+      const currentList = conversationsRef.current || [];
+      const existingConv = currentList.find((c) => {
+        if (userId && (c.id === userId || c._id === userId)) return true;
+        if (name && c.name?.toLowerCase() === name.toLowerCase()) return true;
+        return false;
+      });
+
+      if (existingConv) {
+        openChat(existingConv.id);
+        return;
+      }
+
+      // 2. If authenticated & userId looks like a MongoDB ObjectId, fetch or create on server
+      if (user?._id && userId && typeof userId === 'string' && userId.length === 24 && userId !== user._id) {
+        try {
+          const res = await chatApi.getOrCreateDirectChat(userId);
+          const chat = res?.chat || res;
+          if (chat && chat._id) {
+            const other = chat.participants?.find((p) => (p._id || p) !== user._id) || { name, _id: userId };
+            const chatName = other.name || name || 'Direct Message';
+            const chatInitial = other.name ? other.name[0].toUpperCase() : (initial || (name ? name[0].toUpperCase() : 'D'));
+
+            let msgsFormatted = [];
+            try {
+              const msgsRes = await chatApi.getMessages(chat._id);
+              const list = Array.isArray(msgsRes) ? msgsRes : msgsRes?.messages || [];
+              msgsFormatted = list.map((m) => ({
+                from: m.sender?._id === user._id || m.sender === user._id ? 'me' : 'them',
+                text: m.content || '',
+                time: m.createdAt
+                  ? new Date(m.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+                  : 'Now',
+              }));
+            } catch (_) {}
+
+            const serverConv = {
+              id: chat._id,
+              _id: chat._id,
+              isServerChat: true,
+              name: chatName,
+              initial: chatInitial,
+              online: true,
+              colorIdx: Math.floor(Math.random() * AVATAR_COLORS.length),
+              unread: 0,
+              messages: msgsFormatted.length > 0 ? msgsFormatted : [
+                { from: 'them', text: `Hi! Let's connect on DevConnect 👋`, time: timeNow() },
+              ],
+            };
+
+            setConversations((prev) => {
+              if (prev.some((c) => c.id === chat._id)) {
+                return prev.map((c) => (c.id === chat._id ? { ...c, ...serverConv } : c));
+              }
+              return [serverConv, ...prev];
+            });
+            setActiveId(chat._id);
+            setView('chat');
+            setTimeout(() => textareaRef.current?.focus(), 250);
+            return;
+          }
+        } catch (err) {
+          console.warn('Could not initialize direct chat on server, using local thread:', err);
+        }
+      }
+
+      // 3. Fallback: Create instant local conversation
+      const localId = userId || `dm_${Date.now()}`;
+      const localConv = {
+        id: localId,
+        name: name || 'Direct Message',
+        initial: initial || (name ? name[0].toUpperCase() : 'D'),
+        online: true,
+        colorIdx: Math.floor(Math.random() * AVATAR_COLORS.length),
+        unread: 0,
+        messages: [
+          { from: 'them', text: `Hey! Thanks for reaching out 👋`, time: timeNow() },
+        ],
+      };
+
+      setConversations((prev) => [localConv, ...prev]);
+      setActiveId(localId);
+      setView('chat');
+      setTimeout(() => textareaRef.current?.focus(), 250);
+    };
+
+    window.addEventListener('devconnect:open-chat', handleOpenChat);
+    return () => window.removeEventListener('devconnect:open-chat', handleOpenChat);
+  }, [user?._id]);
 
   // Sync chats from backend
   useEffect(() => {

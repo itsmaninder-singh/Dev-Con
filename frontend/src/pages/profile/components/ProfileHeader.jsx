@@ -20,6 +20,9 @@ export function ProfileHeader({
   isBlocked = false,
   onBlockToggle,
   onOpenReport,
+  targetUserId,
+  isOwnProfile = false,
+  onMessage,
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
@@ -88,7 +91,21 @@ export function ProfileHeader({
                 )}
               </svg>
             </button>
-            <button className="btn btn-ghost" id="messageBtn" onClick={() => showToast('Message request sent')}>
+            <button
+              className="btn btn-ghost"
+              id="messageBtn"
+              onClick={() => {
+                if (onMessage) {
+                  onMessage();
+                } else {
+                  window.dispatchEvent(
+                    new CustomEvent('devconnect:open-chat', {
+                      detail: { userId: targetUserId, name, initial: initials },
+                    })
+                  );
+                }
+              }}
+            >
               Message
             </button>
             <button
@@ -97,12 +114,14 @@ export function ProfileHeader({
             >
               {following ? 'Following' : 'Follow'}
             </button>
-            <button
-              className="btn btn-ghost"
-              onClick={() => navigate('/profile/edit')}
-            >
-              Edit profile
-            </button>
+            {isOwnProfile && (
+              <button
+                className="btn btn-ghost"
+                onClick={() => navigate('/profile/edit')}
+              >
+                Edit profile
+              </button>
+            )}
 
             {/* More Options Dropdown */}
             <div style={{ position: 'relative' }} ref={menuRef}>

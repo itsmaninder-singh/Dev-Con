@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import AIScoreRing from '../../components/ai/AIScoreRing.jsx';
 import AILoadingShimmer from '../../components/ai/AILoadingShimmer.jsx';
 import { scoreCandidateVsTeam } from '../ai/scoring.js';
-import { Sparkles, Check, AlertCircle } from 'lucide-react';
+import { Sparkles, Check, AlertCircle, MessageSquare } from 'lucide-react';
 import soundManager from '../../utils/soundManager.js';
 import { aiApi } from '../../lib/api.js';
 
 const CIRC = 75.4;
 
 export default function CardModal({ item, onClose, onJoin }) {
+  const navigate = useNavigate();
   const [joined, setJoined] = useState(false);
   const [fitOpen, setFitOpen] = useState(false);
   const [fitLoading, setFitLoading] = useState(false);
@@ -119,7 +121,15 @@ export default function CardModal({ item, onClose, onJoin }) {
                 <span className="score-text">{item.matchScore}%</span>
               </span>
             )}
-            <div className="card-owner">
+            <div
+              className="card-owner"
+              style={{ cursor: 'pointer' }}
+              onClick={() => {
+                const handle = item.creator?.username || item.creator?.name?.toLowerCase().replace(/\s+/g, '');
+                if (handle) navigate(`/profile/${handle}`);
+              }}
+              title="View creator profile"
+            >
               <div className="avatar-sm">{item.creator.initials}</div>
               <div className="owner-name">by <b>{item.creator.name}</b></div>
             </div>
@@ -134,15 +144,57 @@ export default function CardModal({ item, onClose, onJoin }) {
           </div>
 
           <div className="modal-section-label">Team</div>
-          <div className="card-owner" style={{ marginBottom: '22px' }}>
-            <div className="avatar-sm">{item.creator.initials}</div>
-            <div className="owner-name">
-              <b>{item.creator.name}</b> (owner) + {
-                item.membersCount - 1 > 0
-                  ? `${item.membersCount - 1} member${item.membersCount - 1 > 1 ? 's' : ''}`
-                  : 'no members yet'
-              }{openSpots > 0 ? ` · ${openSpots} open spot${openSpots > 1 ? 's' : ''}` : ' · full'}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '22px', flexWrap: 'wrap', gap: '10px' }}>
+            <div
+              className="card-owner"
+              style={{ cursor: 'pointer', marginBottom: 0 }}
+              onClick={() => {
+                const handle = item.creator?.username || item.creator?.name?.toLowerCase().replace(/\s+/g, '');
+                if (handle) navigate(`/profile/${handle}`);
+              }}
+              title="View creator profile"
+            >
+              <div className="avatar-sm">{item.creator.initials}</div>
+              <div className="owner-name">
+                <b>{item.creator.name}</b> (owner) + {
+                  item.membersCount - 1 > 0
+                    ? `${item.membersCount - 1} member${item.membersCount - 1 > 1 ? 's' : ''}`
+                    : 'no members yet'
+                }{openSpots > 0 ? ` · ${openSpots} open spot${openSpots > 1 ? 's' : ''}` : ' · full'}
+              </div>
             </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                window.dispatchEvent(
+                  new CustomEvent('devconnect:open-chat', {
+                    detail: {
+                      userId: item.creator?._id || item.creator?.id,
+                      name: item.creator?.name,
+                      initial: item.creator?.initials,
+                    },
+                  })
+                );
+              }}
+              style={{
+                background: 'rgba(255, 152, 162, 0.12)',
+                border: '1px solid rgba(255, 152, 162, 0.3)',
+                color: 'var(--coral, #ff98a2)',
+                padding: '6px 14px',
+                borderRadius: '20px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.18s ease',
+              }}
+              title="Message owner"
+            >
+              <MessageSquare size={13} /> Message
+            </button>
           </div>
 
           {/* AI Tool 4a: Team Fit Check Inline Panel */}

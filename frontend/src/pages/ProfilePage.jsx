@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import gsap from 'gsap';
 import { useProfile } from '../context/ProfileContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useTeams } from '../context/TeamsContext.jsx';
+import { userApi } from '../lib/api.js';
 import { ProfileHeader } from './profile/components/ProfileHeader';
 import { ProfilePanels } from './profile/components/ProfilePanels';
 import { ProfileTabs } from './profile/components/ProfileTabs';
@@ -23,31 +24,83 @@ export default function ProfilePage() {
   const { user } = useAuth() || {};
   const { teams: userTeams } = useTeams() || {};
   const navigate = useNavigate();
+  const { username } = useParams();
 
+  const [targetUser, setTargetUser] = useState(null);
+  const [loadingUser, setLoadingUser] = useState(false);
   const [reportModalOpen, setReportModalOpen] = useState(false);
 
-  const name = profile?.name || user?.name || 'Priya Nair';
-  const handle = name.toLowerCase().replace(/\s+/g, '');
-  const college = profile?.college || 'Bengaluru · Computer Science, RVCE';
-  const bio =
-    profile?.bio ||
-    'Frontend-leaning full-stack dev. I like small, well-tested libraries more than big frameworks. Currently deep in TypeScript tooling and open to hackathons on weekends.';
-  const skills =
-    profile?.skills && profile.skills.length > 0
-      ? profile.skills
-      : ['TypeScript', 'React', 'Node.js', 'Vite', 'Tailwind', 'PostgreSQL'];
-  const openTo =
-    profile?.openTo && profile.openTo.length > 0
-      ? profile.openTo
-      : ['Open Source', 'Hackathons', 'Freelance'];
+  const isOwnProfile = !username || (user?.username && username.toLowerCase() === user.username.toLowerCase());
 
-  const initials = name
-    .split(' ')
-    .filter(Boolean)
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase() || 'PN';
+  useEffect(() => {
+    if (username && (!user?.username || username.toLowerCase() !== user.username.toLowerCase())) {
+      setLoadingUser(true);
+      userApi
+        .getUserByUsername(username)
+        .then((res) => {
+          setTargetUser(res);
+        })
+        .catch((err) => {
+          console.warn("Could not fetch user profile:", err);
+          showToast("User not found, showing public profile");
+        })
+        .finally(() => setLoadingUser(false));
+    } else {
+      setTargetUser(null);
+    }
+  }, [username, user?.username]);
+
+  const activeUser = isOwnProfile ? (profile || user) : targetUser;
+  const name = activeUser?.name || (isOwnProfile ? (profile?.name || user?.name || 'Priya Nair') : (username || 'Developer'));
+  const handle = activeUser?.username || (activeUser?.name ? activeUser.name.toLowerCase().replace(/\s+/g, '') : (username || 'user'));
+  const college = activeUser?.college || (isOwnProfile ? (profile?.college || 'Bengaluru · Computer Science, RVCE') : 'Developer Community');
+  const bio =
+    activeUser?.bio ||
+    (isOwnProfile
+      ? (profile?.bio ||
+        'Frontend-leaning full-stack dev. I like small, well-tested libraries more than big frameworks. Currently deep in TypeScript tooling and open to hackathons on weekends.')
+      : 'Passionate developer building innovative open source projects and hackathon teams on DevConnect.');
+  const skills =
+    activeUser?.skills && activeUser.skills.length > 0
+      ? activeUser.skills
+      : (isOwnProfile
+        ? (profile?.skills && profile.skills.length > 0
+          ? profile.skills
+          : ['TypeScript', 'React', 'Node.js', 'Vite', 'Tailwind', 'PostgreSQL'])
+        : ['JavaScript', 'React', 'Node.js']);
+  const openTo =
+    activeUser?.availableFor && activeUser.availableFor.length > 0
+      ? activeUser.availableFor
+      : (isOwnProfile
+        ? (profile?.openTo && profile.openTo.length > 0
+          ? profile.openTo
+          : ['Open Source', 'Hackathons', 'Freelance'])
+        : ['Open Source', 'Hackathons']);
+
+  const initials =
+    activeUser?.initials ||
+    name
+      .split(' ')
+      .filter(Boolean)
+      .map((w) => w[0])
+      .slice(0, 2)
+      .join('')
+      .toUpperCase() || 'PN';
+
+  const targetUserId = activeUser?._id || activeUser?.id;
+
+  const handleMessage = () => {
+    // Direct message to target person - automatically pop open DM thread
+    window.dispatchEvent(
+      new CustomEvent('devconnect:open-chat', {
+        detail: {
+          userId: targetUserId,
+          name: name,
+          initial: initials,
+        },
+      })
+    );
+  };
 
   const [activeTab, setActiveTab] = useState('teams');
   const [following, setFollowing] = useState(false);
@@ -251,6 +304,9 @@ export default function ProfilePage() {
         following={following}
         handleFollowToggle={handleFollowToggle}
         navigate={navigate}
+        targetUserId={targetUserId}
+        isOwnProfile={isOwnProfile}
+        onMessage={handleMessage}
         isBlocked={isUserBlocked(handle || name)}
         onBlockToggle={() => {
           const isBlocked = isUserBlocked(handle || name);

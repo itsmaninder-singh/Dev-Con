@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { User } from '../models/user.model.js';
 import { ApiError } from '../utils/ApiError.js';
 import {asyncHandler} from "../utils/asyncHandler.js"
@@ -24,7 +25,14 @@ const getMe = asyncHandler(async(req,res)=>{
 });
 
 const getUserByUsername = asyncHandler(async (req, res) => {
-  const user = await User.findOne({ username: req.params.username.toLowerCase() });
+  const param = req.params.username;
+  let user = await User.findOne({ username: param.toLowerCase() });
+  if (!user && mongoose.Types.ObjectId.isValid(param)) {
+    user = await User.findById(param);
+  }
+  if (!user) {
+    user = await User.findOne({ name: new RegExp('^' + param + '$', 'i') });
+  }
   if (!user) {
     throw new ApiError(404, "User not found");
   }

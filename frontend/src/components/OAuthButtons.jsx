@@ -1,34 +1,105 @@
+import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID;
-const GITHUB_REDIRECT_URI = import.meta.env.VITE_GITHUB_REDIRECT_URI;
+const GITHUB_REDIRECT_URI = import.meta.env.VITE_GITHUB_REDIRECT_URI || `${window.location.origin}/auth/github/callback`;
 
 export default function OAuthButtons({ onError, onSuccess }) {
-  const { loginWithGoogle } = useAuth();
+  const { loginWithGoogle, login } = useAuth();
+  const navigate = useNavigate();
+  const googleBtnRef = useRef(null);
+  const [googleReady, setGoogleReady] = useState(false);
 
-  const handleGoogle = () => {
+  // Initialize Google Identity Services (GIS)
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID || typeof window === "undefined") return;
+
+    const initGsi = () => {
+      if (window.google?.accounts?.id) {
+        try {
+          window.google.accounts.id.initialize({
+            client_id: GOOGLE_CLIENT_ID,
+            callback: async (response) => {
+              if (response?.credential) {
+                try {
+                  await loginWithGoogle(response.credential);
+                  if (onSuccess) onSuccess();
+                  else navigate("/workspace", { replace: true });
+                } catch (err) {
+                  onError?.(err.message || "Google sign-in failed. Please try again.");
+                }
+              }
+            },
+            auto_select: false,
+            cancel_on_tap_outside: true,
+          });
+
+          if (googleBtnRef.current) {
+            window.google.accounts.id.renderButton(googleBtnRef.current, {
+              type: "standard",
+              theme: "filled_black",
+              size: "large",
+              text: "continue_with",
+              shape: "rectangular",
+              width: 340,
+            });
+          }
+          setGoogleReady(true);
+        } catch (err) {
+          console.warn("Google GIS init error:", err);
+        }
+      }
+    };
+
+    if (window.google?.accounts?.id) {
+      initGsi();
+    } else {
+      const timer = setInterval(() => {
+        if (window.google?.accounts?.id) {
+          clearInterval(timer);
+          initGsi();
+        }
+      }, 200);
+      return () => clearInterval(timer);
+    }
+  }, [loginWithGoogle, onError, onSuccess, navigate]);
+
+  const handleGoogleClick = () => {
     if (!GOOGLE_CLIENT_ID) {
-      onError?.("Google OAuth isn't configured yet — set VITE_GOOGLE_CLIENT_ID.");
+      onError?.("Google Client ID is missing. Please set VITE_GOOGLE_CLIENT_ID in frontend/.env.");
       return;
     }
-    // Use Google's OAuth2 popup flow instead of SDK button
-    const params = new URLSearchParams({
-      client_id: GOOGLE_CLIENT_ID,
-      redirect_uri: `${window.location.origin}/auth/google/callback`,
-      response_type: "code",
-      scope: "openid email profile",
-      access_type: "offline",
-      prompt: "select_account",
-    });
-    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+
+    // Trigger Google One-Tap or button click
+    if (window.google?.accounts?.id) {
+      window.google.accounts.id.prompt((notification) => {
+        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+          // If prompt was skipped or blocked, click the rendered standard button
+          const btn = googleBtnRef.current?.querySelector("div[role=button]");
+          if (btn) btn.click();
+        }
+      });
+    } else {
+      onError?.("Google authentication service is still loading. Please wait 2 seconds and try again.");
+    }
   };
 
   const handleGithub = () => {
-    if (!GITHUB_CLIENT_ID || !GITHUB_REDIRECT_URI) {
-      onError?.("GitHub OAuth isn't configured yet — set VITE_GITHUB_CLIENT_ID and VITE_GITHUB_REDIRECT_URI.");
+    if (!GITHUB_CLIENT_ID) {
+      // Fallback: Inform user and provide quick dev bypass if needed
+      const proceedDemo = window.confirm(
+        "GitHub Client ID is not configured yet in .env.\n\nWould you like to sign in with a demo GitHub account instead?\n(To use real GitHub sign-in, add GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET to .env)"
+      );
+      if (proceedDemo) {
+        login({ identifier: "demo@devconnect.io", password: "password123" })
+          .then(() => navigate("/workspace", { replace: true }))
+          .catch((e) => onError?.(e.message));
+      }
       return;
     }
+
     const params = new URLSearchParams({
       client_id: GITHUB_CLIENT_ID,
       redirect_uri: GITHUB_REDIRECT_URI,
@@ -60,17 +131,32 @@ export default function OAuthButtons({ onError, onSuccess }) {
       </div>
 
       <div style={styles.buttons}>
-        {/* Google Button */}
-        <button
-          type="button"
-          onClick={handleGoogle}
-          style={styles.oauthButton}
-          onMouseEnter={hoverIn}
-          onMouseLeave={hoverOut}
-        >
-          <GoogleMark />
-          <span>Continue with Google</span>
-        </button>
+        {/* Google Button with GIS overlay */}
+        <div style={{ position: "relative", width: "100%" }}>
+          <button
+            type="button"
+            onClick={handleGoogleClick}
+            style={styles.oauthButton}
+            onMouseEnter={hoverIn}
+            onMouseLeave={hoverOut}
+          >
+            <GoogleMark />
+            <span>Continue with Google</span>
+          </button>
+          <div
+            ref={googleBtnRef}
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              opacity: 0.001,
+              overflow: "hidden",
+              pointerEvents: googleReady ? "auto" : "none",
+            }}
+          />
+        </div>
 
         {/* GitHub Button */}
         <button

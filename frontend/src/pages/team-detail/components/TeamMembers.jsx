@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Sparkles, MoreVertical, ShieldAlert, UserMinus, ArrowUpRight, ArrowDownRight, Flag } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Sparkles, MoreVertical, ShieldAlert, UserMinus, ArrowUpRight, ArrowDownRight, Flag, MessageSquare, User } from 'lucide-react';
 import SpotCard from '../../profile/SpotCard.jsx';
 import AIScoreRing from '../../../components/ai/AIScoreRing.jsx';
 import AILoadingShimmer from '../../../components/ai/AILoadingShimmer.jsx';
@@ -17,6 +18,7 @@ export function TeamMembers({
   onUpdateRole,
   onShowToast,
 }) {
+  const navigate = useNavigate();
   const [activeMenuMemberId, setActiveMenuMemberId] = useState(null);
   const [reportingUser, setReportingUser] = useState(null);
   const [confirmKickUser, setConfirmKickUser] = useState(null);
@@ -111,7 +113,14 @@ export function TeamMembers({
                   flexWrap: 'wrap',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: '220px' }}>
+                <div
+                  style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: '220px', cursor: 'pointer' }}
+                  onClick={() => {
+                    const userTarget = mUser.username || mUserId;
+                    if (userTarget) navigate(`/profile/${userTarget}`);
+                  }}
+                  title="View user profile"
+                >
                   <div
                     style={{
                       width: '42px',
@@ -327,6 +336,69 @@ export function TeamMembers({
                           </button>
                         </>
                       )}
+
+                      {/* Direct message */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playClick();
+                          setActiveMenuMemberId(null);
+                          window.dispatchEvent(
+                            new CustomEvent('devconnect:open-chat', {
+                              detail: {
+                                userId: mUserId,
+                                name: mName,
+                                initial: mInitials,
+                              },
+                            })
+                          );
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--coral, #ff98a2)',
+                          fontSize: '12.5px',
+                          padding: '8px 10px',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          textAlign: 'left',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 152, 162, 0.1)')}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+                      >
+                        <MessageSquare size={13} /> Message {mName.split(' ')[0]}
+                      </button>
+
+                      {/* View Profile */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playClick();
+                          setActiveMenuMemberId(null);
+                          const userTarget = mUser.username || mUserId;
+                          if (userTarget) navigate(`/profile/${userTarget}`);
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#fff',
+                          fontSize: '12.5px',
+                          padding: '8px 10px',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          textAlign: 'left',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)')}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+                      >
+                        <User size={13} /> View Profile
+                      </button>
 
                       {/* General control: report */}
                       <button
