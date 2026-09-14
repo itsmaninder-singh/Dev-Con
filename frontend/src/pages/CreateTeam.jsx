@@ -7,7 +7,7 @@ import CursorFX from './profile/CursorFX.jsx';
 import SpotCard from './profile/SpotCard.jsx';
 import StepsBar from './team/StepsBar.jsx';
 import Step1Basics from './team/Step1Basics.jsx';
-import Step2SkillsTags from './team/Step2SkillsTags.jsx';
+import Step2SkillsTags, { PREDEFINED_SKILLS, resolveValidSkill } from './team/Step2SkillsTags.jsx';
 import Step3Settings from './team/Step3Settings.jsx';
 import WizardActions from './team/WizardActions.jsx';
 import TeamPreviewCard from './team/TeamPreviewCard.jsx';
@@ -27,6 +27,7 @@ export default function CreateTeam() {
   const [currentStep, setCurrentStep] = useState(1);
   const [saveState, setSaveState] = useState('idle'); // idle | saving | saved
   const [nameInvalid, setNameInvalid] = useState(false);
+  const [skillsInvalid, setSkillsInvalid] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
 
   const [name, setName] = useState('');
@@ -46,7 +47,13 @@ export default function CreateTeam() {
     setName(idea.title);
     setDesc(idea.desc);
     if (idea.stack && idea.stack.length) {
-      setSkills(idea.stack);
+      const validSkills = idea.stack
+        .map((s) => resolveValidSkill(s) || (PREDEFINED_SKILLS.includes(s) ? s : null))
+        .filter(Boolean);
+      if (validSkills.length > 0) {
+        setSkills(validSkills);
+        setSkillsInvalid(false);
+      }
     }
     if (idea.tags && idea.tags.length) {
       setTags(idea.tags);
@@ -58,9 +65,19 @@ export default function CreateTeam() {
     }, 4000);
   }
 
-  function addSkill(val) { setSkills((prev) => (prev.includes(val) ? prev : [...prev, val])); }
+  function addSkill(val) {
+    const valid = resolveValidSkill(val) || (PREDEFINED_SKILLS.includes(val) ? val : null);
+    if (!valid) return;
+    setSkills((prev) => (prev.includes(valid) ? prev : [...prev, valid]));
+    setSkillsInvalid(false);
+  }
   function removeSkill(val) { setSkills((prev) => prev.filter((s) => s !== val)); }
-  function toggleSkill(val) { setSkills((prev) => (prev.includes(val) ? prev.filter((s) => s !== val) : [...prev, val])); }
+  function toggleSkill(val) {
+    const valid = resolveValidSkill(val) || (PREDEFINED_SKILLS.includes(val) ? val : null);
+    if (!valid) return;
+    setSkills((prev) => (prev.includes(valid) ? prev.filter((s) => s !== valid) : [...prev, valid]));
+    setSkillsInvalid(false);
+  }
 
   function addTag(val) { setTags((prev) => (prev.includes(val) ? prev : [...prev, val])); }
   function removeTag(val) { setTags((prev) => prev.filter((t) => t !== val)); }
@@ -68,6 +85,10 @@ export default function CreateTeam() {
 
   function goStep(step) {
     if (step > currentStep && currentStep === 1 && !name.trim()) return;
+    if (step > currentStep && currentStep === 2 && skills.length === 0) {
+      setSkillsInvalid(true);
+      return;
+    }
     setCurrentStep(step);
   }
   function handleBack() {
@@ -80,6 +101,11 @@ export default function CreateTeam() {
       return;
     }
     setNameInvalid(false);
+    if (currentStep === 2 && skills.length === 0) {
+      setSkillsInvalid(true);
+      return;
+    }
+    setSkillsInvalid(false);
     if (currentStep < TOTAL_STEPS) {
       setCurrentStep(currentStep + 1);
       return;
@@ -145,6 +171,7 @@ export default function CreateTeam() {
               {currentStep === 2 && (
                 <Step2SkillsTags
                   skills={skills}
+                  skillsInvalid={skillsInvalid}
                   onAddSkill={addSkill}
                   onRemoveSkill={removeSkill}
                   onToggleSkill={toggleSkill}

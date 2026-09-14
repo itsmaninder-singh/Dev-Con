@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MoreHorizontal, Flag, ShieldBan, ShieldCheck } from 'lucide-react';
+import { MoreHorizontal, Flag, ShieldBan, ShieldCheck, Camera } from 'lucide-react';
 import { useChatUI } from '../../../context/ChatUIContext.jsx';
 
 export function ProfileHeader({
@@ -8,6 +8,9 @@ export function ProfileHeader({
   handleAvatarMove,
   handleAvatarLeave,
   initials,
+  avatarUrl,
+  coverUrl,
+  onAvatarUpload,
   name,
   handle,
   college,
@@ -28,23 +31,35 @@ export function ProfileHeader({
   const { openDirectChatWith } = useChatUI();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
+  const avatarInputRef = useRef(null);
 
   useEffect(() => {
+    if (!menuOpen) return;
     function handleClickOutside(e) {
       if (menuRef.current && !menuRef.current.contains(e.target)) {
         setMenuOpen(false);
       }
     }
-    if (menuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('click', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('click', handleClickOutside);
+    };
   }, [menuOpen]);
 
   return (
     <>
       {/* Cover Header */}
-      <div className="cover" ref={coverRef}></div>
+      <div
+        className="cover"
+        ref={coverRef}
+        style={coverUrl ? {
+          backgroundImage: `url(${coverUrl})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        } : {}}
+      ></div>
 
       {/* Identity Wrap */}
       <div className="identity-wrap">
@@ -55,8 +70,68 @@ export function ProfileHeader({
             ref={avatarRef}
             onMouseMove={handleAvatarMove}
             onMouseLeave={handleAvatarLeave}
+            onClick={() => {
+              if (isOwnProfile) {
+                avatarInputRef.current?.click();
+              }
+            }}
+            style={{
+              position: 'relative',
+              overflow: 'hidden',
+              cursor: isOwnProfile ? 'pointer' : 'default',
+            }}
+            title={isOwnProfile ? "Click to change profile picture" : name}
           >
-            {initials}
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt={name}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  borderRadius: 'inherit',
+                  display: 'block',
+                }}
+              />
+            ) : (
+              initials
+            )}
+            {isOwnProfile && (
+              <div
+                className="avatar-camera-overlay"
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'rgba(0,0,0,0.45)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#fff',
+                  opacity: 0,
+                  transition: 'opacity 0.2s ease',
+                  borderRadius: 'inherit',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                onMouseLeave={(e) => (e.currentTarget.style.opacity = '0')}
+              >
+                <Camera size={26} />
+              </div>
+            )}
+            {isOwnProfile && (
+              <input
+                type="file"
+                ref={avatarInputRef}
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file && onAvatarUpload) {
+                    onAvatarUpload(file);
+                  }
+                }}
+              />
+            )}
           </div>
 
           <div className="identity-text" id="identityText">
@@ -93,134 +168,236 @@ export function ProfileHeader({
                 )}
               </svg>
             </button>
-            <button
-              className="btn btn-ghost"
-              id="messageBtn"
-              data-chat-trigger="true"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (onMessage) {
-                  onMessage();
-                } else {
-                  openDirectChatWith(targetUserId, { name, initial: initials });
-                }
-              }}
-            >
-              Message
-            </button>
-            <button
-              className={`btn ${following ? 'btn-ghost' : 'btn-primary'}`}
-              onClick={handleFollowToggle}
-            >
-              {following ? 'Following' : 'Follow'}
-            </button>
-            {isOwnProfile && (
-              <button
-                className="btn btn-ghost"
-                onClick={() => navigate('/profile/edit')}
-              >
-                Edit profile
-              </button>
-            )}
-
-            {/* More Options Dropdown */}
-            <div style={{ position: 'relative' }} ref={menuRef}>
-              <button
-                type="button"
-                className="btn btn-ghost btn-icon"
-                onClick={() => setMenuOpen((o) => !o)}
-                aria-label="More options"
-                title="More options"
-                style={{ width: '42px', height: '42px' }}
-              >
-                <MoreHorizontal size={18} />
-              </button>
-
-              {menuOpen && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: 'calc(100% + 8px)',
-                    right: 0,
-                    minWidth: '170px',
-                    background: 'rgba(20, 20, 24, 0.96)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: '14px',
-                    boxShadow: '0 12px 30px rgba(0,0,0,0.5)',
-                    backdropFilter: 'blur(14px)',
-                    zIndex: 50,
-                    padding: '6px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '4px',
-                    animation: 'fadeIn 0.15s ease',
+            {!isOwnProfile ? (
+              <>
+                {isBlocked ? (
+                  <button
+                    className="btn btn-ghost"
+                    id="messageBtn"
+                    style={{ opacity: 0.5, cursor: 'not-allowed' }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (showToast) showToast(`Cannot message @${handle} while blocked. Unblock first.`);
+                    }}
+                    title="User is blocked"
+                  >
+                    Blocked
+                  </button>
+                ) : (
+                  <button
+                    className="btn btn-ghost"
+                    id="messageBtn"
+                    data-chat-trigger="true"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (onMessage) {
+                        onMessage();
+                      } else {
+                        openDirectChatWith(targetUserId, { name, initial: initials });
+                      }
+                    }}
+                  >
+                    Message
+                  </button>
+                )}
+                <button
+                  className={`btn ${following ? 'btn-ghost' : 'btn-primary'}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleFollowToggle();
                   }}
                 >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      if (onOpenReport) onOpenReport();
-                    }}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--text, #fff)',
-                      padding: '8px 12px',
-                      borderRadius: '8px',
-                      fontSize: '13px',
-                      fontWeight: 500,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      textAlign: 'left',
-                      transition: 'background 0.15s ease',
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
-                  >
-                    <Flag size={14} color="var(--coral, #ff98a2)" /> Report User
-                  </button>
+                  {following ? 'Following' : 'Follow'}
+                </button>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      if (onBlockToggle) onBlockToggle();
-                    }}
+                {/* Direct Report Button */}
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  id="reportBtn"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (onOpenReport) onOpenReport();
+                  }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    borderColor: 'rgba(255, 152, 162, 0.35)',
+                    color: 'var(--coral, #ff98a2)',
+                  }}
+                  title={`Report @${handle}`}
+                >
+                  <Flag size={14} color="var(--coral, #ff98a2)" />
+                  <span>Report</span>
+                </button>
+
+                {/* Direct Block / Unblock Button */}
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  id="blockBtn"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (onBlockToggle) onBlockToggle();
+                  }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    borderColor: isBlocked ? 'rgba(74, 222, 128, 0.4)' : 'rgba(255, 123, 123, 0.4)',
+                    color: isBlocked ? '#4ade80' : '#ff7b7b',
+                  }}
+                  title={isBlocked ? `Unblock @${handle}` : `Block @${handle}`}
+                >
+                  {isBlocked ? (
+                    <>
+                      <ShieldCheck size={14} color="#4ade80" />
+                      <span>Unblock</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShieldBan size={14} color="#ff7b7b" />
+                      <span>Block</span>
+                    </>
+                  )}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => navigate('/profile/edit')}
+                >
+                  Edit profile
+                </button>
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => navigate('/explore')}
+                  title="View other developer profiles to connect, message, or test report/block"
+                  style={{ fontSize: '12.5px', opacity: 0.85 }}
+                >
+                  Explore members →
+                </button>
+              </>
+            )}
+
+            {!isOwnProfile && (
+              /* More Options Dropdown */
+              <div
+                style={{ position: 'relative' }}
+                ref={menuRef}
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-icon"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setMenuOpen((o) => !o);
+                  }}
+                  aria-label="More options"
+                  title="More options"
+                  style={{ width: '42px', height: '42px' }}
+                >
+                  <MoreHorizontal size={18} />
+                </button>
+
+                {menuOpen && (
+                  <div
                     style={{
-                      background: 'none',
-                      border: 'none',
-                      color: isBlocked ? 'var(--coral, #ff98a2)' : 'var(--text, #fff)',
-                      padding: '8px 12px',
-                      borderRadius: '8px',
-                      fontSize: '13px',
-                      fontWeight: 500,
-                      cursor: 'pointer',
+                      position: 'absolute',
+                      top: 'calc(100% + 8px)',
+                      right: 0,
+                      minWidth: '175px',
+                      background: 'rgba(20, 20, 24, 0.98)',
+                      border: '1px solid rgba(255, 255, 255, 0.12)',
+                      borderRadius: '14px',
+                      boxShadow: '0 12px 30px rgba(0,0,0,0.6)',
+                      backdropFilter: 'blur(16px)',
+                      zIndex: 50,
+                      padding: '6px',
                       display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      textAlign: 'left',
-                      transition: 'background 0.15s ease',
+                      flexDirection: 'column',
+                      gap: '4px',
+                      animation: 'fadeIn 0.15s ease',
                     }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
                   >
-                    {isBlocked ? (
-                      <>
-                        <ShieldCheck size={14} color="var(--coral, #ff98a2)" /> Unblock User
-                      </>
-                    ) : (
-                      <>
-                        <ShieldBan size={14} color="#ff7b7b" /> Block User
-                      </>
-                    )}
-                  </button>
-                </div>
-              )}
-            </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setMenuOpen(false);
+                        if (onOpenReport) onOpenReport();
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--text, #fff)',
+                        padding: '9px 12px',
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        textAlign: 'left',
+                        transition: 'background 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+                    >
+                      <Flag size={14} color="var(--coral, #ff98a2)" /> Report User
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setMenuOpen(false);
+                        if (onBlockToggle) onBlockToggle();
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: isBlocked ? 'var(--coral, #ff98a2)' : 'var(--text, #fff)',
+                        padding: '9px 12px',
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        textAlign: 'left',
+                        transition: 'background 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+                    >
+                      {isBlocked ? (
+                        <>
+                          <ShieldCheck size={14} color="var(--coral, #ff98a2)" /> Unblock User
+                        </>
+                      ) : (
+                        <>
+                          <ShieldBan size={14} color="#ff7b7b" /> Block User
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -24,6 +24,8 @@ import {
   updateAvailableFor,
   uploadProfilePicture,
   uploadCoverPicture,
+  blockUser,
+  unblockUser,
 } from "../controller/user.controller.js";
 
 import {
@@ -99,6 +101,8 @@ router.patch("/users/me/availability", protect, toggleAvailability);
 router.patch("/users/me/available-for", protect, updateAvailableFor);
 router.post("/users/me/profile-picture", protect, upload.single("profilePicture"), uploadProfilePicture);
 router.post("/users/me/cover-picture", protect, upload.single("coverPicture"), uploadCoverPicture);
+router.post("/users/:userId/block", protect, blockUser);
+router.post("/users/:userId/unblock", protect, unblockUser);
 
 router.post("/teams", protect, createTeam);
 router.get("/teams", getTeams);

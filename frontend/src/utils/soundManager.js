@@ -443,6 +443,45 @@ class SoundManager {
       thud.stop(now + 0.28);
     } catch (_) {}
   }
+
+  /* ============================================================
+     5. SUCCESS CHIME SOUND (Harmonic chime for actions/submissions)
+     ============================================================ */
+  playSuccess() {
+    if (!this.enabled) return;
+    const ctx = this.getContext();
+    if (!ctx || ctx.state !== 'running') return;
+
+    try {
+      const now = ctx.currentTime;
+      const vol = 0.12 * (this.masterVolume / 0.12);
+
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(523.25, now);
+      osc1.frequency.setValueAtTime(659.25, now + 0.08);
+      osc1.frequency.setValueAtTime(783.99, now + 0.16);
+
+      osc2.type = 'triangle';
+      osc2.frequency.setValueAtTime(1046.50, now + 0.16);
+
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.linearRampToValueAtTime(vol, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
+
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc1.start(now);
+      osc1.stop(now + 0.35);
+      osc2.start(now + 0.16);
+      osc2.stop(now + 0.35);
+    } catch (_) {}
+  }
 }
 
 // Singleton export

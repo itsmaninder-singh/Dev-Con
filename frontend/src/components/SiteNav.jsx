@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useProfile } from '../context/ProfileContext.jsx';
 import { Bell, Volume2, VolumeX } from 'lucide-react';
 import { RandomLetterSwap } from './ui/random-letter-swap';
 import { INITIAL_NOTIFICATIONS } from '../data/notifications.js';
@@ -22,8 +23,8 @@ export default function SiteNav() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
-  const [activePreviewId, setActivePreviewId] = useState('n1');
+  const [notifications, setNotifications] = useState([]);
+  const [activePreviewId, setActivePreviewId] = useState(null);
   const [calloutTop, setCalloutTop] = useState(60);
   const menuRef = useRef(null);
   const triggerRef = useRef(null);
@@ -32,7 +33,10 @@ export default function SiteNav() {
   const location = useLocation();
   const isLanding = location.pathname === '/';
   const { user, logout } = useAuth() || {};
+  const { profile } = useProfile() || {};
   const { soundEnabled, toggleSound, playClick } = useUISound();
+
+  const avatarUrl = profile?.avatarUrl || profile?.profilePicture || user?.profilePicture;
 
   const unreadCount = notifications.filter((n) => n.unread).length;
 
@@ -186,29 +190,12 @@ export default function SiteNav() {
       </ul>
 
       <div className="sn-nav-right" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        {isLanding ? (
-          user?._id ? (
-            <NavLink
-              to="/workspace"
-              style={{
-                padding: '9px 22px',
-                borderRadius: '30px',
-                border: '1px solid rgba(255, 152, 162, 0.4)',
-                background: 'rgba(255, 152, 162, 0.1)',
-                color: '#ff98a2',
-                fontSize: '13px',
-                fontWeight: 600,
-                textDecoration: 'none',
-                transition: 'all 0.25s ease',
-              }}
-            >
-              Start Building
-            </NavLink>
-          ) : (
+        {!user?._id ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <NavLink
               to="/login"
               style={{
-                padding: '9px 22px',
+                padding: '7px 16px',
                 borderRadius: '30px',
                 border: '1px solid rgba(255, 255, 255, 0.15)',
                 background: 'transparent',
@@ -229,7 +216,31 @@ export default function SiteNav() {
             >
               Sign In
             </NavLink>
-          )
+            <NavLink
+              to="/register"
+              style={{
+                padding: '7px 16px',
+                borderRadius: '30px',
+                border: '1px solid rgba(255, 152, 162, 0.4)',
+                background: 'rgba(255, 152, 162, 0.12)',
+                color: 'var(--coral, #ff98a2)',
+                fontSize: '13px',
+                fontWeight: 600,
+                textDecoration: 'none',
+                transition: 'all 0.25s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 152, 162, 0.22)';
+                e.currentTarget.style.borderColor = 'var(--coral, #ff98a2)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 152, 162, 0.12)';
+                e.currentTarget.style.borderColor = 'rgba(255, 152, 162, 0.4)';
+              }}
+            >
+              Get Started
+            </NavLink>
+          </div>
         ) : (
           <>
             {/* Navbar Search Bar */}
@@ -436,8 +447,23 @@ export default function SiteNav() {
             setMenuOpen((v) => !v);
             setNotifOpen(false);
           }}
+          style={{ overflow: 'hidden' }}
         >
-          {initials}
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt=""
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                borderRadius: 'inherit',
+                display: 'block',
+              }}
+            />
+          ) : (
+            initials
+          )}
         </div>
         <div className={menuOpen ? 'sn-profile-menu sn-open' : 'sn-profile-menu'} ref={menuRef}>
           <div

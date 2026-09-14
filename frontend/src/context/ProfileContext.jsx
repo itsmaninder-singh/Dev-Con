@@ -63,6 +63,10 @@ export function ProfileProvider({ children }) {
             name: serverUser.name || prev.name,
             bio: serverUser.bio || prev.bio,
             college: serverUser.college || prev.college,
+            avatarUrl: serverUser.profilePicture || serverUser.avatarUrl || prev.avatarUrl,
+            profilePicture: serverUser.profilePicture || serverUser.avatarUrl || prev.profilePicture,
+            coverUrl: serverUser.coverPicture || serverUser.coverUrl || prev.coverUrl,
+            coverPicture: serverUser.coverPicture || serverUser.coverUrl || prev.coverPicture,
             skills: serverUser.skills?.length ? serverUser.skills : prev.skills,
             experience: serverUser.experience || prev.experience,
             experienceLevel: serverUser.experienceLevel || prev.experienceLevel,
@@ -107,20 +111,23 @@ export function ProfileProvider({ children }) {
 
   function blockUser(userToBlock) {
     if (!userToBlock) return;
-    const uid = String(userToBlock._id || userToBlock.id || userToBlock.userId || '');
+    const uid = String(userToBlock._id || userToBlock.id || userToBlock.userId || userToBlock.username || userToBlock.handle || '');
     if (!uid) return;
 
+    const uname = (userToBlock.username || userToBlock.handle || '').toLowerCase();
+
     setBlockedUsers((prev) => {
-      if (prev.some((u) => String(u._id || u.id) === uid)) return prev;
+      if (prev.some((u) => String(u._id || u.id).toLowerCase() === uid.toLowerCase() || (uname && u.username?.toLowerCase() === uname))) return prev;
       const entry = {
         _id: uid,
         id: uid,
-        name: userToBlock.name || 'User',
-        username: userToBlock.username || userToBlock.handle || 'user',
+        name: userToBlock.name || userToBlock.username || 'User',
+        username: userToBlock.username || userToBlock.handle || uid,
         initials:
           userToBlock.initials ||
-          (userToBlock.name || 'U')
+          (userToBlock.name || userToBlock.username || 'U')
             .split(' ')
+            .filter(Boolean)
             .map((w) => w[0])
             .join('')
             .slice(0, 2)
@@ -129,17 +136,40 @@ export function ProfileProvider({ children }) {
       };
       return [entry, ...prev];
     });
+
+    if (/^[0-9a-fA-F]{24}$/.test(uid)) {
+      userApi.blockUser(uid).catch((err) => {
+        console.warn('Backend blockUser deferred:', err.message);
+      });
+    }
   }
 
   function unblockUser(userId) {
-    const uid = String(userId);
-    setBlockedUsers((prev) => prev.filter((u) => String(u._id || u.id) !== uid));
+    if (!userId) return;
+    const uid = String(userId).toLowerCase();
+    setBlockedUsers((prev) =>
+      prev.filter((u) => {
+        const entryId = String(u._id || u.id || '').toLowerCase();
+        const entryUsername = (u.username || '').toLowerCase();
+        return entryId !== uid && entryUsername !== uid;
+      })
+    );
+
+    if (/^[0-9a-fA-F]{24}$/.test(userId)) {
+      userApi.unblockUser(userId).catch((err) => {
+        console.warn('Backend unblockUser deferred:', err.message);
+      });
+    }
   }
 
   function isUserBlocked(userId) {
     if (!userId) return false;
-    const uid = String(userId);
-    return blockedUsers.some((u) => String(u._id || u.id) === uid);
+    const uid = String(userId).toLowerCase();
+    return blockedUsers.some(
+      (u) =>
+        String(u._id || u.id || '').toLowerCase() === uid ||
+        Boolean(u.username && u.username.toLowerCase() === uid)
+    );
   }
 
   return (

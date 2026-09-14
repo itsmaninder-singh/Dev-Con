@@ -188,6 +188,11 @@
   gap: 18px;
 }
 
+.room-shell.full-width {
+  grid-template-columns: 1fr;
+  max-width: 1440px;
+}
+
 .room-hero {
   grid-column: 1 / -1;
   display: flex;

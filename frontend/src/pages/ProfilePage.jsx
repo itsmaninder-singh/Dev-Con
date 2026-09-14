@@ -89,9 +89,55 @@ export default function ProfilePage() {
       .join('')
       .toUpperCase() || 'PN';
 
-  const targetUserId = activeUser?._id || activeUser?.id;
+  const avatarUrl =
+    activeUser?.avatarUrl ||
+    activeUser?.profilePicture ||
+    profile?.avatarUrl ||
+    profile?.profilePicture ||
+    user?.profilePicture;
+
+  const coverUrl =
+    activeUser?.coverUrl ||
+    activeUser?.coverPicture ||
+    profile?.coverUrl ||
+    profile?.coverPicture ||
+    user?.coverPicture;
+
+  const handleAvatarUpload = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result;
+      updateProfile({ avatarUrl: dataUrl, profilePicture: dataUrl });
+      showToast('Profile picture updated');
+    };
+    reader.readAsDataURL(file);
+
+    try {
+      const formData = new FormData();
+      formData.append('profilePicture', file);
+      userApi.uploadProfilePicture(formData)
+        .then((res) => {
+          if (res?.profilePicture) {
+            updateProfile({ avatarUrl: res.profilePicture, profilePicture: res.profilePicture });
+          }
+        })
+        .catch((err) => console.warn('Backend profile upload deferred:', err.message));
+    } catch (_) {}
+  };
+
+  const targetUserId = activeUser?._id || activeUser?.id || username || handle;
+  const isBlocked = !isOwnProfile && Boolean(
+    isUserBlocked(targetUserId) ||
+    isUserBlocked(handle) ||
+    (username && isUserBlocked(username))
+  );
 
   const handleMessage = () => {
+    if (isBlocked) {
+      showToast(`Cannot message @${handle} while blocked. Unblock first.`);
+      return;
+    }
     // Jump straight into DM with this person via ChatUIContext
     openDirectChatWith(targetUserId, { name, initial: initials });
   };
@@ -288,6 +334,9 @@ export default function ProfilePage() {
         handleAvatarMove={handleAvatarMove}
         handleAvatarLeave={handleAvatarLeave}
         initials={initials}
+        avatarUrl={avatarUrl}
+        coverUrl={coverUrl}
+        onAvatarUpload={handleAvatarUpload}
         name={name}
         handle={handle}
         college={college}
@@ -301,25 +350,86 @@ export default function ProfilePage() {
         targetUserId={targetUserId}
         isOwnProfile={isOwnProfile}
         onMessage={handleMessage}
-        isBlocked={isUserBlocked(handle || name)}
+        isBlocked={isBlocked}
         onBlockToggle={() => {
-          const isBlocked = isUserBlocked(handle || name);
           if (isBlocked) {
-            unblockUser(handle || name);
+            unblockUser(targetUserId);
+            if (handle && handle !== targetUserId) unblockUser(handle);
+            if (username && username !== targetUserId) unblockUser(username);
             showToast(`Unblocked ${name}`);
           } else {
-            blockUser({ id: handle || name, name, username: handle, initials });
+            blockUser({
+              _id: activeUser?._id || activeUser?.id || targetUserId,
+              id: activeUser?._id || activeUser?.id || targetUserId,
+              name,
+              username: handle || username,
+              initials,
+            });
             showToast(`Blocked ${name}`);
           }
         }}
         onOpenReport={() => setReportModalOpen(true)}
       />
 
+      {isBlocked && (
+        <div
+          style={{
+            margin: '16px 6% 0',
+            padding: '12px 18px',
+            borderRadius: '14px',
+            background: 'rgba(255, 120, 120, 0.12)',
+            border: '1px solid rgba(255, 120, 120, 0.28)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            color: '#ff98a2',
+            fontSize: '13.5px',
+            fontWeight: 500,
+            position: 'relative',
+            zIndex: 3,
+            animation: 'fadeIn 0.2s ease',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '16px' }}>🚫</span>
+            <span>You have blocked <strong>@{handle}</strong>. They cannot message or interact with you.</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              unblockUser(targetUserId);
+              if (handle && handle !== targetUserId) unblockUser(handle);
+              if (username && username !== targetUserId) unblockUser(username);
+              showToast(`Unblocked ${name}`);
+            }}
+            style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              borderRadius: '8px',
+              padding: '5px 12px',
+              color: '#fff',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Unblock
+          </button>
+        </div>
+      )}
+
       <ReportUserModal
         isOpen={reportModalOpen}
         onClose={() => setReportModalOpen(false)}
-        targetUser={{ _id: handle || 'user_1', name, username: handle }}
-        onReportSuccess={() => showToast(`Report filed for @${handle}`)}
+        targetUser={{
+          _id: activeUser?._id || activeUser?.id || targetUserId,
+          id: activeUser?._id || activeUser?.id || targetUserId,
+          name,
+          username: handle || username,
+        }}
+        onReportSuccess={() => showToast(`Report filed for @${handle || username}`)}
       />
 
       {/* Main Grid Layout */}
@@ -333,6 +443,7 @@ export default function ProfilePage() {
           repFillRef={repFillRef}
           repScoreRef={repScoreRef}
           navigate={navigate}
+          isOwnProfile={isOwnProfile}
         />
 
         <ProfileTabs

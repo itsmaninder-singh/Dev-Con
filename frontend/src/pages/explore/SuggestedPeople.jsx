@@ -151,9 +151,10 @@ export default function SuggestedPeople() {
               style={{ animationDelay: `${idx * 40}ms` }}
               onClick={() => handleCardClick(item.id)}
               onDoubleClick={(e) => {
+                e.preventDefault();
                 e.stopPropagation();
-                const target = item.username || (item.name ? item.name.toLowerCase().replace(/\s+/g, '') : item.id);
-                navigate(`/profile/${target}`);
+                const target = item.username || item._id || item.id || (item.name ? item.name.toLowerCase().replace(/\s+/g, '') : '');
+                if (target) navigate(`/profile/${target}`);
               }}
               title="Double-click to view profile"
               onMouseMove={(e) => {

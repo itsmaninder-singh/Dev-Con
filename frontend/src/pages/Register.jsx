@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { User, AtSign, Mail, Lock, Phone, AlertCircle, Loader2 } from "lucide-react";
 import AuthLayout from "../components/AuthLayout.jsx";
 import FormField from "../components/FormField.jsx";
@@ -23,6 +23,8 @@ const initialForm = {
 export default function Register() {
   const { register } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const nextParam = searchParams.get("next");
 
   const [form, setForm] = useState(initialForm);
   const [fieldErrors, setFieldErrors] = useState({});
@@ -68,7 +70,7 @@ export default function Register() {
       const { phoneNumber, terms, ...rest } = form;
       const payload = phoneNumber.trim() ? { ...rest, phoneNumber } : rest;
       await register(payload);
-      navigate("/workspace");
+      navigate(nextParam || "/workspace", { replace: true });
     } catch (err) {
       setError(err.message || "Registration failed. Please try again.");
     } finally {

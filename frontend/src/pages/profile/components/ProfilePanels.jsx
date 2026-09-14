@@ -9,6 +9,7 @@ export function ProfilePanels({
   repFillRef,
   repScoreRef,
   navigate,
+  isOwnProfile = false,
 }) {
   const userBio =
     bio ||
@@ -34,7 +35,7 @@ export function ProfilePanels({
       <div className="profile-panel" id="panelAbout">
         <div className="panel-title-row">
           <h4>About</h4>
-          {navigate && (
+          {isOwnProfile && navigate && (
             <button
               type="button"
               className="mini-edit-btn"

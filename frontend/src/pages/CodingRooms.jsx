@@ -3,6 +3,23 @@ import { useNavigate } from 'react-router-dom';
 import { useProfile } from '../context/ProfileContext';
 import { useAuth } from '../context/AuthContext';
 import { connectSocket, getSocket } from '../lib/socket';
+import {
+  Save,
+  Circle,
+  CircleDot,
+  Check,
+  CheckCircle2,
+  Code2,
+  Kanban,
+  FileText,
+  Link2,
+  Users,
+  User,
+  Copy,
+  ExternalLink,
+  Plus,
+  Layers,
+} from 'lucide-react';
 import './coding-rooms.css';
 import RoomLobby from './RoomLobby';
 
@@ -98,6 +115,162 @@ function LiveRoom({ room, onCreate, onLeave }) {
   // Room chat state
   const [messages, setMessages] = useState([]);
   const [message, setMessage] = useState('');
+
+  // Kanban / Task board state for session (4 columns, priority, categories)
+  const KANBAN_COLUMNS = [
+    { id: 'todo', title: 'To Do', color: '#ff98a2', icon: '📌' },
+    { id: 'in-progress', title: 'In Progress', color: '#8fd6ff', icon: '⚡' },
+    { id: 'in-review', title: 'In Review', color: '#ffd43b', icon: '🔍' },
+    { id: 'done', title: 'Done', color: '#81c784', icon: '✅' },
+  ];
+
+  const [boardTasks, setBoardTasks] = useState([
+    { id: 'task-1', title: 'Setup project boilerplate & dependencies', status: 'done', priority: 'medium', category: 'DevOps', assignee: 'You' },
+    { id: 'task-2', title: 'Implement core matchmaking logic', status: 'in-progress', priority: 'high', category: 'Backend', assignee: 'Karan' },
+    { id: 'task-3', title: 'Add real-time websocket synchronization', status: 'in-review', priority: 'high', category: 'API', assignee: 'Aditi' },
+    { id: 'task-4', title: 'Test edge-case handling & write unit tests', status: 'todo', priority: 'low', category: 'Frontend', assignee: 'Unassigned' },
+  ]);
+
+  const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [newTaskStatus, setNewTaskStatus] = useState('todo');
+  const [newTaskPriority, setNewTaskPriority] = useState('medium');
+  const [newTaskCategory, setNewTaskCategory] = useState('Frontend');
+  const [newTaskAssignee, setNewTaskAssignee] = useState('You');
+  const [taskModalOpen, setTaskModalOpen] = useState(false);
+  const [boardPriorityFilter, setBoardPriorityFilter] = useState('all');
+  const [boardAssigneeFilter, setBoardAssigneeFilter] = useState('all');
+  const [boardSearch, setBoardSearch] = useState('');
+
+  // Overview Scratchpad & Resources state
+  const [roomNotes, setRoomNotes] = useState(
+    `# ${room.name} — Workspace Scratchpad\n\n` +
+    `## Session Goals\n` +
+    `- [x] Initialize shared project workspace\n` +
+    `- [ ] Build real-time pair programming interface\n` +
+    `- [ ] Review PRs and deploy staging build\n\n` +
+    `## Architecture & Notes\n` +
+    `- Frontend: React + Socket.io for live collaboration\n` +
+    `- State: Reactive sprint board & real-time file sharing\n` +
+    `- API: REST routes + WebSocket rooms for instant sync\n`
+  );
+
+  const [pinnedResources, setPinnedResources] = useState([
+    { id: 'res-1', title: 'GitHub Repository', url: 'https://github.com', category: 'Code' },
+    { id: 'res-2', title: 'Figma Design System', url: 'https://figma.com', category: 'Design' },
+    { id: 'res-3', title: 'API Documentation', url: 'https://devconnect.io/docs', category: 'Docs' },
+  ]);
+  const [newResourceOpen, setNewResourceOpen] = useState(false);
+  const [newResourceTitle, setNewResourceTitle] = useState('');
+  const [newResourceUrl, setNewResourceUrl] = useState('');
+  const [newResourceCat, setNewResourceCat] = useState('Code');
+  const [memberRoles, setMemberRoles] = useState({
+    me: 'Team Lead',
+  });
+
+  const handleAddTask = (e) => {
+    if (e) e.preventDefault();
+    if (!newTaskTitle.trim()) return;
+    const task = {
+      id: `task-${Date.now()}`,
+      title: newTaskTitle.trim(),
+      status: newTaskStatus,
+      priority: newTaskPriority,
+      category: newTaskCategory,
+      assignee: newTaskAssignee || displayName,
+    };
+    setBoardTasks((prev) => [...prev, task]);
+    setNewTaskTitle('');
+    setTaskModalOpen(false);
+    setToast('Task added to sprint board');
+  };
+
+  const handleMoveTask = (taskId, newStatus) => {
+    setBoardTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t))
+    );
+  };
+
+  const handleMoveTaskDir = (taskId, direction) => {
+    const colOrder = ['todo', 'in-progress', 'in-review', 'done'];
+    setBoardTasks((prev) =>
+      prev.map((t) => {
+        if (t.id !== taskId) return t;
+        const currIdx = colOrder.indexOf(t.status);
+        const nextIdx =
+          direction === 'next'
+            ? Math.min(currIdx + 1, colOrder.length - 1)
+            : Math.max(currIdx - 1, 0);
+        return { ...t, status: colOrder[nextIdx] };
+      })
+    );
+  };
+
+  const handleDeleteTask = (taskId) => {
+    setBoardTasks((prev) => prev.filter((t) => t.id !== taskId));
+    setToast('Task removed');
+  };
+
+  const handleAddResource = (e) => {
+    if (e) e.preventDefault();
+    if (!newResourceTitle.trim() || !newResourceUrl.trim()) return;
+    let url = newResourceUrl.trim();
+    if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+    const res = {
+      id: `res-${Date.now()}`,
+      title: newResourceTitle.trim(),
+      url,
+      category: newResourceCat,
+    };
+    setPinnedResources((prev) => [...prev, res]);
+    setNewResourceTitle('');
+    setNewResourceUrl('');
+    setNewResourceOpen(false);
+    setToast('Resource link pinned to room');
+  };
+
+  const handleDeleteResource = (resId) => {
+    setPinnedResources((prev) => prev.filter((r) => r.id !== resId));
+    setToast('Resource link removed');
+  };
+
+  const insertTemplate = (type) => {
+    if (type === 'arch') {
+      setRoomNotes(
+        (prev) =>
+          prev +
+          `\n\n## Architecture Blueprint\n` +
+          `- **Client**: React + Vite, SPA, Socket.io client\n` +
+          `- **Server**: Node/Express, WebSocket room '${room.code}'\n` +
+          `- **Data Flow**: Optimistic local state with server broadcast ack\n` +
+          `- **Key Endpoints**: /api/rooms/:id/session, /api/rooms/tasks\n`
+      );
+      setToast('Architecture template inserted');
+    } else if (type === 'api') {
+      setRoomNotes(
+        (prev) =>
+          prev +
+          `\n\n## API Endpoints Spec\n` +
+          `| Method | Path | Description | Status |\n` +
+          `|---|---|---|---|\n` +
+          `| POST | /rooms/join | Join session with room code | Active |\n` +
+          `| GET | /rooms/files | List workspace files | Active |\n` +
+          `| PUT | /rooms/files/:name | Save file content | In Review |\n`
+      );
+      setToast('API spec template inserted');
+    } else if (type === 'meeting') {
+      setRoomNotes(
+        (prev) =>
+          prev +
+          `\n\n## Meeting Minutes (${new Date().toLocaleDateString()})\n` +
+          `- **Attendees**: ${connectedUsers.map((u) => u.name).join(', ')}\n` +
+          `- **Discussion**: Aligning on feature requirements & MVP demo deadline.\n` +
+          `- **Decisions Made**:\n` +
+          `  1. Sprint Board tasks must be updated before merging code.\n` +
+          `  2. Code runs in the integrated terminal sandbox.\n`
+      );
+      setToast('Meeting notes template inserted');
+    }
+  };
 
   const textareaRef = useRef(null);
   const gutterRef = useRef(null);
@@ -615,6 +788,17 @@ function LiveRoom({ room, onCreate, onLeave }) {
     setMessage('');
   };
 
+  const totalTasks = boardTasks.length;
+  const completedTasks = boardTasks.filter((t) => t.status === 'done').length;
+  const progressPct = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+  const filteredBoardTasks = boardTasks.filter((t) => {
+    if (boardPriorityFilter !== 'all' && t.priority !== boardPriorityFilter) return false;
+    if (boardAssigneeFilter === 'mine' && t.assignee !== 'You' && t.assignee !== displayName) return false;
+    if (boardSearch.trim() && !t.title.toLowerCase().includes(boardSearch.trim().toLowerCase())) return false;
+    return true;
+  });
+
   const clock = new Date(session * 1000).toISOString().slice(11, 19);
 
   return (
@@ -622,7 +806,7 @@ function LiveRoom({ room, onCreate, onLeave }) {
       <div className="ambient" />
       <div className="room-subnav">
         <div className="crumb">
-          <button className="back" onClick={onLeave}>← Rooms</button> / {room.name} / <b>Live Room</b>
+          <button className="back" onClick={onLeave}>← Rooms</button> / {room.name} / <b>{activeTab}</b>
         </div>
         <div className="nav-actions">
           <button className="outline-btn" onClick={onCreate}>
@@ -649,307 +833,1327 @@ function LiveRoom({ room, onCreate, onLeave }) {
         ))}
       </div>
 
-      <main className="room-shell">
-        <header className="room-hero">
-          <div>
-            <div className="eyebrow">Live collaboration</div>
-            <h1>
-              {room.name.split(' ')[0]} <em>builds</em>
-              <br />
-              in the open.
-            </h1>
-          </div>
-          <div className="metrics">
-            <Metric value={clock} label="Session time" />
-            <Metric value={`${connectedUsers.length} / 4`} label="Connected" />
-            <Metric value={`+${changeCount}`} label="Changes" />
-          </div>
-        </header>
+      <main className={`room-shell ${activeTab !== 'Live Room' ? 'full-width' : ''}`}>
+        {/* =========================================================================
+            TAB 1: OVERVIEW (Room Mission Control, Notes, Resources, & Sprint Vitals)
+            ========================================================================= */}
+        {activeTab === 'Overview' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
+            {/* Overview Hero */}
+            <header className="room-hero" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '20px' }}>
+              <div>
+                <div className="eyebrow">ROOM MISSION CONTROL</div>
+                <h1 style={{ fontSize: 'clamp(28px, 3.5vw, 44px)', margin: '6px 0 8px' }}>
+                  {room.name}
+                </h1>
+                <p style={{ margin: 0, color: 'var(--muted)', fontSize: '13.5px', maxWidth: '640px', lineHeight: 1.5 }}>
+                  Central workspace dashboard for architectural notes, live sprint progression, pinned developer resources, and team member roles.
+                </p>
+              </div>
+              <div className="metrics">
+                <Metric value={clock} label="Session duration" />
+                <Metric value={`${progressPct}%`} label="Sprint progress" />
+                <Metric value={`${connectedUsers.length} online`} label="Active builders" />
+              </div>
+            </header>
 
-        <section className="editor">
-          <div className="editor-head">
-            <div className="file-tabs" style={{ display: 'flex', alignItems: 'center', gap: '4px', overflowX: 'auto', maxWidth: '55%' }}>
-              {Object.keys(files).map((f) => {
-                const isActive = tab === f;
-                return (
-                  <div
-                    key={f}
+            {/* Quick Navigation Hub */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', padding: '14px 20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <span style={{ fontSize: '12px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: 600 }}>Quick Actions:</span>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('Live Room')}
+                  style={{
+                    background: '#ff98a2',
+                    color: '#1a1012',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '7px 14px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    boxShadow: '0 0 14px rgba(255, 152, 162, 0.25)',
+                  }}
+                >
+                  <Code2 size={13} strokeWidth={2.5} />
+                  <span>Open Code Editor</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('Board')}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.07)',
+                    color: '#f2f1ed',
+                    border: '1px solid rgba(255, 255, 255, 0.14)',
+                    borderRadius: '8px',
+                    padding: '7px 14px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <Kanban size={13} strokeWidth={2.2} />
+                  <span>Open Sprint Board ({totalTasks - completedTasks} remaining)</span>
+                </button>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '12px', color: 'var(--muted)' }}>Room Code:</span>
+                <span style={{ fontFamily: 'monospace', fontWeight: 800, color: '#ff98a2', fontSize: '15px', letterSpacing: '2px', background: 'rgba(255, 152, 162, 0.1)', padding: '4px 10px', borderRadius: '6px', border: '1px solid rgba(255, 152, 162, 0.3)' }}>
+                  {room.code}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(room.code);
+                    setToast(`Room code ${room.code} copied to clipboard!`);
+                  }}
+                  style={{
+                    background: 'none',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    color: '#fff',
+                    borderRadius: '6px',
+                    padding: '5px 10px',
+                    fontSize: '11px',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                  }}
+                >
+                  <Copy size={11} />
+                  <span>Copy Link</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Sprint Progress Bar Card */}
+            <div style={{ background: 'rgba(18, 18, 22, 0.85)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '20px 24px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
+                <div>
+                  <span style={{ fontSize: '10.5px', fontWeight: 700, color: '#ff98a2', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                    Active Sprint Velocity
+                  </span>
+                  <div style={{ fontSize: '16px', fontWeight: 700, color: '#f2f1ed', marginTop: '2px' }}>
+                    {completedTasks} of {totalTasks} milestones completed ({progressPct}%)
+                  </div>
+                </div>
+
+                {/* THEMED MINIMALIST STATUS BADGES (NO AI EMOJIS) */}
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span
                     style={{
-                      position: 'relative',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      color: '#ff98a2',
+                      background: 'rgba(255, 152, 162, 0.08)',
+                      border: '1px solid rgba(255, 152, 162, 0.25)',
+                      padding: '4px 10px',
+                      borderRadius: '20px',
                       display: 'inline-flex',
                       alignItems: 'center',
+                      gap: '6px',
                     }}
                   >
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ff98a2', boxShadow: '0 0 6px rgba(255, 152, 162, 0.6)' }} />
+                    <span>{boardTasks.filter((t) => t.status === 'todo').length} To Do</span>
+                  </span>
+
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      color: '#8fd6ff',
+                      background: 'rgba(143, 214, 255, 0.08)',
+                      border: '1px solid rgba(143, 214, 255, 0.25)',
+                      padding: '4px 10px',
+                      borderRadius: '20px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#8fd6ff', boxShadow: '0 0 6px rgba(143, 214, 255, 0.6)' }} />
+                    <span>{boardTasks.filter((t) => t.status === 'in-progress').length} In Progress</span>
+                  </span>
+
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      color: '#ffd43b',
+                      background: 'rgba(255, 212, 59, 0.08)',
+                      border: '1px solid rgba(255, 212, 59, 0.25)',
+                      padding: '4px 10px',
+                      borderRadius: '20px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ffd43b', boxShadow: '0 0 6px rgba(255, 212, 59, 0.6)' }} />
+                    <span>{boardTasks.filter((t) => t.status === 'in-review').length} In Review</span>
+                  </span>
+
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      color: '#81c784',
+                      background: 'rgba(129, 199, 132, 0.08)',
+                      border: '1px solid rgba(129, 199, 132, 0.25)',
+                      padding: '4px 10px',
+                      borderRadius: '20px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <Check size={11} strokeWidth={3} />
+                    <span>{completedTasks} Done</span>
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ height: '7px', background: 'rgba(255, 255, 255, 0.06)', borderRadius: '4px', overflow: 'hidden' }}>
+                <div
+                  style={{
+                    height: '100%',
+                    width: `${progressPct}%`,
+                    background: 'linear-gradient(90deg, #ff98a2 0%, #ffb4be 50%, #81c784 100%)',
+                    borderRadius: '4px',
+                    boxShadow: '0 0 10px rgba(255, 152, 162, 0.35)',
+                    transition: 'width 0.3s ease',
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* 2-Column Section: Notes & Scratchpad (Left) + Resources & Team Roles (Right) */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)', gap: '20px' }}>
+              {/* Left: Collaborative Shared Scratchpad */}
+              <div style={{ background: 'rgba(18, 18, 22, 0.85)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '22px', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '14.5px', fontWeight: 700, color: '#f2f1ed', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <FileText size={15} color="#ff98a2" strokeWidth={2.2} />
+                      <span>Shared Room Scratchpad & Decisions</span>
+                    </h3>
+                    <small style={{ color: 'var(--muted)', fontSize: '11px' }}>Real-time workspace notes, architecture blueprints & specs</small>
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px' }}>
                     <button
-                      onClick={() => {
-                        setTab(f);
-                        setToast(`${f} opened`);
-                      }}
-                      className={isActive ? 'active' : ''}
+                      type="button"
+                      onClick={() => insertTemplate('arch')}
+                      title="Insert Architecture template"
+                      style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.12)', color: 'var(--muted)', borderRadius: '6px', padding: '4px 8px', fontSize: '10.5px', cursor: 'pointer' }}
+                    >
+                      + Arch
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => insertTemplate('api')}
+                      title="Insert API spec template"
+                      style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.12)', color: 'var(--muted)', borderRadius: '6px', padding: '4px 8px', fontSize: '10.5px', cursor: 'pointer' }}
+                    >
+                      + API
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => insertTemplate('meeting')}
+                      title="Insert Meeting Minutes template"
+                      style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.12)', color: 'var(--muted)', borderRadius: '6px', padding: '4px 8px', fontSize: '10.5px', cursor: 'pointer' }}
+                    >
+                      + Minutes
+                    </button>
+                  </div>
+                </div>
+
+                <textarea
+                  value={roomNotes}
+                  onChange={(e) => setRoomNotes(e.target.value)}
+                  placeholder="Type notes, decisions, architecture decisions or paste API contracts here..."
+                  style={{
+                    flex: 1,
+                    minHeight: '260px',
+                    background: 'rgba(0, 0, 0, 0.45)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '10px',
+                    padding: '14px',
+                    color: '#e4e4e7',
+                    fontSize: '12.5px',
+                    lineHeight: 1.6,
+                    fontFamily: 'monospace',
+                    outline: 'none',
+                    resize: 'vertical',
+                  }}
+                />
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--muted)' }}>
+                    {roomNotes.length} characters · Auto-saved locally
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setToast('Session notes saved to room!')}
+                    style={{
+                      background: 'rgba(255, 152, 162, 0.15)',
+                      border: '1px solid rgba(255, 152, 162, 0.35)',
+                      color: '#ff98a2',
+                      borderRadius: '8px',
+                      padding: '6px 14px',
+                      fontSize: '11.5px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Save Notes
+                  </button>
+                </div>
+              </div>
+
+              {/* Right: Pinned Resources & Team Roster */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {/* Pinned Resources Card */}
+                <div style={{ background: 'rgba(18, 18, 22, 0.85)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                    <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#f2f1ed', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Link2 size={15} color="#ff98a2" strokeWidth={2.2} />
+                      <span>Pinned Links & Resources</span>
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setNewResourceOpen(!newResourceOpen)}
                       style={{
-                        paddingRight: Object.keys(files).length > 1 ? '24px' : '12px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '5px',
+                        background: 'none',
+                        border: '1px dashed rgba(255, 152, 162, 0.5)',
+                        color: '#ff98a2',
+                        borderRadius: '6px',
+                        padding: '4px 8px',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
                       }}
                     >
-                      <span>{f}</span>
+                      {newResourceOpen ? '✕ Cancel' : '+ Pin Link'}
                     </button>
-                    {Object.keys(files).length > 1 && (
-                      <button
-                        onClick={(e) => handleDeleteFile(f, e)}
-                        title={`Delete ${f}`}
+                  </div>
+
+                  {newResourceOpen && (
+                    <form onSubmit={handleAddResource} style={{ background: 'rgba(0, 0, 0, 0.4)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '10px', padding: '12px', marginBottom: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <input
+                        type="text"
+                        placeholder="Resource title (e.g. Figma wireframe)"
+                        value={newResourceTitle}
+                        onChange={(e) => setNewResourceTitle(e.target.value)}
+                        style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '6px', padding: '6px 10px', color: '#fff', fontSize: '12px', outline: 'none' }}
+                        required
+                      />
+                      <input
+                        type="url"
+                        placeholder="URL (https://...)"
+                        value={newResourceUrl}
+                        onChange={(e) => setNewResourceUrl(e.target.value)}
+                        style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '6px', padding: '6px 10px', color: '#fff', fontSize: '12px', outline: 'none' }}
+                        required
+                      />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <select
+                          value={newResourceCat}
+                          onChange={(e) => setNewResourceCat(e.target.value)}
+                          style={{ background: '#1c1c22', border: '1px solid rgba(255, 255, 255, 0.15)', color: '#fff', borderRadius: '6px', padding: '4px 8px', fontSize: '11px' }}
+                        >
+                          <option value="Code">Code</option>
+                          <option value="Design">Design</option>
+                          <option value="Docs">Docs</option>
+                          <option value="Other">Other</option>
+                        </select>
+                        <button
+                          type="submit"
+                          style={{ background: '#ff98a2', color: '#1a1012', border: 'none', borderRadius: '6px', padding: '5px 12px', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}
+                        >
+                          Save Link
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {pinnedResources.map((r) => (
+                      <div
+                        key={r.id}
                         style={{
-                          position: 'absolute',
-                          right: '6px',
-                          background: 'none',
-                          border: 'none',
-                          color: isActive ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 255, 255, 0.3)',
-                          cursor: 'pointer',
-                          fontSize: '13px',
-                          lineHeight: 1,
-                          padding: '2px',
                           display: 'flex',
+                          justifyContent: 'space-between',
                           alignItems: 'center',
-                          justifyContent: 'center',
-                          borderRadius: '50%',
+                          padding: '8px 12px',
+                          background: 'rgba(255, 255, 255, 0.03)',
+                          border: '1px solid rgba(255, 255, 255, 0.07)',
+                          borderRadius: '8px',
                         }}
-                        onMouseEnter={(e) => (e.currentTarget.style.color = '#ff98a2')}
-                        onMouseLeave={(e) => (e.currentTarget.style.color = isActive ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 255, 255, 0.3)')}
                       >
-                        ×
-                      </button>
-                    )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '9px', overflow: 'hidden' }}>
+                          <span style={{ display: 'flex', alignItems: 'center' }}>
+                            {r.category === 'Design' ? (
+                              <Layers size={13} color="#ff98a2" />
+                            ) : r.category === 'Docs' ? (
+                              <FileText size={13} color="#ffd43b" />
+                            ) : r.category === 'Code' ? (
+                              <Code2 size={13} color="#8fd6ff" />
+                            ) : (
+                              <Link2 size={13} color="#81c784" />
+                            )}
+                          </span>
+                          <a
+                            href={r.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ color: '#f2f1ed', fontSize: '12px', fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                          >
+                            <span>{r.title}</span>
+                            <ExternalLink size={10} style={{ opacity: 0.6 }} />
+                          </a>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '10px', color: 'var(--muted)', background: 'rgba(255, 255, 255, 0.06)', padding: '2px 6px', borderRadius: '4px' }}>
+                            {r.category}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteResource(r.id)}
+                            style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '13px', padding: '2px' }}
+                            title="Remove"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Team Roster & Roles */}
+                <div style={{ background: 'rgba(18, 18, 22, 0.85)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '20px' }}>
+                  <h3 style={{ margin: '0 0 14px', fontSize: '14px', fontWeight: 700, color: '#f2f1ed', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Users size={15} color="#ff98a2" strokeWidth={2.2} />
+                    <span>Connected Builders & Roles</span>
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {connectedUsers.map((u) => {
+                      const userRole = memberRoles[u.id] || (u.id === 'me' ? 'Team Lead' : 'Fullstack Dev');
+                      const assignedCount = boardTasks.filter(
+                        (t) => t.assignee === u.name || (u.id === 'me' && t.assignee === 'You')
+                      ).length;
+
+                      return (
+                        <div
+                          key={u.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            background: 'rgba(255, 255, 255, 0.03)',
+                            border: '1px solid rgba(255, 255, 255, 0.07)',
+                            borderRadius: '10px',
+                            padding: '10px 12px',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <Avatar person={u} />
+                            <div>
+                              <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#f2f1ed' }}>
+                                {u.name}
+                              </div>
+                              <div style={{ fontSize: '10.5px', color: 'var(--muted)' }}>
+                                {assignedCount} tasks assigned · Active
+                              </div>
+                            </div>
+                          </div>
+
+                          <select
+                            value={userRole}
+                            onChange={(e) => {
+                              setMemberRoles((prev) => ({ ...prev, [u.id]: e.target.value }));
+                              setToast(`${u.name} role set to ${e.target.value}`);
+                            }}
+                            style={{
+                              background: 'rgba(0, 0, 0, 0.4)',
+                              border: '1px solid rgba(255, 255, 255, 0.15)',
+                              color: '#ff98a2',
+                              borderRadius: '6px',
+                              padding: '4px 8px',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              outline: 'none',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <option value="Team Lead">Team Lead</option>
+                            <option value="Frontend Engineer">Frontend Engineer</option>
+                            <option value="Backend / API">Backend / API</option>
+                            <option value="Fullstack Dev">Fullstack Dev</option>
+                            <option value="UI/UX Designer">UI/UX Designer</option>
+                            <option value="DevOps">DevOps</option>
+                          </select>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* =========================================================================
+            TAB 2: BOARD (Full-Width Interactive Sprint Kanban Board)
+            ========================================================================= */}
+        {activeTab === 'Board' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* Board Hero */}
+            <header className="room-hero" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '18px' }}>
+              <div>
+                <div className="eyebrow">COLLABORATIVE SPRINT TRACKER</div>
+                <h1 style={{ fontSize: 'clamp(28px, 3.5vw, 44px)', margin: '6px 0 8px' }}>
+                  Milestones & Sprint Board
+                </h1>
+                <p style={{ margin: 0, color: 'var(--muted)', fontSize: '13.5px', maxWidth: '640px', lineHeight: 1.5 }}>
+                  Track development velocity, distribute work packages, and organize features for {room.name}.
+                </p>
+              </div>
+              <div className="metrics">
+                <Metric value={`${progressPct}%`} label="Sprint velocity" />
+                <Metric value={`${completedTasks} / ${totalTasks}`} label="Completed" />
+                <Metric value={`${totalTasks - completedTasks} active`} label="In flight" />
+              </div>
+            </header>
+
+            {/* Board Controls Toolbar */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '12px',
+                background: 'rgba(18, 18, 22, 0.85)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '14px',
+                padding: '12px 18px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <input
+                  type="text"
+                  placeholder="Search sprint tasks…"
+                  value={boardSearch}
+                  onChange={(e) => setBoardSearch(e.target.value)}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    borderRadius: '8px',
+                    padding: '7px 12px',
+                    color: '#fff',
+                    fontSize: '12px',
+                    outline: 'none',
+                    minWidth: '200px',
+                  }}
+                />
+
+                <select
+                  value={boardPriorityFilter}
+                  onChange={(e) => setBoardPriorityFilter(e.target.value)}
+                  style={{
+                    background: '#16161b',
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    borderRadius: '8px',
+                    padding: '7px 10px',
+                    color: '#f2f1ed',
+                    fontSize: '12px',
+                    outline: 'none',
+                  }}
+                >
+                  <option value="all">All Priorities</option>
+                  <option value="high">High Priority</option>
+                  <option value="medium">Medium Priority</option>
+                  <option value="low">Low Priority</option>
+                </select>
+
+                <select
+                  value={boardAssigneeFilter}
+                  onChange={(e) => setBoardAssigneeFilter(e.target.value)}
+                  style={{
+                    background: '#16161b',
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    borderRadius: '8px',
+                    padding: '7px 10px',
+                    color: '#f2f1ed',
+                    fontSize: '12px',
+                    outline: 'none',
+                  }}
+                >
+                  <option value="all">All Assignees</option>
+                  <option value="mine">My Tasks Only</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {boardTasks.some((t) => t.status === 'done') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBoardTasks((prev) => prev.filter((t) => t.status !== 'done'));
+                      setToast('Cleared completed tasks');
+                    }}
+                    style={{
+                      background: 'none',
+                      border: '1px solid rgba(255, 255, 255, 0.14)',
+                      color: 'var(--muted)',
+                      borderRadius: '8px',
+                      padding: '7px 12px',
+                      fontSize: '11.5px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Clear Done
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewTaskStatus('todo');
+                    setTaskModalOpen(true);
+                  }}
+                  style={{
+                    background: '#ff98a2',
+                    color: '#1a1012',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '7px 16px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  + Add Sprint Task
+                </button>
+              </div>
+            </div>
+
+            {/* 4-Column Kanban Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+              {KANBAN_COLUMNS.map((col) => {
+                const colTasks = filteredBoardTasks.filter((t) => t.status === col.id);
+
+                return (
+                  <div
+                    key={col.id}
+                    style={{
+                      background: 'rgba(18, 18, 22, 0.85)',
+                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                      borderRadius: '16px',
+                      padding: '16px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      minHeight: '450px',
+                    }}
+                  >
+                    {/* Column Header */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: col.color }} />
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: '#f2f1ed' }}>
+                          {col.title}
+                        </span>
+                      </div>
+                      <span
+                        style={{
+                          fontSize: '11px',
+                          color: 'var(--muted)',
+                          background: 'rgba(255, 255, 255, 0.07)',
+                          padding: '2px 8px',
+                          borderRadius: '10px',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {colTasks.length}
+                      </span>
+                    </div>
+
+                    {/* Task Cards List */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
+                      {colTasks.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '36px 12px', color: 'rgba(255, 255, 255, 0.3)', fontSize: '12px', fontStyle: 'italic', border: '1px dashed rgba(255, 255, 255, 0.06)', borderRadius: '10px' }}>
+                          No tasks in {col.title}
+                        </div>
+                      ) : (
+                        colTasks.map((task) => {
+                          const priorityColor =
+                            task.priority === 'high'
+                              ? '#ff6b6b'
+                              : task.priority === 'medium'
+                              ? '#ffd43b'
+                              : '#69db7c';
+
+                          return (
+                            <div
+                              key={task.id}
+                              style={{
+                                background: 'rgba(255, 255, 255, 0.04)',
+                                border: '1px solid rgba(255, 255, 255, 0.08)',
+                                borderRadius: '12px',
+                                padding: '12px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px',
+                                transition: 'transform 0.15s ease, border-color 0.15s ease',
+                              }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span
+                                  style={{
+                                    fontSize: '9.5px',
+                                    textTransform: 'uppercase',
+                                    fontWeight: 700,
+                                    letterSpacing: '0.6px',
+                                    color: priorityColor,
+                                    background: `${priorityColor}1a`,
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                  }}
+                                >
+                                  {task.priority || 'medium'}
+                                </span>
+                                {task.category && (
+                                  <span
+                                    style={{
+                                      fontSize: '9.5px',
+                                      color: 'var(--muted)',
+                                      background: 'rgba(255, 255, 255, 0.05)',
+                                      padding: '2px 6px',
+                                      borderRadius: '4px',
+                                    }}
+                                  >
+                                    {task.category}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div style={{ fontSize: '12.5px', color: '#f2f1ed', fontWeight: 500, lineHeight: 1.4 }}>
+                                {task.title}
+                              </div>
+
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '8px', marginTop: '2px' }}>
+                                <span style={{ fontSize: '10.5px', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                  <User size={11} strokeWidth={2.2} />
+                                  <span>{task.assignee}</span>
+                                </span>
+
+                                <div style={{ display: 'flex', gap: '3px' }}>
+                                  {col.id !== 'todo' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMoveTaskDir(task.id, 'prev')}
+                                      style={{ background: 'none', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '4px', color: 'var(--muted)', cursor: 'pointer', fontSize: '10px', padding: '2px 5px' }}
+                                      title="Move Left"
+                                    >
+                                      ←
+                                    </button>
+                                  )}
+                                  {col.id !== 'done' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMoveTaskDir(task.id, 'next')}
+                                      style={{ background: 'none', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '4px', color: 'var(--muted)', cursor: 'pointer', fontSize: '10px', padding: '2px 5px' }}
+                                      title="Move Right"
+                                    >
+                                      →
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteTask(task.id)}
+                                    style={{ background: 'none', border: 'none', color: '#ff6b6b', cursor: 'pointer', fontSize: '12px', padding: '2px 4px' }}
+                                    title="Delete task"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    {/* Quick Column Add Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewTaskStatus(col.id);
+                        setTaskModalOpen(true);
+                      }}
+                      style={{
+                        marginTop: '12px',
+                        background: 'transparent',
+                        border: '1px dashed rgba(255, 255, 255, 0.15)',
+                        borderRadius: '8px',
+                        padding: '8px',
+                        color: 'var(--muted)',
+                        fontSize: '11.5px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = col.color;
+                        e.currentTarget.style.color = col.color;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                        e.currentTarget.style.color = 'var(--muted)';
+                      }}
+                    >
+                      + Add to {col.title}
+                    </button>
                   </div>
                 );
               })}
-              <button
-                type="button"
-                onClick={() => {
-                  setNewFileName('main.py');
-                  setSelectedLang('python');
-                  setNewFileModalOpen(true);
-                }}
-                className="new-file-btn"
-                title="Create new file (Python, C++, Java, JS, HTML, etc.)"
+            </div>
+
+            {/* Task Creation Modal */}
+            {taskModalOpen && (
+              <div
                 style={{
-                  padding: '5px 10px',
-                  borderRadius: '6px',
-                  border: '1px dashed rgba(255, 152, 162, 0.4)',
-                  background: 'rgba(255, 152, 162, 0.08)',
-                  color: 'var(--pink, #ff98a2)',
-                  fontFamily: 'inherit',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  whiteSpace: 'nowrap',
-                  transition: 'all 0.15s ease',
+                  position: 'fixed',
+                  inset: 0,
+                  zIndex: 10000,
+                  background: 'rgba(0, 0, 0, 0.75)',
+                  backdropFilter: 'blur(10px)',
+                  display: 'grid',
+                  placeItems: 'center',
+                  padding: '16px',
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 152, 162, 0.18)';
-                  e.currentTarget.style.borderColor = 'var(--pink, #ff98a2)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 152, 162, 0.08)';
-                  e.currentTarget.style.borderColor = 'rgba(255, 152, 162, 0.4)';
-                }}
+                onClick={() => setTaskModalOpen(false)}
               >
-                + New File
-              </button>
-            </div>
-            <span className="session-label">COLLABORATIVE SESSION</span>
-            <div className="stack">
-              {connectedUsers.map((p) => (
-                <Avatar key={p.id} person={p} small />
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <button
-                className="save-btn"
-                onClick={handleSaveToLocal}
-                title="Save code to your computer"
-                style={{
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  border: '1px solid rgba(255, 255, 255, 0.16)',
-                  color: 'var(--text-hi, #f2f1ed)',
-                  padding: '6px 14px',
-                  borderRadius: '8px',
-                  fontSize: '12.5px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  transition: 'all 0.2s ease',
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.14)')}
-                onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)')}
-              >
-                💾 Save
-              </button>
-              <button className="run" onClick={handleRunCode} disabled={running}>
-                {running ? '⏳ Running…' : '▶ Run'}
-              </button>
-            </div>
-          </div>
-
-          {/* REAL-TIME INTERACTIVE COLLABORATIVE CODE EDITOR */}
-          <div className="editor-code-container">
-            <div className="editor-gutter" ref={gutterRef}>
-              {lines.map((_, i) => (
-                <div key={i} className={`gutter-num ${activeLine === i + 1 ? 'active' : ''}`}>
-                  {i + 1}
-                </div>
-              ))}
-            </div>
-            <div className="editor-textarea-wrap">
-              <textarea
-                ref={textareaRef}
-                className="real-code-textarea"
-                value={currentCode}
-                onChange={handleCodeChange}
-                onKeyDown={handleKeyDown}
-                onScroll={handleScroll}
-                onClick={(e) => {
-                  const line = currentCode.slice(0, e.target.selectionStart).split('\n').length;
-                  setActiveLine(line);
-                }}
-                onKeyUp={(e) => {
-                  const line = currentCode.slice(0, e.target.selectionStart).split('\n').length;
-                  setActiveLine(line);
-                }}
-                placeholder="// Start coding here... Your changes will sync live!"
-                spellCheck="false"
-                autoComplete="off"
-                autoCorrect="off"
-                autoCapitalize="off"
-              />
-            </div>
-          </div>
-
-          {/* REAL-TIME REMOTE TYPING INDICATOR */}
-          <div className="typing-bar">
-            {remoteTyping ? (
-              <div className="typing-indicator">
-                <span className="pulse-dot" />
-                <span>{remoteTyping}</span>
-              </div>
-            ) : (
-              <span>Editing: <b>{tab}</b> · Line {activeLine}, Col 1</span>
-            )}
-            <span style={{ fontSize: '11px', opacity: 0.6 }}>Press Ctrl+Enter to Run</span>
-          </div>
-
-          {/* INTEGRATED TERMINAL (STARTS EMPTY BY DEFAULT) */}
-          <div className="room-terminal">
-            <div className="terminal-header">
-              <div className="terminal-tabs">
-                <button
-                  className={`terminal-tab-btn ${terminalTab === 'terminal' ? 'active' : ''}`}
-                  onClick={() => setTerminalTab('terminal')}
+                <div
+                  style={{
+                    width: '100%',
+                    maxWidth: '460px',
+                    background: '#141419',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    borderRadius: '16px',
+                    padding: '24px',
+                    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.8)',
+                  }}
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  Terminal
-                </button>
-                <button
-                  className={`terminal-tab-btn ${terminalTab === 'output' ? 'active' : ''}`}
-                  onClick={() => setTerminalTab('output')}
-                >
-                  Output
-                </button>
-              </div>
-              <div className="terminal-controls">
-                <button className="terminal-btn" onClick={() => setTerminalLogs([])}>
-                  ⊘ Clear
-                </button>
-                <button className="terminal-btn" onClick={handleRunCode}>
-                  ▶ Run
-                </button>
-              </div>
-            </div>
-
-            <div className="terminal-body" ref={terminalBodyRef}>
-              {terminalLogs.length === 0 ? (
-                <div className="terminal-empty">
-                  <span>Terminal ready. Click <b>▶ Run</b> or press <b>Ctrl+Enter</b> to see output.</span>
-                </div>
-              ) : (
-                terminalLogs.map((log) => (
-                  <div key={log.id} className={`terminal-line ${log.type}`}>
-                    {log.text}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#f2f1ed' }}>
+                      Add Sprint Milestone
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setTaskModalOpen(false)}
+                      style={{ background: 'none', border: 'none', color: '#8e8e93', fontSize: '18px', cursor: 'pointer' }}
+                    >
+                      ✕
+                    </button>
                   </div>
-                ))
-              )}
-            </div>
 
-            <form className="terminal-prompt-row" onSubmit={handleTerminalSubmit}>
-              <span className="terminal-prompt-sym">$</span>
-              <input
-                className="terminal-input"
-                value={terminalCmd}
-                onChange={(e) => setTerminalCmd(e.target.value)}
-                placeholder="Type command (run, clear, ls, help)..."
-              />
-            </form>
-          </div>
-        </section>
+                  <form onSubmit={handleAddTask} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--muted)', marginBottom: '6px', textTransform: 'uppercase' }}>
+                        Task Title *
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Implement WebSocket heartbeat protocol"
+                        value={newTaskTitle}
+                        onChange={(e) => setNewTaskTitle(e.target.value)}
+                        autoFocus
+                        required
+                        style={{
+                          width: '100%',
+                          background: 'rgba(0, 0, 0, 0.5)',
+                          border: '1px solid rgba(255, 255, 255, 0.15)',
+                          borderRadius: '8px',
+                          padding: '10px 12px',
+                          color: '#fff',
+                          fontSize: '13px',
+                          outline: 'none',
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                    </div>
 
-        <aside>
-          <section className="panel">
-            <h2>In this room · {connectedUsers.length}</h2>
-            {connectedUsers.map((p) => (
-              <div className="person" key={p.id}>
-                <Avatar person={p} />
-                <div>
-                  <b>{p.name}</b>
-                  <small>{p.state}</small>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--muted)', marginBottom: '6px', textTransform: 'uppercase' }}>
+                          Status / Column
+                        </label>
+                        <select
+                          value={newTaskStatus}
+                          onChange={(e) => setNewTaskStatus(e.target.value)}
+                          style={{
+                            width: '100%',
+                            background: '#1e1e24',
+                            border: '1px solid rgba(255, 255, 255, 0.15)',
+                            borderRadius: '8px',
+                            padding: '9px 10px',
+                            color: '#fff',
+                            fontSize: '12px',
+                            outline: 'none',
+                          }}
+                        >
+                          <option value="todo">To Do</option>
+                          <option value="in-progress">In Progress</option>
+                          <option value="in-review">In Review</option>
+                          <option value="done">Done</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--muted)', marginBottom: '6px', textTransform: 'uppercase' }}>
+                          Priority
+                        </label>
+                        <select
+                          value={newTaskPriority}
+                          onChange={(e) => setNewTaskPriority(e.target.value)}
+                          style={{
+                            width: '100%',
+                            background: '#1e1e24',
+                            border: '1px solid rgba(255, 255, 255, 0.15)',
+                            borderRadius: '8px',
+                            padding: '9px 10px',
+                            color: '#fff',
+                            fontSize: '12px',
+                            outline: 'none',
+                          }}
+                        >
+                          <option value="high">High Priority</option>
+                          <option value="medium">Medium Priority</option>
+                          <option value="low">Low Priority</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--muted)', marginBottom: '6px', textTransform: 'uppercase' }}>
+                          Category
+                        </label>
+                        <select
+                          value={newTaskCategory}
+                          onChange={(e) => setNewTaskCategory(e.target.value)}
+                          style={{
+                            width: '100%',
+                            background: '#1e1e24',
+                            border: '1px solid rgba(255, 255, 255, 0.15)',
+                            borderRadius: '8px',
+                            padding: '9px 10px',
+                            color: '#fff',
+                            fontSize: '12px',
+                            outline: 'none',
+                          }}
+                        >
+                          <option value="Frontend">Frontend</option>
+                          <option value="Backend">Backend</option>
+                          <option value="API">API</option>
+                          <option value="Bug">Bug</option>
+                          <option value="Design">Design</option>
+                          <option value="DevOps">DevOps</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--muted)', marginBottom: '6px', textTransform: 'uppercase' }}>
+                          Assignee
+                        </label>
+                        <select
+                          value={newTaskAssignee}
+                          onChange={(e) => setNewTaskAssignee(e.target.value)}
+                          style={{
+                            width: '100%',
+                            background: '#1e1e24',
+                            border: '1px solid rgba(255, 255, 255, 0.15)',
+                            borderRadius: '8px',
+                            padding: '9px 10px',
+                            color: '#fff',
+                            fontSize: '12px',
+                            outline: 'none',
+                          }}
+                        >
+                          <option value="You">You ({displayName})</option>
+                          {connectedUsers
+                            .filter((u) => u.id !== 'me')
+                            .map((u) => (
+                              <option key={u.id} value={u.name}>
+                                {u.name}
+                              </option>
+                            ))}
+                          <option value="Unassigned">Unassigned</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setTaskModalOpen(false)}
+                        style={{
+                          background: 'none',
+                          border: '1px solid rgba(255, 255, 255, 0.15)',
+                          borderRadius: '8px',
+                          padding: '8px 16px',
+                          color: '#8e8e93',
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        style={{
+                          background: '#ff98a2',
+                          color: '#1a1012',
+                          border: 'none',
+                          borderRadius: '8px',
+                          padding: '8px 20px',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Add Task
+                      </button>
+                    </div>
+                  </form>
                 </div>
               </div>
-            ))}
-            <button
-              className="invite"
-              onClick={() => {
-                navigator.clipboard?.writeText(room.code);
-                setToast(`Join code ${room.code} copied`);
-              }}
-            >
-              Copy join code · {room.code}
-            </button>
-          </section>
+            )}
+          </div>
+        )}
 
-          <section className="panel chat">
-            <h2>Room chat</h2>
-            <div className="messages">
-              {messages.length === 0 ? (
-                <div style={{ color: 'var(--muted)', fontSize: '11px', textAlign: 'center', padding: '16px 0' }}>
-                  No messages yet. Say hi to your team! 👋
-                </div>
-              ) : (
-                messages.map((m) => (
-                  <div key={m.id} className={`message ${m.who === getSocket()?.id ? 'mine' : ''}`}>
-                    <Avatar person={{ initials: m.initials, color: m.color }} small />
-                    <div>
-                      <div style={{ fontSize: '10px', color: 'var(--muted)', marginBottom: '2px' }}>
-                        {m.userName} · {m.time}
+        {/* =========================================================================
+            TAB 3: LIVE ROOM (Dedicated Multi-File Code Editor, Runner, & Live Chat)
+            ========================================================================= */}
+        {activeTab === 'Live Room' && (
+          <>
+            <header className="room-hero">
+              <div>
+                <div className="eyebrow">LIVE COLLABORATION</div>
+                <h1>
+                  {room.name.split(' ')[0]} <em>builds</em>
+                  <br />
+                  in the open.
+                </h1>
+              </div>
+              <div className="metrics">
+                <Metric value={clock} label="Session time" />
+                <Metric value={`${connectedUsers.length} / 4`} label="Connected" />
+                <Metric value={`+${changeCount}`} label="Changes" />
+              </div>
+            </header>
+
+            <section className="editor">
+              <div className="editor-head">
+                <div className="file-tabs" style={{ display: 'flex', alignItems: 'center', gap: '4px', overflowX: 'auto', maxWidth: '55%' }}>
+                  {Object.keys(files).map((f) => {
+                    const isActive = tab === f;
+                    return (
+                      <div
+                        key={f}
+                        style={{
+                          position: 'relative',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <button
+                          onClick={() => {
+                            setTab(f);
+                            setToast(`${f} opened`);
+                          }}
+                          className={isActive ? 'active' : ''}
+                          style={{
+                            paddingRight: Object.keys(files).length > 1 ? '24px' : '12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                          }}
+                        >
+                          <span>{f}</span>
+                        </button>
+                        {Object.keys(files).length > 1 && (
+                          <button
+                            onClick={(e) => handleDeleteFile(f, e)}
+                            title={`Delete ${f}`}
+                            style={{
+                              position: 'absolute',
+                              right: '6px',
+                              background: 'none',
+                              border: 'none',
+                              color: isActive ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 255, 255, 0.3)',
+                              cursor: 'pointer',
+                              fontSize: '13px',
+                              lineHeight: 1,
+                              padding: '2px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              borderRadius: '50%',
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.color = '#ff98a2')}
+                            onMouseLeave={(e) => (e.currentTarget.style.color = isActive ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 255, 255, 0.3)')}
+                          >
+                            ×
+                          </button>
+                        )}
                       </div>
-                      <span>{m.text}</span>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewFileName('main.py');
+                      setSelectedLang('python');
+                      setNewFileModalOpen(true);
+                    }}
+                    className="new-file-btn"
+                    title="Create new file (Python, C++, Java, JS, HTML, etc.)"
+                    style={{
+                      padding: '5px 10px',
+                      borderRadius: '6px',
+                      border: '1px dashed rgba(255, 152, 162, 0.4)',
+                      background: 'rgba(255, 152, 162, 0.08)',
+                      color: 'var(--pink, #ff98a2)',
+                      fontFamily: 'inherit',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      whiteSpace: 'nowrap',
+                      transition: 'all 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 152, 162, 0.18)';
+                      e.currentTarget.style.borderColor = 'var(--pink, #ff98a2)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 152, 162, 0.08)';
+                      e.currentTarget.style.borderColor = 'rgba(255, 152, 162, 0.4)';
+                    }}
+                  >
+                    + New File
+                  </button>
+                </div>
+                <span className="session-label">COLLABORATIVE SESSION</span>
+                <div className="stack">
+                  {connectedUsers.map((p) => (
+                    <Avatar key={p.id} person={p} small />
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <button
+                    className="save-btn"
+                    onClick={handleSaveToLocal}
+                    title="Save code to your computer"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.08)',
+                      border: '1px solid rgba(255, 255, 255, 0.16)',
+                      color: 'var(--text-hi, #f2f1ed)',
+                      padding: '6px 14px',
+                      borderRadius: '8px',
+                      fontSize: '12.5px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.2s ease',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.14)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)')}
+                  >
+                    <Save size={13} />
+                    <span>Save</span>
+                  </button>
+                  <button className="run" onClick={handleRunCode} disabled={running}>
+                    {running ? '⏳ Running…' : '▶ Run'}
+                  </button>
+                </div>
+              </div>
+
+              {/* REAL-TIME INTERACTIVE COLLABORATIVE CODE EDITOR */}
+              <div className="editor-code-container">
+                <div className="editor-gutter" ref={gutterRef}>
+                  {lines.map((_, i) => (
+                    <div key={i} className={`gutter-num ${activeLine === i + 1 ? 'active' : ''}`}>
+                      {i + 1}
+                    </div>
+                  ))}
+                </div>
+                <div className="editor-textarea-wrap">
+                  <textarea
+                    ref={textareaRef}
+                    className="real-code-textarea"
+                    value={currentCode}
+                    onChange={handleCodeChange}
+                    onKeyDown={handleKeyDown}
+                    onScroll={handleScroll}
+                    onClick={(e) => {
+                      const line = currentCode.slice(0, e.target.selectionStart).split('\n').length;
+                      setActiveLine(line);
+                    }}
+                    onKeyUp={(e) => {
+                      const line = currentCode.slice(0, e.target.selectionStart).split('\n').length;
+                      setActiveLine(line);
+                    }}
+                    placeholder="// Start coding here... Your changes will sync live!"
+                    spellCheck="false"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                  />
+                </div>
+              </div>
+
+              {/* REAL-TIME REMOTE TYPING INDICATOR */}
+              <div className="typing-bar">
+                {remoteTyping ? (
+                  <div className="typing-indicator">
+                    <span className="pulse-dot" />
+                    <span>{remoteTyping}</span>
+                  </div>
+                ) : (
+                  <span>Editing: <b>{tab}</b> · Line {activeLine}, Col 1</span>
+                )}
+                <span style={{ fontSize: '11px', opacity: 0.6 }}>Press Ctrl+Enter to Run</span>
+              </div>
+
+              {/* INTEGRATED TERMINAL */}
+              <div className="room-terminal">
+                <div className="terminal-header">
+                  <div className="terminal-tabs">
+                    <button
+                      className={`terminal-tab-btn ${terminalTab === 'terminal' ? 'active' : ''}`}
+                      onClick={() => setTerminalTab('terminal')}
+                    >
+                      Terminal
+                    </button>
+                    <button
+                      className={`terminal-tab-btn ${terminalTab === 'output' ? 'active' : ''}`}
+                      onClick={() => setTerminalTab('output')}
+                    >
+                      Output
+                    </button>
+                  </div>
+                  <div className="terminal-controls">
+                    <button className="terminal-btn" onClick={() => setTerminalLogs([])}>
+                      ⊘ Clear
+                    </button>
+                    <button className="terminal-btn" onClick={handleRunCode}>
+                      ▶ Run
+                    </button>
+                  </div>
+                </div>
+
+                <div className="terminal-body" ref={terminalBodyRef}>
+                  {terminalLogs.length === 0 ? (
+                    <div className="terminal-empty">
+                      <span>Terminal ready. Click <b>▶ Run</b> or press <b>Ctrl+Enter</b> to see output.</span>
+                    </div>
+                  ) : (
+                    terminalLogs.map((log) => (
+                      <div key={log.id} className={`terminal-line ${log.type}`}>
+                        {log.text}
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <form className="terminal-prompt-row" onSubmit={handleTerminalSubmit}>
+                  <span className="terminal-prompt-sym">$</span>
+                  <input
+                    className="terminal-input"
+                    value={terminalCmd}
+                    onChange={(e) => setTerminalCmd(e.target.value)}
+                    placeholder="Type command (run, clear, ls, help)..."
+                  />
+                </form>
+              </div>
+            </section>
+
+            {/* SIDEBAR ASIDE: ONLY RENDERED ON LIVE ROOM TAB */}
+            <aside>
+              <section className="panel">
+                <h2>In this room · {connectedUsers.length}</h2>
+                {connectedUsers.map((p) => (
+                  <div className="person" key={p.id}>
+                    <Avatar person={p} />
+                    <div>
+                      <b>{p.name}</b>
+                      <small>{p.state}</small>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
-            <form onSubmit={sendRoomMessage}>
-              <input
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Message the room…"
-              />
-              <button aria-label="Send message">↑</button>
-            </form>
-          </section>
-        </aside>
+                ))}
+                <button
+                  className="invite"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(room.code);
+                    setToast(`Join code ${room.code} copied`);
+                  }}
+                >
+                  Copy join code · {room.code}
+                </button>
+              </section>
+
+              <section className="panel chat">
+                <h2>Room chat</h2>
+                <div className="messages">
+                  {messages.length === 0 ? (
+                    <div style={{ color: 'var(--muted)', fontSize: '11px', textAlign: 'center', padding: '16px 0' }}>
+                      No messages yet. Say hi to your team! 👋
+                    </div>
+                  ) : (
+                    messages.map((m) => (
+                      <div key={m.id} className={`message ${m.who === getSocket()?.id ? 'mine' : ''}`}>
+                        <Avatar person={{ initials: m.initials, color: m.color }} small />
+                        <div>
+                          <div style={{ fontSize: '10px', color: 'var(--muted)', marginBottom: '2px' }}>
+                            {m.userName} · {m.time}
+                          </div>
+                          <span>{m.text}</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <form onSubmit={sendRoomMessage}>
+                  <input
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    placeholder="Message the room…"
+                  />
+                  <button aria-label="Send message">↑</button>
+                </form>
+              </section>
+            </aside>
+          </>
+        )}
       </main>
 
       {newFileModalOpen && (

@@ -1,41 +1,17 @@
-﻿import { Navigate, useLocation } from "react-router-dom";
-import { useAuth } from "../context/AuthContext.jsx";
+import { Navigate, useLocation } from "react-router-dom";
+import { useRequireAuth } from "../hooks/useRequireAuth.js";
 
 export default function ProtectedRoute({ children }) {
-  const { user, initializing } = useAuth();
+  const { ready, loading } = useRequireAuth();
   const location = useLocation();
 
-  if (initializing) {
-    return (
-      <div
-        className="profile-app-root"
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "var(--bg, #0c0d10)",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-            fontFamily: "Inter, sans-serif",
-            fontSize: "13px",
-            color: "var(--muted, #c7c8ca)",
-          }}
-        >
-          <span className="ai-spinner" />
-          <span>Verifying session...</span>
-        </div>
-      </div>
-    );
+  if (loading) {
+    return null;
   }
 
-  if (!user) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+  if (!ready) {
+    const currentPath = location.pathname + location.search;
+    return <Navigate to={`/login?next=${encodeURIComponent(currentPath)}`} replace />;
   }
 
   return children;

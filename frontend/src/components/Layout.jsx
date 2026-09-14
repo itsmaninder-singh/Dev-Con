@@ -1,13 +1,16 @@
 import { Outlet, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '../context/AuthContext.jsx';
 import SiteNav from './SiteNav';
 import ChatWidget from './ChatWidget';
+import ProfileCompletionBanner from './ProfileCompletionBanner';
 import ScrollSound from './effects/ScrollSound';
 import ClickSpark from './effects/ClickSpark';
 
 export default function Layout() {
   const location = useLocation();
   const isLanding = location.pathname === '/';
+  const { user } = useAuth() || {};
 
   return (
     <ClickSpark
@@ -33,6 +36,7 @@ export default function Layout() {
         </motion.div>
       </AnimatePresence>
       {!isLanding && <ChatWidget />}
+      {user && !isLanding && <ProfileCompletionBanner />}
       <ScrollSound />
     </ClickSpark>
   );

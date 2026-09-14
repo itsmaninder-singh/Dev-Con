@@ -330,18 +330,33 @@ export function TeamsProvider({ children }) {
 
   function isMember(team) {
     if (!team) return false;
-    const tid = team._id || team.id;
-    if (joinedTeamIds.has(tid)) return true;
-    return team.members?.some(
-      (m) => m.user?._id === currentUserId || m.user?.name === currentUserName
-    );
+    const tid = String(team._id || team.id || '');
+    if (tid && joinedTeamIds.has(tid)) return true;
+    return team.members?.some((m) => {
+      const u = m.user;
+      if (!u) return false;
+      const uid = String(u._id || u.id || u || '');
+      const uname = String(u.name || '');
+      const uusername = String(u.username || '');
+      return (
+        (uid && (uid === String(currentUserId) || (authUser?._id && uid === String(authUser._id)))) ||
+        (uname && (uname === currentUserName || uname === authUser?.name)) ||
+        (uusername && authUser?.username && uusername.toLowerCase() === authUser.username.toLowerCase())
+      );
+    }) || false;
   }
 
   function isCreator(team) {
     if (!team) return false;
+    const c = team.creator;
+    if (!c) return false;
+    const cid = String(c._id || c.id || c || '');
+    const cname = String(c.name || '');
+    const cusername = String(c.username || '');
     return (
-      team.creator?._id === currentUserId ||
-      team.creator?.name === currentUserName
+      (cid && (cid === String(currentUserId) || (authUser?._id && cid === String(authUser._id)))) ||
+      (cname && (cname === currentUserName || cname === authUser?.name)) ||
+      (cusername && authUser?.username && cusername.toLowerCase() === authUser.username.toLowerCase())
     );
   }
 

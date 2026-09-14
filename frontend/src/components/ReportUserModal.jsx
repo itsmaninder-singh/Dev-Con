@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Flag, X, AlertTriangle, Check } from 'lucide-react';
 import { reportApi } from '../lib/api.js';
 import useUISound from '../hooks/useUISound.js';
@@ -35,42 +36,76 @@ export default function ReportUserModal({
     setErrorMsg('');
 
     try {
-      // Attempt backend API call
-      await reportApi.createReport({
-        reportedUserId: targetId,
+      const isObjectId = targetId && /^[0-9a-fA-F]{24}$/.test(String(targetId));
+      if (isObjectId) {
+        await reportApi.createReport({
+          reportedUserId: String(targetId),
+          reason: selectedReason,
+          description: description.trim(),
+        });
+      } else {
+        // Mock user or non-Mongo ID: save report locally for moderation review
+        const localReports = JSON.parse(localStorage.getItem('dc_local_reports') || '[]');
+        localReports.unshift({
+          reportedUserId: targetId || targetName,
+          targetName,
+          reason: selectedReason,
+          description: description.trim(),
+          createdAt: new Date().toISOString(),
+        });
+        localStorage.setItem('dc_local_reports', JSON.stringify(localReports));
+      }
+
+      if (typeof playSuccess === 'function') {
+        playSuccess();
+      } else if (typeof playClick === 'function') {
+        playClick();
+      }
+
+      setSubmitted(true);
+      setTimeout(() => {
+        if (onReportSuccess) onReportSuccess(targetUser);
+        onClose();
+        setSubmitted(false);
+        setDescription('');
+      }, 1200);
+    } catch (err) {
+      console.warn('Report API fallback:', err.message);
+      // Fallback: save report locally so no user report is lost
+      const localReports = JSON.parse(localStorage.getItem('dc_local_reports') || '[]');
+      localReports.unshift({
+        reportedUserId: targetId || targetName,
+        targetName,
         reason: selectedReason,
         description: description.trim(),
+        createdAt: new Date().toISOString(),
       });
-      playSuccess();
+      localStorage.setItem('dc_local_reports', JSON.stringify(localReports));
+
+      if (typeof playSuccess === 'function') {
+        playSuccess();
+      } else if (typeof playClick === 'function') {
+        playClick();
+      }
+
       setSubmitted(true);
       setTimeout(() => {
         if (onReportSuccess) onReportSuccess(targetUser);
         onClose();
         setSubmitted(false);
         setDescription('');
-      }, 1400);
-    } catch (err) {
-      // If user is not logged into backend or target is mock, handle gracefully
-      console.warn('Report API fallback:', err.message);
-      playSuccess();
-      setSubmitted(true);
-      setTimeout(() => {
-        if (onReportSuccess) onReportSuccess(targetUser);
-        onClose();
-        setSubmitted(false);
-        setDescription('');
-      }, 1400);
+      }, 1200);
     } finally {
       setSubmitting(false);
     }
   }
 
-  return (
+  const modalContent = (
     <div
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 9999,
+        zIndex: 100000,
         background: 'rgba(5, 5, 8, 0.78)',
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
@@ -359,4 +394,8 @@ export default function ReportUserModal({
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined'
+    ? createPortal(modalContent, document.body)
+    : modalContent;
 }

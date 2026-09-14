@@ -20,7 +20,7 @@ const IDEA_TEMPLATES = [
   {
     title: 'AI Smart Matcher',
     desc: 'Matches students or hackathon builders based on complementary skills, timezone availability, and working styles via vector embeddings.',
-    stack: ['Node.js', 'Postgres', 'Vector Search', 'LLM APIs'],
+    stack: ['Node.js', 'PostgreSQL', 'AI/LLM', 'Python'],
     tags: ['ai', 'startup'],
     difficulty: 'Hard',
   },

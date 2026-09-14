@@ -74,9 +74,8 @@ const acceptJoinReq= asyncHandler(async(req,res)=>{
     if(joinReq.receiver.toString()!== req.user._id.toString()){
         throw new ApiError(403,"Not authorized to respond to this request");
     }
-    if(joinReq.status!== "pending"){
-        throw new ApiError(400.`Request already ${joinReq.status}`);
-
+    if(joinReq.status !== "pending"){
+        throw new ApiError(400, `Request already ${joinReq.status}`);
     }
     if(joinReq.targetType=== "team"){
         const team = await Team.findById(joinReq.team);
@@ -106,14 +105,14 @@ const acceptJoinReq= asyncHandler(async(req,res)=>{
         const alreadyMember = project.members.some((m)=>m.user.toString() === joinReq.sender.toString())
          if (!alreadyMember) {
       project.members.push({
-        user: joinRequest.sender,
-        role: joinRequest.roleAppliedFor || "Contributor",
+        user: joinReq.sender,
+        role: joinReq.roleAppliedFor || "Contributor",
       });
       if (project.members.length >= project.maxTeamSize) {
         project.status = "in-progress";
       }
       await project.save();
-      await addUserToEntityChat("project", project._id, joinRequest.sender);
+      await addUsertoEntityChat("project", project._id, joinReq.sender);
 
     }
     }
@@ -122,16 +121,16 @@ const acceptJoinReq= asyncHandler(async(req,res)=>{
     await joinReq.save();
 
     await sendNotification({
-    recipient: joinRequest.sender,
+    recipient: joinReq.sender,
     sender: req.user._id,
     type: "join_request_accepted",
     text: `${req.user.name} accepted your request to join`,
-    joinRequest: joinRequest._id,
+    joinRequest: joinReq._id,
   });
 
    return res
     .status(200)
-    .json(new ApiResponse(200, "Request accepted successfully", joinRequest));
+    .json(new ApiResponse(200, "Request accepted successfully", joinReq));
 })
 
 const ignoreJoinRequest = asyncHandler(async (req, res) => {

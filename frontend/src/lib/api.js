@@ -208,6 +208,22 @@ export const userApi = {
       throw new Error(extractMessage(err));
     }
   },
+  blockUser: async (userId) => {
+    try {
+      const { data } = await api.post(`/users/${userId}/block`);
+      return data.data;
+    } catch (err) {
+      throw new Error(extractMessage(err));
+    }
+  },
+  unblockUser: async (userId) => {
+    try {
+      const { data } = await api.post(`/users/${userId}/unblock`);
+      return data.data;
+    } catch (err) {
+      throw new Error(extractMessage(err));
+    }
+  },
 };
 
 export const reportApi = {

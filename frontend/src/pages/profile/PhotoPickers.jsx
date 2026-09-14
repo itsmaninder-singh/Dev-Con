@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { userApi } from '../../lib/api.js';
 
 export default function PhotoPickers({ name, coverUrl, avatarUrl, onCoverChange, onAvatarChange }) {
   const coverInputRef = useRef(null);
@@ -9,9 +10,35 @@ export default function PhotoPickers({ name, coverUrl, avatarUrl, onCoverChange,
 
   function handleFile(file, kind) {
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    if (kind === 'cover') onCoverChange(url);
-    else onAvatarChange(url);
+
+    // Read as persistent DataURL for instant display & localStorage persistence
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result;
+      if (kind === 'cover') onCoverChange(dataUrl);
+      else onAvatarChange(dataUrl);
+    };
+    reader.readAsDataURL(file);
+
+    // Upload to backend / Cloudinary if server session active
+    try {
+      const formData = new FormData();
+      if (kind === 'cover') {
+        formData.append('coverPicture', file);
+        userApi.uploadCoverPicture(formData)
+          .then((res) => {
+            if (res?.coverPicture) onCoverChange(res.coverPicture);
+          })
+          .catch((err) => console.warn('Backend cover picture upload deferred:', err.message));
+      } else {
+        formData.append('profilePicture', file);
+        userApi.uploadProfilePicture(formData)
+          .then((res) => {
+            if (res?.profilePicture) onAvatarChange(res.profilePicture);
+          })
+          .catch((err) => console.warn('Backend profile picture upload deferred:', err.message));
+      }
+    } catch (_) {}
   }
 
   function handleDrop(e) {

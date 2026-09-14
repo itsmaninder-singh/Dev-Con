@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { Link, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { Mail, Lock, AlertCircle, Loader2 } from "lucide-react";
 import AuthLayout from "../components/AuthLayout.jsx";
 import FormField from "../components/FormField.jsx";
@@ -14,7 +14,9 @@ export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const redirectTo = location.state?.from?.pathname || "/workspace";
+  const [searchParams] = useSearchParams();
+  const nextParam = searchParams.get("next");
+  const redirectTo = nextParam || location.state?.from?.pathname || "/workspace";
 
   const [form, setForm] = useState({ identifier: "", password: "", remember: false });
   const [error, setError] = useState("");

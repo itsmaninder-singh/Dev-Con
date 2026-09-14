@@ -62,11 +62,32 @@ export default function App() {
               <Route element={<Layout />}>
               {/* Public Routes */}
               <Route path="/" element={<Landing />} />
-              <Route path="/hackathons" element={<Hackathons />} />
-              <Route path="/explore" element={<Explore />} />
-              <Route path="/about" element={<About />} />
 
               {/* Protected Routes */}
+              <Route
+                path="/hackathons"
+                element={
+                  <ProtectedRoute>
+                    <Hackathons />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/explore"
+                element={
+                  <ProtectedRoute>
+                    <Explore />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/about"
+                element={
+                  <ProtectedRoute>
+                    <About />
+                  </ProtectedRoute>
+                }
+              />
               <Route
                 path="/profile"
                 element={

@@ -25,18 +25,22 @@ const createTeam = asyncHandler(async(req,res)=>{
         throw new ApiError(400,"Team Name is requried");
     }
     const team = await Team.create({
-    name,
-    description,
-    creator: req.user._id,
-    project: project || null,
-    skillsNeeded,
-    maxMembers,
-    visibility,
-    tags,
-    members: [{ user: req.user._id, role: "Creator" }],
-
+      name,
+      description,
+      creator: req.user._id,
+      project: project || null,
+      skillsNeeded,
+      maxMembers,
+      visibility,
+      tags,
+      members: [{ user: req.user._id, role: "Creator" }],
     });
-    return res.status(201).json(new ApiResponse(201,"Team created successfully",team));
+
+    const populatedTeam = await Team.findById(team._id)
+      .populate("creator", "name username profilePicture")
+      .populate("members.user", "name username profilePicture skills");
+
+    return res.status(201).json(new ApiResponse(201, "Team created successfully", populatedTeam || team));
 });
 
 const editTeams = asyncHandler(async(req,res)=>{

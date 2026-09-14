@@ -33,6 +33,14 @@ export function useUISound() {
     soundManager.playPageFlip();
   }, []);
 
+  const playSuccess = useCallback(() => {
+    if (typeof soundManager.playSuccess === 'function') {
+      soundManager.playSuccess();
+    } else {
+      soundManager.playClick();
+    }
+  }, []);
+
   const toggleSound = useCallback(() => {
     soundManager.setEnabled(!soundManager.isEnabled());
   }, []);
@@ -49,6 +57,7 @@ export function useUISound() {
     playModalOpen,
     playModalClose,
     playPageFlip,
+    playSuccess,
     toggleSound,
     setVolume,
   };

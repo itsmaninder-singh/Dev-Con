@@ -180,13 +180,67 @@ const uploadCoverPicture = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, "Cover picture updated", { coverPicture: user.coverPicture }));
 });
 
+const blockUser = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    throw new ApiError(400, "Invalid user ID");
+  }
+  if (userId === req.user._id.toString()) {
+    throw new ApiError(400, "You cannot block yourself");
+  }
 
-export{
-    getMe,
-    getUserByUsername,
-    updateProfile,
-    toggleAvailability,
-    updateAvailableFor,
-    uploadProfilePicture,
-    uploadCoverPicture
+  const targetUser = await User.findById(userId);
+  if (!targetUser) {
+    throw new ApiError(404, "User not found");
+  }
+
+  const user = await User.findById(req.user._id);
+  const alreadyBlocked = user.blockedUsers.some(
+    (id) => id.toString() === userId.toString()
+  );
+
+  if (!alreadyBlocked) {
+    user.blockedUsers.push(userId);
+    await user.save({ validateModifiedOnly: true });
+  }
+
+  return res.status(200).json(
+    new ApiResponse(200, "User blocked successfully", {
+      blockedUserId: userId,
+      blockedUsers: user.blockedUsers,
+    })
+  );
+});
+
+const unblockUser = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    throw new ApiError(400, "Invalid user ID");
+  }
+
+  const user = await User.findById(req.user._id);
+  user.blockedUsers = user.blockedUsers.filter(
+    (id) => id.toString() !== userId.toString()
+  );
+  await user.save({ validateModifiedOnly: true });
+
+  return res.status(200).json(
+    new ApiResponse(200, "User unblocked successfully", {
+      unblockedUserId: userId,
+      blockedUsers: user.blockedUsers,
+    })
+  );
+});
+
+export {
+  getMe,
+  getUserByUsername,
+  updateProfile,
+  toggleAvailability,
+  updateAvailableFor,
+  uploadProfilePicture,
+  uploadCoverPicture,
+  blockUser,
+  unblockUser,
 };
+
