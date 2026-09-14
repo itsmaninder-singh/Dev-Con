@@ -15,7 +15,11 @@ export function TeamHero({
   const [openingChat, setOpeningChat] = useState(false);
   const { openGroupChat } = useChatUI();
 
-  async function handleOpenTeamChat() {
+  async function handleOpenTeamChat(e) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     try {
       setOpeningChat(true);
       const teamId = team._id || team.id;
@@ -155,6 +159,7 @@ export function TeamHero({
             <button
               type="button"
               className="apple-btn apple-btn-secondary"
+              data-chat-trigger="true"
               onClick={handleOpenTeamChat}
               disabled={openingChat}
               title="Open team group chat"

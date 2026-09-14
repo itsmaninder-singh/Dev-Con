@@ -117,7 +117,7 @@ export function ChatUIProvider({ children }) {
   /**
    * openDirectChatWith:
    * 1. Calls GET /chats/direct/:userId to get or create the 1:1 chat.
-   * 2. Immediately pops open the floating chat widget showing this thread directly.
+   * 2. Immediately pops open the floating chat widget showing this thread directly with active text box.
    */
   const openDirectChatWith = useCallback(
     async (userId, targetInfo = {}) => {
@@ -138,9 +138,28 @@ export function ChatUIProvider({ children }) {
           (targetName && targetName.toLowerCase().includes(c.name?.toLowerCase()))
       );
 
+      const tempId = userId || `dm_${Date.now()}`;
+
       if (existing) {
         setActiveId(existing.id);
         setConversations((prev) => prev.map((c) => (c.id === existing.id ? { ...c, unread: 0 } : c)));
+      } else {
+        // Optimistically create and set active conversation immediately
+        const optimisticConv = {
+          id: tempId,
+          _id: userId && userId.length === 24 ? userId : tempId,
+          isServerChat: !!(userId && userId.length === 24),
+          name: targetName,
+          initial: targetInitial,
+          online: true,
+          colorIdx: Math.floor(Math.random() * AVATAR_COLORS.length),
+          unread: 0,
+          messages: [
+            { from: 'them', text: `Hi! Let’s connect on DevConnect 👋`, time: timeNow() },
+          ],
+        };
+        setConversations((prev) => [optimisticConv, ...prev]);
+        setActiveId(tempId);
       }
 
       // If valid MongoDB ObjectId, call GET /chats/direct/:userId via chatApi
@@ -182,35 +201,18 @@ export function ChatUIProvider({ children }) {
             };
 
             setConversations((prev) => {
-              if (prev.some((c) => c.id === chat._id)) {
-                return prev.map((c) => (c.id === chat._id ? { ...c, ...serverConv } : c));
+              const matches = (c) => c.id === chat._id || c.id === tempId || c._id === userId;
+              if (prev.some(matches)) {
+                return prev.map((c) => (matches(c) ? { ...c, ...serverConv, id: chat._id } : c));
               }
               return [serverConv, ...prev];
             });
-            setActiveId(chat._id);
+            setActiveId((curr) => (curr === tempId || curr === userId || !curr ? chat._id : curr));
             return chat;
           }
         } catch (err) {
           console.warn('GET /chats/direct/:userId failed, using fallback thread:', err);
         }
-      }
-
-      // Fallback: Create instant local conversation if not already created
-      if (!existing) {
-        const localId = userId || `dm_${Date.now()}`;
-        const localConv = {
-          id: localId,
-          name: targetName,
-          initial: targetInitial,
-          online: true,
-          colorIdx: Math.floor(Math.random() * AVATAR_COLORS.length),
-          unread: 0,
-          messages: [
-            { from: 'them', text: `Hey! Thanks for reaching out 👋`, time: timeNow() },
-          ],
-        };
-        setConversations((prev) => [localConv, ...prev]);
-        setActiveId(localId);
       }
     },
     [user?._id]
@@ -219,7 +221,7 @@ export function ChatUIProvider({ children }) {
   /**
    * openGroupChat:
    * 1. Calls POST /chats/group with { name, participantIds, team, project } to get or create the group chat.
-   * 2. Immediately pops open the floating chat widget showing this thread directly.
+   * 2. Immediately pops open the floating chat widget showing this thread directly with active text box.
    */
   const openGroupChat = useCallback(
     async ({ teamId = null, projectId = null, name = 'Team Chat', participantIds = [] }) => {
@@ -238,9 +240,29 @@ export function ChatUIProvider({ children }) {
           (c.name?.toLowerCase() === targetName.toLowerCase())
       );
 
+      const tempId = teamId ? `team_${teamId}` : `group_${Date.now()}`;
+
       if (existing) {
         setActiveId(existing.id);
         setConversations((prev) => prev.map((c) => (c.id === existing.id ? { ...c, unread: 0 } : c)));
+      } else {
+        // Optimistically create and set active conversation immediately
+        const optimisticConv = {
+          id: tempId,
+          _id: tempId,
+          team: teamId,
+          isGroup: true,
+          name: targetName,
+          initial: targetInitial,
+          online: true,
+          colorIdx: Math.floor(Math.random() * AVATAR_COLORS.length),
+          unread: 0,
+          messages: [
+            { from: 'them', text: `Welcome to ${targetName}! 💬`, time: timeNow() },
+          ],
+        };
+        setConversations((prev) => [optimisticConv, ...prev]);
+        setActiveId(tempId);
       }
 
       try {
@@ -283,40 +305,20 @@ export function ChatUIProvider({ children }) {
           };
 
           setConversations((prev) => {
-            const hasExisting = prev.some((c) => c.id === chat._id || (teamId && (c.team === teamId || c.id === `team_${teamId}`)));
-            if (hasExisting) {
-              return prev.map((c) =>
-                c.id === chat._id || (teamId && (c.team === teamId || c.id === `team_${teamId}`))
-                  ? { ...c, ...serverConv, id: chat._id }
-                  : c
-              );
+            const matches = (c) =>
+              c.id === chat._id ||
+              c.id === tempId ||
+              (teamId && (c.team === teamId || c.team?._id === teamId || c.id === `team_${teamId}`));
+            if (prev.some(matches)) {
+              return prev.map((c) => (matches(c) ? { ...c, ...serverConv, id: chat._id } : c));
             }
             return [serverConv, ...prev];
           });
-          setActiveId(chat._id);
+          setActiveId((curr) => (curr === tempId || !curr ? chat._id : curr));
           return chat;
         }
       } catch (err) {
         console.warn('POST /chats/group failed, using fallback thread:', err);
-      }
-
-      // Fallback: Create instant local conversation if not already created
-      if (!existing) {
-        const localId = teamId ? `team_${teamId}` : `group_${Date.now()}`;
-        const localConv = {
-          id: localId,
-          team: teamId,
-          name: targetName,
-          initial: targetInitial,
-          online: true,
-          colorIdx: Math.floor(Math.random() * AVATAR_COLORS.length),
-          unread: 0,
-          messages: [
-            { from: 'them', text: `Welcome to ${targetName}! 💬`, time: timeNow() },
-          ],
-        };
-        setConversations((prev) => [localConv, ...prev]);
-        setActiveId(localId);
       }
     },
     [user?._id]

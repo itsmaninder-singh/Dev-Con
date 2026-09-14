@@ -6,6 +6,8 @@ import AIScoreRing from '../../../components/ai/AIScoreRing.jsx';
 import AILoadingShimmer from '../../../components/ai/AILoadingShimmer.jsx';
 import ReportUserModal from '../../../components/ReportUserModal.jsx';
 import useUISound from '../../../hooks/useUISound.js';
+import { useChatUI } from '../../../context/ChatUIContext.jsx';
+import { useAuth } from '../../../context/AuthContext.jsx';
 
 export function TeamMembers({
   members,
@@ -19,6 +21,8 @@ export function TeamMembers({
   onShowToast,
 }) {
   const navigate = useNavigate();
+  const { openDirectChatWith } = useChatUI();
+  const { user: currentUser } = useAuth() || {};
   const [activeMenuMemberId, setActiveMenuMemberId] = useState(null);
   const [reportingUser, setReportingUser] = useState(null);
   const [confirmKickUser, setConfirmKickUser] = useState(null);
@@ -225,6 +229,46 @@ export function TeamMembers({
                     </div>
                   )}
 
+                  {/* Direct Message button on member row */}
+                  {currentUser?._id !== mUserId && (
+                    <button
+                      type="button"
+                      data-chat-trigger="true"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        playClick();
+                        openDirectChatWith(mUserId, { name: mName, initial: mInitials });
+                      }}
+                      style={{
+                        background: 'rgba(255, 152, 162, 0.1)',
+                        border: '1px solid rgba(255, 152, 162, 0.28)',
+                        borderRadius: '20px',
+                        color: 'var(--coral, #ff98a2)',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        padding: '5px 12px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 152, 162, 0.22)';
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 152, 162, 0.1)';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }}
+                      title={`Send message to ${mName}`}
+                    >
+                      <MessageSquare size={13} />
+                      <span>Message</span>
+                    </button>
+                  )}
+
                   <button
                     type="button"
                     onClick={() => {
@@ -340,18 +384,16 @@ export function TeamMembers({
                       {/* Direct message */}
                       <button
                         type="button"
-                        onClick={() => {
+                        data-chat-trigger="true"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
                           playClick();
                           setActiveMenuMemberId(null);
-                          window.dispatchEvent(
-                            new CustomEvent('devconnect:open-chat', {
-                              detail: {
-                                userId: mUserId,
-                                name: mName,
-                                initial: mInitials,
-                              },
-                            })
-                          );
+                          openDirectChatWith(mUserId, {
+                            name: mName,
+                            initial: mInitials,
+                          });
                         }}
                         style={{
                           background: 'none',
@@ -369,7 +411,7 @@ export function TeamMembers({
                         onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 152, 162, 0.1)')}
                         onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
                       >
-                        <MessageSquare size={13} /> Message {mName.split(' ')[0]}
+                        <MessageSquare size={13} /> Send Message to {mName.split(' ')[0]}
                       </button>
 
                       {/* View Profile */}

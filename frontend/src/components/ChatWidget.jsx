@@ -308,7 +308,10 @@ export default function ChatWidget() {
 
   useEffect(() => {
     if (view === 'chat' && open) {
-      setTimeout(() => textareaRef.current?.focus(), 150);
+      const t1 = setTimeout(() => textareaRef.current?.focus(), 50);
+      const t2 = setTimeout(() => textareaRef.current?.focus(), 150);
+      const t3 = setTimeout(() => textareaRef.current?.focus(), 300);
+      return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
     }
   }, [view, open, activeId]);
 
@@ -333,7 +336,7 @@ export default function ChatWidget() {
     setConversations((list) => list.map((c) => (c.id === id ? { ...c, unread: 0 } : c)));
     setActiveId(id);
     setView('chat');
-    setTimeout(() => textareaRef.current?.focus(), 200);
+    setTimeout(() => textareaRef.current?.focus(), 150);
 
     // If it's a server chat, fetch message history
     const target = conversations.find((c) => c.id === id);
@@ -369,8 +372,14 @@ export default function ChatWidget() {
     setInputValue('');
 
     // If server chat, send via chatApi
-    if (active.isServerChat && active.id && active.id.length === 24) {
-      chatApi.sendMessage(active.id, text).catch(() => {});
+    const serverChatId = (active.isServerChat && active.id && active.id.length === 24)
+      ? active.id
+      : (active._id && typeof active._id === 'string' && active._id.length === 24)
+      ? active._id
+      : null;
+
+    if (serverChatId) {
+      chatApi.sendMessage(serverChatId, text).catch(() => {});
     } else {
       setTyping(true);
       setTimeout(() => {
