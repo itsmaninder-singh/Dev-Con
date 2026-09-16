@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, X, Users, Rocket, User, Sparkles, Command } from 'lucide-react';
-import { TEAMS, PROJECTS } from '../pages/explore/data.js';
-import { ROSTER } from '../pages/ai/mockPeople.js';
+import { useTeams } from '../context/TeamsContext.jsx';
 import useUISound from '../hooks/useUISound.js';
 
 export default function NavSearchBar() {
+  const { teams = [], projects = [] } = useTeams() || {};
   const [open, setOpen] = useState(false);
   const [mobileExpanded, setMobileExpanded] = useState(false);
   const [query, setQuery] = useState('');
@@ -20,51 +20,68 @@ export default function NavSearchBar() {
     const items = [];
 
     // Teams
-    (TEAMS || []).forEach((t) => {
+    (teams || []).forEach((t) => {
+      const tid = t._id || t.id;
+      const tskills = t.skillsNeeded || t.skills || [];
       items.push({
-        id: `team-${t.id}`,
+        id: `team-${tid}`,
         title: t.name,
-        subtitle: `${t.type} • ${t.skillsNeeded?.join(', ')}`,
+        subtitle: `${t.type || 'team'} • ${tskills.join(', ')}`,
         category: 'Teams',
         icon: Users,
-        badge: t.type,
+        badge: t.type || 'team',
         path: '/explore',
-        state: { selectedId: t.id, kind: 'team' },
+        state: { selectedId: tid, kind: 'team' },
       });
     });
 
     // Projects
-    (PROJECTS || []).forEach((p) => {
+    (projects || []).forEach((p) => {
+      const pid = p._id || p.id;
+      const pskills = p.skills || p.skillsNeeded || [];
       items.push({
-        id: `project-${p.id}`,
+        id: `project-${pid}`,
         title: p.name,
-        subtitle: `${p.type} • ${p.skillsNeeded?.join(', ')}`,
+        subtitle: `${p.category || p.type || 'project'} • ${pskills.join(', ')}`,
         category: 'Projects',
         icon: Rocket,
-        badge: p.type,
+        badge: p.category || p.type || 'project',
         path: '/explore',
-        state: { selectedId: p.id, kind: 'project' },
+        state: { selectedId: pid, kind: 'project' },
       });
     });
 
-    // People
-    (ROSTER || []).forEach((u) => {
-      items.push({
-        id: `person-${u.id}`,
-        title: u.name,
-        subtitle: `${u.skills?.join(' • ')}`,
-        category: 'People',
-        icon: User,
-        badge: u.initials,
-        path: '/explore',
-        state: { filterUser: u.name },
+    // People from teams & projects
+    const peopleMap = new Map();
+    (teams || []).forEach((t) => {
+      (t.members || []).forEach((m) => {
+        const u = m.user;
+        if (u && (u._id || u.name)) {
+          const uid = u._id || u.name;
+          if (!peopleMap.has(uid)) {
+            peopleMap.set(uid, {
+              id: `person-${uid}`,
+              title: u.name || u.username || 'Developer',
+              subtitle: m.role || 'Team Member',
+              category: 'People',
+              icon: User,
+              badge: u.initials || 'DV',
+              path: u.username ? `/profile/${u.username}` : '/explore',
+              state: { filterUser: u.name },
+            });
+          }
+        }
       });
     });
+    peopleMap.forEach((person) => items.push(person));
 
     // Unique skills
     const skillsSet = new Set();
-    [...TEAMS, ...PROJECTS].forEach((item) => {
-      item.skillsNeeded?.forEach((s) => skillsSet.add(s));
+    (teams || []).forEach((item) => {
+      (item.skillsNeeded || item.skills || []).forEach((s) => skillsSet.add(s));
+    });
+    (projects || []).forEach((item) => {
+      (item.skills || item.skillsNeeded || []).forEach((s) => skillsSet.add(s));
     });
     skillsSet.forEach((skill) => {
       items.push({
@@ -80,7 +97,7 @@ export default function NavSearchBar() {
     });
 
     return items;
-  }, []);
+  }, [teams, projects]);
 
   // Filter items matching query
   const results = useMemo(() => {

@@ -1,51 +1,97 @@
 import { useState } from 'react';
 import { useTeams } from '../../context/TeamsContext.jsx';
-import { ROSTER } from './mockPeople.js';
 
-function assignRole(person, teamSkills) {
-  const match = teamSkills.find((s) => person.skills.some((ps) => ps.toLowerCase() === s.toLowerCase()));
+function assignRole(person, teamSkills = []) {
+  const pSkills = person.skills || [];
+  const match = teamSkills.find((s) => pSkills.some((ps) => ps.toLowerCase() === s.toLowerCase()));
   if (match) return `${match} lead`;
-  if (person.skills.some((s) => /figma|tailwind/i.test(s))) return 'Design support';
-  return 'Contributor';
+  if (pSkills.some((s) => /figma|tailwind|design|ui/i.test(s))) return 'Design support';
+  if (pSkills.some((s) => /node|express|mongo|sql|backend/i.test(s))) return 'Backend Architect';
+  return 'Core Contributor';
 }
 
-/* Real integration: replace this with a call to your API, passing the
-   team's actual member list (not the mock ROSTER) and skill requirements. */
 export default function RoleAssignment() {
-  const { teams } = useTeams();
-  const [teamId, setTeamId] = useState(teams[0]?.id || '');
+  const { teams = [] } = useTeams() || {};
+  const [teamId, setTeamId] = useState(teams[0]?._id || teams[0]?.id || '');
   const [loading, setLoading] = useState(false);
   const [assignments, setAssignments] = useState(null);
 
-  const team = teams.find((t) => t.id === teamId);
+  const team = teams.find((t) => t._id === teamId || t.id === teamId) || teams[0];
 
   function assign() {
     if (!team) return;
     setLoading(true);
     setAssignments(null);
     setTimeout(() => {
-      const members = ROSTER.slice(0, Math.max(2, Math.min(team.membersCount, ROSTER.length)));
-      setAssignments(members.map((p) => ({ ...p, role: assignRole(p, team.skills || []) })));
+      const skillsNeeded = team.skillsNeeded?.length ? team.skillsNeeded : team.skills || [];
+      const rawMembers = team.members?.length
+        ? team.members
+        : team.creator
+        ? [{ user: team.creator, role: 'Creator' }]
+        : [];
+
+      const members = rawMembers.map((m, idx) => {
+        const u = m.user || m || {};
+        const name = u.name || u.username || `Member ${idx + 1}`;
+        const initials =
+          u.initials ||
+          name
+            .split(' ')
+            .map((w) => w[0])
+            .slice(0, 2)
+            .join('')
+            .toUpperCase();
+        const skills = u.skills?.length ? u.skills : skillsNeeded.slice(idx, idx + 2);
+        return {
+          id: u._id || u.id || `m_${idx}`,
+          name,
+          initials,
+          skills: skills.length ? skills : ['Generalist'],
+          role: assignRole({ name, skills }, skillsNeeded),
+        };
+      });
+      setAssignments(members);
       setLoading(false);
-    }, 900);
+    }, 600);
   }
 
   return (
     <div className="ai-feature">
       <div className="ai-feature-intro">
         <h2>Assign roles across a team</h2>
-        <p>Pick one of your teams — it'll suggest who's best suited for which part of the work, based on skill match.</p>
+        <p>Pick one of your teams — AI suggests optimal responsibility distribution based on member skills.</p>
       </div>
 
-      <div className="ai-input-row">
-        <select className="ai-select" value={teamId} onChange={(e) => { setTeamId(e.target.value); setAssignments(null); }}>
-          {teams.length === 0 && <option value="">No teams yet</option>}
-          {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-        </select>
-        <button className="join-btn" onClick={assign} disabled={loading || !team}>
-          {loading ? 'Assigning...' : 'Assign roles'}
-        </button>
-      </div>
+      {teams.length === 0 ? (
+        <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted, #888)' }}>
+          <p style={{ fontSize: '14px', marginBottom: '8px', color: 'var(--text-main, #fff)', fontWeight: 600 }}>
+            No teams created yet
+          </p>
+          <p style={{ fontSize: '13px', margin: 0, maxWidth: '420px', marginLeft: 'auto', marginRight: 'auto' }}>
+            Create a squad in Teams & Workspace to automatically assign and optimize member roles.
+          </p>
+        </div>
+      ) : (
+        <div className="ai-input-row">
+          <select
+            className="ai-select"
+            value={team?._id || team?.id || ''}
+            onChange={(e) => {
+              setTeamId(e.target.value);
+              setAssignments(null);
+            }}
+          >
+            {teams.map((t) => (
+              <option key={t._id || t.id} value={t._id || t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+          <button className="join-btn" onClick={assign} disabled={loading || !team}>
+            {loading ? 'Assigning...' : 'Assign roles'}
+          </button>
+        </div>
+      )}
 
       {loading && <div className="ai-loading"><span className="ai-spinner" /> matching skills to roles...</div>}
 

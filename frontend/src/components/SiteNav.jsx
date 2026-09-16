@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useProfile } from '../context/ProfileContext.jsx';
-import { Bell, Volume2, VolumeX } from 'lucide-react';
+import { Bell, Volume2, VolumeX, Menu, X, Settings as SettingsIcon } from 'lucide-react';
 import { RandomLetterSwap } from './ui/random-letter-swap';
 import { INITIAL_NOTIFICATIONS } from '../data/notifications.js';
 import useUISound from '../hooks/useUISound.js';
@@ -23,6 +23,7 @@ export default function SiteNav() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [activePreviewId, setActivePreviewId] = useState(null);
   const [calloutTop, setCalloutTop] = useState(60);
@@ -85,6 +86,10 @@ export default function SiteNav() {
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
 
   useEffect(() => {
     const onClickOutside = (e) => {
@@ -486,6 +491,16 @@ export default function SiteNav() {
             </svg>
             Edit profile
           </div>
+          <div
+            className="sn-menu-item"
+            onClick={() => {
+              setMenuOpen(false);
+              navigate('/settings');
+            }}
+          >
+            <SettingsIcon size={15} style={{ stroke: 'currentColor', flexShrink: 0 }} />
+            Settings
+          </div>
           <div className="sn-menu-divider" />
           <div className="sn-menu-item sn-danger" onClick={handleLogout}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -498,7 +513,114 @@ export default function SiteNav() {
         </div>
         </>
       )}
+
+      {/* Mobile Menu Hamburger Button */}
+      <button
+        type="button"
+        className="sn-mobile-toggle"
+        onClick={() => setMobileNavOpen((prev) => !prev)}
+        aria-label="Toggle navigation menu"
+        aria-expanded={mobileNavOpen}
+      >
+        {mobileNavOpen ? <X size={20} /> : <Menu size={20} />}
+      </button>
       </div>
+
+      {/* Mobile Navigation Drawer */}
+      {mobileNavOpen && (
+        <div className="sn-mobile-overlay" onClick={() => setMobileNavOpen(false)}>
+          <div className="sn-mobile-drawer" onClick={(e) => e.stopPropagation()}>
+            <div className="sn-mobile-drawer-header">
+              <span className="sn-mobile-drawer-title">Menu</span>
+              <button
+                type="button"
+                className="sn-mobile-drawer-close"
+                onClick={() => setMobileNavOpen(false)}
+                aria-label="Close menu"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <ul className="sn-mobile-links">
+              {NAV_LINKS.map((link) => {
+                const isActive =
+                  link.to === '/workspace'
+                    ? location.pathname.startsWith('/workspace') || location.pathname.startsWith('/teams')
+                    : location.pathname.startsWith(link.to);
+
+                return (
+                  <li key={link.to}>
+                    <NavLink
+                      to={link.to}
+                      className={isActive ? 'sn-mobile-link sn-active' : 'sn-mobile-link'}
+                      onClick={() => setMobileNavOpen(false)}
+                    >
+                      {link.label}
+                    </NavLink>
+                  </li>
+                );
+              })}
+
+              {user?._id && (
+                <>
+                  <li className="sn-mobile-divider" />
+                  <li>
+                    <NavLink
+                      to="/profile"
+                      className="sn-mobile-link"
+                      onClick={() => setMobileNavOpen(false)}
+                    >
+                      My Profile
+                    </NavLink>
+                  </li>
+                  <li>
+                    <NavLink
+                      to="/settings"
+                      className="sn-mobile-link"
+                      onClick={() => setMobileNavOpen(false)}
+                    >
+                      Settings
+                    </NavLink>
+                  </li>
+                </>
+              )}
+            </ul>
+
+            <div className="sn-mobile-footer">
+              {!user?._id ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+                  <NavLink
+                    to="/login"
+                    className="sn-mobile-btn-signin"
+                    onClick={() => setMobileNavOpen(false)}
+                  >
+                    Sign In
+                  </NavLink>
+                  <NavLink
+                    to="/register"
+                    className="sn-mobile-btn-signup"
+                    onClick={() => setMobileNavOpen(false)}
+                  >
+                    Get Started
+                  </NavLink>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="sn-mobile-btn-logout"
+                  onClick={() => {
+                    setMobileNavOpen(false);
+                    handleLogout();
+                  }}
+                >
+                  Log Out
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </nav>
   );
 }

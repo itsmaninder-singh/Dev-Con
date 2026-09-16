@@ -722,4 +722,198 @@
     cursor: pointer;
     padding: 4px;
   }
-}
+}
+
+/* ================= Mobile Toggle & Drawer ================= */
+.sn-mobile-toggle {
+  display: none;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: #f2f1ed;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sn-mobile-toggle:hover {
+  background: rgba(255, 152, 162, 0.1);
+  border-color: rgba(255, 152, 162, 0.3);
+  color: #ff98a2;
+}
+
+@media (max-width: 900px) {
+  .sn-mobile-toggle {
+    display: flex;
+  }
+}
+
+.sn-mobile-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 999;
+  display: flex;
+  justify-content: flex-end;
+  animation: snFadeIn 0.2s ease;
+}
+
+.sn-mobile-drawer {
+  width: 300px;
+  max-width: 85vw;
+  height: 100vh;
+  background: #0f0f13;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  padding: 24px 20px;
+  box-shadow: -10px 0 40px rgba(0, 0, 0, 0.7);
+  animation: snSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes snSlideIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.sn-mobile-drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  margin-bottom: 16px;
+}
+
+.sn-mobile-drawer-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.01em;
+}
+
+.sn-mobile-drawer-close {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: #a1a1aa;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sn-mobile-drawer-close:hover {
+  background: rgba(255, 152, 162, 0.1);
+  color: #ff98a2;
+  border-color: rgba(255, 152, 162, 0.3);
+}
+
+.sn-mobile-links {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.sn-mobile-link {
+  display: block;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #c7c8ca;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.sn-mobile-link:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+}
+
+.sn-mobile-link.sn-active {
+  background: rgba(255, 152, 162, 0.1);
+  color: #ff98a2;
+  font-weight: 600;
+  border-left: 3px solid #ff98a2;
+}
+
+.sn-mobile-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.07);
+  margin: 8px 0;
+}
+
+.sn-mobile-footer {
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.sn-mobile-btn-signin {
+  display: block;
+  text-align: center;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: transparent;
+  color: #f2f1ed;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.sn-mobile-btn-signin:hover {
+  border-color: #ff98a2;
+  background: rgba(255, 152, 162, 0.08);
+}
+
+.sn-mobile-btn-signup {
+  display: block;
+  text-align: center;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 152, 162, 0.4);
+  background: rgba(255, 152, 162, 0.15);
+  color: #ff98a2;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.sn-mobile-btn-signup:hover {
+  background: rgba(255, 152, 162, 0.25);
+}
+
+.sn-mobile-btn-logout {
+  width: 100%;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 122, 122, 0.2);
+  background: rgba(255, 122, 122, 0.08);
+  color: #ff9a9a;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sn-mobile-btn-logout:hover {
+  background: rgba(255, 122, 122, 0.18);
+  border-color: rgba(255, 122, 122, 0.4);
+}
+

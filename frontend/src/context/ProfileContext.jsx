@@ -1,23 +1,23 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { userApi } from '../lib/api.js';
 import { useAuth } from './AuthContext.jsx';
 
 const STORAGE_KEY = 'dc_profile';
 
 const DEFAULT_PROFILE = {
-  name: 'Arjun Sharma',
-  bio: "Full-stack dev who likes shipping fast and breaking things in staging, not prod.",
-  college: 'Lovely Professional University',
+  name: '',
+  bio: '',
+  college: '',
   phone: '',
   coverUrl: null,
   avatarUrl: null,
-  skills: ['React', 'Node.js', 'PostgreSQL', 'TypeScript'],
-  experience: '2-5 years',
-  experienceLevel: 'Mid-Level',
-  timezone: 'Asia/Kolkata',
-  preferredRole: 'Frontend',
-  personality: 'Proactive builder, loves shipping MVPs & async discussions',
-  openTo: ['Hackathon', 'Freelance'],
+  skills: [],
+  experience: 'Fresher',
+  experienceLevel: 'Fresher',
+  timezone: '',
+  preferredRole: '',
+  personality: '',
+  openTo: [],
   isAvailable: true,
 };
 
@@ -25,7 +25,12 @@ function loadInitial() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_PROFILE;
-    return { ...DEFAULT_PROFILE, ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw);
+    if (parsed?.name === 'Arjun Sharma' || parsed?.username === 'arjun') {
+      localStorage.removeItem(STORAGE_KEY);
+      return DEFAULT_PROFILE;
+    }
+    return { ...DEFAULT_PROFILE, ...parsed };
   } catch {
     return DEFAULT_PROFILE;
   }
@@ -50,24 +55,38 @@ export function ProfileProvider({ children }) {
   const [profile, setProfile] = useState(loadInitial);
   const [blockedUsers, setBlockedUsers] = useState(loadInitialBlocked);
 
-  // Sync profile from backend if user has active session
+  const updateTimerRef = useRef(null);
+  const pendingPatchRef = useRef({});
+
+  // Sync profile immediately from user and fetch fresh server profile
   useEffect(() => {
     if (!user?._id) return;
+
+    setProfile((prev) => ({
+      ...prev,
+      name: user.name || prev.name,
+      username: user.username || prev.username,
+      email: user.email || prev.email,
+      avatarUrl: user.profilePicture || prev.avatarUrl,
+      profilePicture: user.profilePicture || prev.profilePicture,
+    }));
+
     userApi
       .getMe()
       .then((serverUser) => {
-        if (serverUser) {
+        if (serverUser?._id) {
           setProfile((prev) => ({
             ...prev,
             ...serverUser,
-            name: serverUser.name || prev.name,
-            bio: serverUser.bio || prev.bio,
-            college: serverUser.college || prev.college,
+            name: serverUser.name || user.name || prev.name,
+            bio: serverUser.bio !== undefined ? serverUser.bio : prev.bio,
+            college: serverUser.college !== undefined ? serverUser.college : prev.college,
             avatarUrl: serverUser.profilePicture || serverUser.avatarUrl || prev.avatarUrl,
             profilePicture: serverUser.profilePicture || serverUser.avatarUrl || prev.profilePicture,
             coverUrl: serverUser.coverPicture || serverUser.coverUrl || prev.coverUrl,
             coverPicture: serverUser.coverPicture || serverUser.coverUrl || prev.coverPicture,
-            skills: serverUser.skills?.length ? serverUser.skills : prev.skills,
+            skills: Array.isArray(serverUser.skills) ? serverUser.skills : (prev.skills || []),
+            openTo: Array.isArray(serverUser.availableFor) ? serverUser.availableFor : (prev.openTo || []),
             experience: serverUser.experience || prev.experience,
             experienceLevel: serverUser.experienceLevel || prev.experienceLevel,
             timezone: serverUser.timezone || prev.timezone,
@@ -78,9 +97,9 @@ export function ProfileProvider({ children }) {
         }
       })
       .catch(() => {
-        // Unauthenticated or demo mode, continue with local state
+        // Continue with local state
       });
-  }, [user?._id]);
+  }, [user]);
 
   useEffect(() => {
     try {
@@ -101,12 +120,18 @@ export function ProfileProvider({ children }) {
   function updateProfile(patch) {
     setProfile((prev) => ({ ...prev, ...patch }));
 
-    // Seamlessly sync with backend if user is logged in
-    userApi
-      .updateProfile(patch)
-      .catch((err) => {
-        console.warn('Backend profile update deferred:', err.message);
-      });
+    // Merge into pending patch and debounce server sync by 450ms
+    pendingPatchRef.current = { ...pendingPatchRef.current, ...patch };
+    if (updateTimerRef.current) clearTimeout(updateTimerRef.current);
+    updateTimerRef.current = setTimeout(() => {
+      const payload = { ...pendingPatchRef.current };
+      pendingPatchRef.current = {};
+      userApi
+        .updateProfile(payload)
+        .catch((err) => {
+          console.warn('Backend profile update deferred:', err.message);
+        });
+    }, 450);
   }
 
   function blockUser(userToBlock) {

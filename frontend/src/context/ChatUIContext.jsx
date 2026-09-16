@@ -10,49 +10,7 @@ export const AVATAR_COLORS = [
   'linear-gradient(145deg, #9fc4c0, #5f8f89)',
 ];
 
-const INITIAL_CONVERSATIONS = [
-  {
-    id: 'aditi', name: 'Aditi Rao · Nightwatch', initial: 'A', online: true, colorIdx: 0,
-    unread: 2,
-    messages: [
-      { from: 'them', text: 'Hey! 👋 Have you started on the WebSocket layer?', time: '10:02 AM' },
-      { from: 'me', text: 'Yeah, writing the socket reconnect logic right now', time: '10:03 AM' },
-      { from: 'them', text: 'Perfect, send the PR over for review 🔥', time: '10:04 AM' },
-    ],
-  },
-  {
-    id: 'kabir', name: 'Kabir Mehta', initial: 'K', online: true, colorIdx: 1,
-    unread: 2,
-    messages: [
-      { from: 'them', text: 'Hey, did you deploy the Ledger Loop demo?', time: '9:40 AM' },
-      { from: 'them', text: 'The UPI split flow looks great 🔥', time: '9:41 AM' },
-    ],
-  },
-  {
-    id: 'meera', name: 'Meera Pillai', initial: 'M', online: false, colorIdx: 2,
-    unread: 0,
-    messages: [
-      { from: 'me', text: 'Let’s hop on a call tomorrow about Fable’s frontend', time: 'Yesterday' },
-      { from: 'them', text: 'Done, send over a calendar invite', time: 'Yesterday' },
-    ],
-  },
-  {
-    id: 'formless', name: 'Formless Team 👩💻', initial: 'F', online: true, colorIdx: 3,
-    unread: 1,
-    messages: [
-      { from: 'them', text: 'There’s a new PR pending review', time: '8:15 AM' },
-      { from: 'them', text: 'Should I merge it into main?', time: '8:16 AM' },
-    ],
-  },
-  {
-    id: 'yusuf', name: 'Yusuf Sheikh', initial: 'Y', online: false, colorIdx: 4,
-    unread: 0,
-    messages: [
-      { from: 'them', text: 'Thanks for accepting my Nightwatch join request!', time: 'Mon' },
-      { from: 'me', text: 'Welcome to the team 🙌', time: 'Mon' },
-    ],
-  },
-];
+const INITIAL_CONVERSATIONS = [];
 
 function timeNow() {
   return new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });

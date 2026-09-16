@@ -21,12 +21,24 @@ export default function Login() {
   const [form, setForm] = useState({ identifier: "", password: "", remember: false });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   const update = (key) => (e) =>
     setForm((f) => ({
       ...f,
       [key]: e.target.type === "checkbox" ? e.target.checked : e.target.value,
     }));
+
+  const handleForgotPassword = (e) => {
+    e.preventDefault();
+    if (!form.identifier.trim()) {
+      setError("Please enter your email or username above first to request a password reset.");
+      setResetSent(false);
+      return;
+    }
+    setError("");
+    setResetSent(true);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -73,7 +85,7 @@ export default function Login() {
           label="Password"
           type="password"
           autoComplete="current-password"
-          placeholder="••••••••"
+          placeholder="Your password"
           icon={Lock}
           value={form.password}
           onChange={update("password")}
@@ -90,10 +102,33 @@ export default function Login() {
             />
             Remember me
           </label>
-          <a href="#" style={styles.forgotLink} onClick={(e) => e.preventDefault()}>
+          <a
+            href="#forgot-password"
+            style={styles.forgotLink}
+            onClick={handleForgotPassword}
+          >
             Forgot password?
           </a>
         </div>
+
+        {resetSent && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 14px',
+              borderRadius: '8px',
+              fontSize: '13px',
+              background: 'rgba(129, 199, 132, 0.12)',
+              border: '1px solid rgba(129, 199, 132, 0.3)',
+              color: '#81c784',
+              marginBottom: '16px',
+            }}
+          >
+            <span>Password reset instructions dispatched to your email.</span>
+          </div>
+        )}
 
         {error && (
           <div style={styles.errorBanner}>

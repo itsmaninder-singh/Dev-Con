@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useProfile } from '../context/ProfileContext.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
+import { authApi, userApi } from '../lib/api.js';
 import '../Settings.css';
 
 const MoonIcon = (p) => <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z" /></svg>;
@@ -17,21 +20,27 @@ const OPEN_OPTIONS = [
 ];
 
 export default function Settings() {
+  const navigate = useNavigate();
   const { profile, updateProfile, blockedUsers, unblockUser } = useProfile();
+  const { user, logout } = useAuth() || {};
   const { theme, setTheme } = useTheme();
   const [toasts, setToasts] = useState([]);
   const [savingKey, setSavingKey] = useState(null);
   const [savedMsgKey, setSavedMsgKey] = useState(null);
 
-  // Not yet part of the shared profile (no backend field for these): kept
-  // as local-only state, same as the uploaded mock's defaultValue inputs.
-  const [username, setUsername] = useState('priyanair');
-  const [email, setEmail] = useState('priya.nair@example.com');
+  // Authenticated user credentials
+  const [username, setUsername] = useState(user?.username || profile?.username || '');
+  const [email, setEmail] = useState(user?.email || profile?.email || '');
+
+  useEffect(() => {
+    if (user?.username) setUsername(user.username);
+    if (user?.email) setEmail(user.email);
+  }, [user]);
 
   const [newPw, setNewPw] = useState('');
   const [confirmPw, setConfirmPw] = useState('');
   const [currentPw, setCurrentPw] = useState('');
-  const [pwError, setPwError] = useState(false);
+  const [pwError, setPwError] = useState('');
   const nameRef = useRef(null);
 
   function showToast(msg) {
@@ -42,9 +51,6 @@ export default function Settings() {
 
   function flashSave(key, msg) {
     setSavingKey(key);
-    // Real integration: this is where you'd await the actual PATCH request
-    // (profile fields already save instantly via ProfileContext as you
-    // type/toggle below — this flash is just a "yes, it's saved" confirmation).
     setTimeout(() => {
       setSavingKey(null);
       setSavedMsgKey(key);
@@ -58,16 +64,67 @@ export default function Settings() {
     showToast(mode === 'dark' ? 'Switched to dark mode' : 'Switched to light mode');
   }
 
-  function handleSavePassword() {
-    if (newPw.length < 8 || newPw !== confirmPw) { setPwError(true); return; }
-    setPwError(false);
-    flashSave('password', 'Password updated');
-    setCurrentPw(''); setNewPw(''); setConfirmPw('');
+  async function handleSaveAccount() {
+    setSavingKey('account');
+    try {
+      await userApi.updateProfile({
+        name: profile.name,
+        college: profile.college,
+        bio: profile.bio,
+        experience: profile.experience,
+      });
+      setSavedMsgKey('account');
+      showToast('Account details saved');
+      setTimeout(() => setSavedMsgKey(null), 2000);
+    } catch (err) {
+      showToast(err.message || 'Failed to update account details');
+    } finally {
+      setSavingKey(null);
+    }
+  }
+
+  async function handleSavePassword() {
+    if (!currentPw) {
+      setPwError('Please enter your current password');
+      return;
+    }
+    if (newPw.length < 8) {
+      setPwError('New password must be at least 8 characters');
+      return;
+    }
+    if (newPw !== confirmPw) {
+      setPwError('Passwords do not match');
+      return;
+    }
+    setPwError('');
+    setSavingKey('password');
+    try {
+      await authApi.changePassword({ currentPassword: currentPw, newPassword: newPw });
+      setSavedMsgKey('password');
+      showToast('Password updated successfully');
+      setCurrentPw('');
+      setNewPw('');
+      setConfirmPw('');
+      setTimeout(() => setSavedMsgKey(null), 2500);
+    } catch (err) {
+      const msg = err.message || 'Failed to update password';
+      setPwError(msg);
+      showToast(msg);
+    } finally {
+      setSavingKey(null);
+    }
   }
 
   function toggleOpenChip(label) {
     const has = profile.openTo.includes(label);
     updateProfile({ openTo: has ? profile.openTo.filter((o) => o !== label) : [...profile.openTo, label] });
+  }
+
+  function handleDeactivate() {
+    if (window.confirm('Are you sure you want to deactivate your account? This will hide your profile and log you out.')) {
+      if (logout) logout();
+      navigate('/login');
+    }
   }
 
   return (
@@ -147,7 +204,7 @@ export default function Settings() {
             />
           </div>
           <div className="save-row">
-            <button className="btn btn-primary" disabled={savingKey === 'account'} onClick={() => flashSave('account', 'Profile updated')}>
+            <button className="btn btn-primary" disabled={savingKey === 'account'} onClick={handleSaveAccount}>
               {savingKey === 'account' ? 'Saving...' : 'Save changes'}
             </button>
             <span className={`save-msg${savedMsgKey === 'account' ? ' show' : ''}`}>Saved ✓</span>
@@ -228,7 +285,7 @@ export default function Settings() {
             <div className="field-group"><label>New password</label><input type="password" placeholder="••••••••" value={newPw} onChange={(e) => setNewPw(e.target.value)} /></div>
             <div className="field-group"><label>Confirm new password</label><input type="password" placeholder="••••••••" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} /></div>
           </div>
-          {pwError && <div className="field-hint" style={{ color: 'var(--bad)' }}>Passwords don't match, or are under 8 characters.</div>}
+          {pwError && <div className="field-hint" style={{ color: 'var(--bad)' }}>{pwError}</div>}
           <div className="save-row">
             <button className="btn btn-primary" disabled={savingKey === 'password'} onClick={handleSavePassword}>
               {savingKey === 'password' ? 'Saving...' : 'Update password'}
@@ -382,7 +439,12 @@ export default function Settings() {
         <div className="panel danger-zone">
           <div className="panel-title">Danger zone</div>
           <div className="panel-sub">Deactivating hides your profile and pauses matching. This can be undone by logging back in.</div>
-          <button className="btn" style={{ background: 'transparent', color: 'var(--bad)', border: '1px solid rgba(255,122,122,0.35)' }}>
+          <button
+            type="button"
+            className="btn"
+            onClick={handleDeactivate}
+            style={{ background: 'transparent', color: 'var(--bad)', border: '1px solid rgba(255,122,122,0.35)' }}
+          >
             Deactivate account
           </button>
         </div>

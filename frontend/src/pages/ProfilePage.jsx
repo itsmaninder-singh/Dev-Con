@@ -11,19 +11,10 @@ import { ProfilePanels } from './profile/components/ProfilePanels';
 import { ProfileTabs } from './profile/components/ProfileTabs';
 import ReportUserModal from '../components/ReportUserModal.jsx';
 
-const DEFAULT_TEAMS = [
-  { id: 't1', type: 'hackathon', name: 'Nightwatch', role: 'Frontend' },
-  { id: 't3', type: 'open-source', name: 'Formless', role: 'Creator' },
-];
-
-const DEFAULT_PROJECTS = [
-  { id: 'p2', type: 'open-source', name: 'Queuely', role: 'Contributor' },
-];
-
 export default function ProfilePage() {
   const { profile, blockUser, unblockUser, isUserBlocked } = useProfile();
   const { user } = useAuth() || {};
-  const { teams: userTeams } = useTeams() || {};
+  const { teams: userTeams, projects: userProjects } = useTeams() || {};
   const { openDirectChatWith } = useChatUI();
   const navigate = useNavigate();
   const { username } = useParams();
@@ -53,31 +44,26 @@ export default function ProfilePage() {
   }, [username, user?.username]);
 
   const activeUser = isOwnProfile ? (profile || user) : targetUser;
-  const name = activeUser?.name || (isOwnProfile ? (profile?.name || user?.name || 'Priya Nair') : (username || 'Developer'));
+  const name = activeUser?.name || (isOwnProfile ? (profile?.name || user?.name || 'Developer') : (username || 'Developer'));
   const handle = activeUser?.username || (activeUser?.name ? activeUser.name.toLowerCase().replace(/\s+/g, '') : (username || 'user'));
-  const college = activeUser?.college || (isOwnProfile ? (profile?.college || 'Bengaluru · Computer Science, RVCE') : 'Developer Community');
+  const college = activeUser?.college || (isOwnProfile ? (profile?.college || '') : '');
   const bio =
     activeUser?.bio ||
     (isOwnProfile
-      ? (profile?.bio ||
-        'Frontend-leaning full-stack dev. I like small, well-tested libraries more than big frameworks. Currently deep in TypeScript tooling and open to hackathons on weekends.')
-      : 'Passionate developer building innovative open source projects and hackathon teams on DevConnect.');
+      ? (profile?.bio || '')
+      : '');
   const skills =
     activeUser?.skills && activeUser.skills.length > 0
       ? activeUser.skills
-      : (isOwnProfile
-        ? (profile?.skills && profile.skills.length > 0
-          ? profile.skills
-          : ['TypeScript', 'React', 'Node.js', 'Vite', 'Tailwind', 'PostgreSQL'])
-        : ['JavaScript', 'React', 'Node.js']);
+      : (isOwnProfile && profile?.skills && profile.skills.length > 0
+        ? profile.skills
+        : []);
   const openTo =
     activeUser?.availableFor && activeUser.availableFor.length > 0
       ? activeUser.availableFor
-      : (isOwnProfile
-        ? (profile?.openTo && profile.openTo.length > 0
-          ? profile.openTo
-          : ['Open Source', 'Hackathons', 'Freelance'])
-        : ['Open Source', 'Hackathons']);
+      : (isOwnProfile && profile?.openTo && profile.openTo.length > 0
+        ? profile.openTo
+        : []);
 
   const initials =
     activeUser?.initials ||
@@ -87,7 +73,7 @@ export default function ProfilePage() {
       .map((w) => w[0])
       .slice(0, 2)
       .join('')
-      .toUpperCase() || 'PN';
+      .toUpperCase() || 'DV';
 
   const avatarUrl =
     activeUser?.avatarUrl ||
@@ -155,10 +141,79 @@ export default function ProfilePage() {
   const repScoreRef = useRef(null);
   const coverRef = useRef(null);
 
-  const displayTeams = userTeams && userTeams.length > 0
-    ? userTeams.map((t) => ({ id: t.id, type: t.category || 'team', name: t.name, role: t.role || 'Member' }))
-    : DEFAULT_TEAMS;
-  const displayProjects = DEFAULT_PROJECTS;
+  const profileUserId = String(activeUser?._id || activeUser?.id || (isOwnProfile ? (user?._id || profile?._id) : targetUserId) || '');
+  const profileUsername = String(activeUser?.username || (isOwnProfile ? (user?.username || profile?.username) : (username || handle)) || '').toLowerCase();
+
+  const isUserMemberOfTeam = (team) => {
+    if (!team) return false;
+    const cid = String(team.creator?._id || team.creator?.id || team.creator || '');
+    const cusername = String(team.creator?.username || '').toLowerCase();
+    if ((profileUserId && cid === profileUserId) || (profileUsername && cusername === profileUsername)) {
+      return true;
+    }
+    if (Array.isArray(team.members)) {
+      return team.members.some((m) => {
+        const u = m.user;
+        const mid = String(u?._id || u?.id || u || '');
+        const musername = String(u?.username || '').toLowerCase();
+        return (profileUserId && mid === profileUserId) || (profileUsername && musername === profileUsername);
+      });
+    }
+    return false;
+  };
+
+  const getTeamRoleForProfileUser = (team) => {
+    const cid = String(team.creator?._id || team.creator?.id || team.creator || '');
+    const cusername = String(team.creator?.username || '').toLowerCase();
+    if ((profileUserId && cid === profileUserId) || (profileUsername && cusername === profileUsername)) {
+      return 'Creator';
+    }
+    if (Array.isArray(team.members)) {
+      const match = team.members.find((m) => {
+        const u = m.user;
+        const mid = String(u?._id || u?.id || u || '');
+        const musername = String(u?.username || '').toLowerCase();
+        return (profileUserId && mid === profileUserId) || (profileUsername && musername === profileUsername);
+      });
+      if (match?.role) return match.role;
+    }
+    return 'Member';
+  };
+
+  const displayTeams = (userTeams || [])
+    .filter(isUserMemberOfTeam)
+    .map((t) => ({
+      id: t._id || t.id,
+      type: t.category || t.type || (t.tags && t.tags[0]) || 'team',
+      name: t.name,
+      role: getTeamRoleForProfileUser(t),
+    }));
+
+  const isUserInProject = (project) => {
+    if (!project) return false;
+    const cid = String(project.creator?._id || project.creator?.id || project.creator || '');
+    const cusername = String(project.creator?.username || '').toLowerCase();
+    if ((profileUserId && cid === profileUserId) || (profileUsername && cusername === profileUsername)) {
+      return true;
+    }
+    if (Array.isArray(project.collaborators)) {
+      return project.collaborators.some((collab) => {
+        const mid = String(collab?._id || collab?.id || collab || '');
+        const musername = String(collab?.username || '').toLowerCase();
+        return (profileUserId && mid === profileUserId) || (profileUsername && musername === profileUsername);
+      });
+    }
+    return false;
+  };
+
+  const displayProjects = (userProjects || [])
+    .filter(isUserInProject)
+    .map((p) => ({
+      id: p._id || p.id,
+      type: p.category || p.type || p.status || 'open-source',
+      name: p.name || p.title,
+      role: String(p.creator?._id || p.creator?.id || p.creator || '') === profileUserId ? 'Creator' : (p.role || 'Contributor'),
+    }));
 
   const showToast = (msg) => {
     const id = Date.now() + Math.random();
@@ -218,7 +273,7 @@ export default function ProfilePage() {
     gsap.to('.right-col', { opacity: 1, y: 0, duration: 0.6, delay: 0.45, ease: 'power2.out' });
 
     // Reputation Ring
-    const repScore = 640;
+    const repScore = activeUser?.reputation?.score ?? 0;
     const repMax = 1000;
     const circumference = 2 * Math.PI * 27;
     if (repFillRef.current) {

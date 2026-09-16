@@ -1,6 +1,7 @@
 import axios from "axios";
 
-const rawBase = import.meta.env.VITE_API_URL || "http://localhost:6969/api/v1";
+const defaultBase = import.meta.env.DEV ? "http://localhost:6969/api/v1" : "/api/v1";
+const rawBase = import.meta.env.VITE_API_URL || defaultBase;
 const BASE_URL = rawBase.endsWith("/api/v1")
   ? rawBase
   : `${rawBase.replace(/\/+$/, "")}/api/v1`;
@@ -119,9 +120,10 @@ export const authApi = {
     }
   },
 
-  google: async (idToken) => {
+  google: async (payload) => {
     try {
-      const { data } = await api.post("/auth/google", { idToken });
+      const body = typeof payload === "string" ? { idToken: payload } : payload;
+      const { data } = await api.post("/auth/google", body);
       return data.data;
     } catch (err) {
       throw new Error(extractMessage(err));
@@ -144,6 +146,15 @@ export const authApi = {
 
   logout: async () => {
     await api.post("/auth/logout");
+  },
+
+  changePassword: async ({ currentPassword, newPassword }) => {
+    try {
+      const { data } = await api.post("/auth/change-password", { currentPassword, newPassword });
+      return data;
+    } catch (err) {
+      throw new Error(extractMessage(err));
+    }
   },
 };
 
@@ -616,4 +627,17 @@ export const matchupApi = {
     }
   },
 };
+
+export const searchApi = {
+  searchUsers: async (params = {}) => {
+    try {
+      const query = new URLSearchParams(params).toString();
+      const { data } = await api.get(`/search/users${query ? `?${query}` : ""}`);
+      return data.data;
+    } catch (err) {
+      throw new Error(extractMessage(err));
+    }
+  },
+};
+
 

@@ -1,17 +1,51 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useProfile } from '../../context/ProfileContext.jsx';
-import { ROSTER } from './mockPeople.js';
+import { useTeams } from '../../context/TeamsContext.jsx';
 import { overlap, scorePair } from './scoring.js';
 
-/* Real integration: replace runCheck() with a call to your API, passing
-   both people's ids and letting the backend do the actual scoring. */
 export default function CompatibilityCheck() {
   const { profile } = useProfile();
-  const you = { id: 'you', name: profile.name || 'You', initials: 'YO', skills: profile.skills || [], availability: profile.isAvailable ? 'Open now' : 'Not available', workStyle: 'Your profile' };
-  const people = [you, ...ROSTER];
+  const { teams } = useTeams() || {};
+
+  const you = useMemo(
+    () => ({
+      id: 'you',
+      name: profile?.name || 'You',
+      initials: 'YO',
+      skills: profile?.skills || [],
+      availability: profile?.isAvailable ? 'Open now' : 'Not available',
+      workStyle: profile?.preferredRole || 'Your profile',
+    }),
+    [profile]
+  );
+
+  const teamMembers = useMemo(() => {
+    const map = new Map();
+    (teams || []).forEach((t) => {
+      (t.members || []).forEach((m) => {
+        const u = m.user;
+        if (u && (u._id || u.name) && u.name !== profile?.name) {
+          const uid = u._id || u.name;
+          if (!map.has(uid)) {
+            map.set(uid, {
+              id: uid,
+              name: u.name || u.username || 'Teammate',
+              initials: u.initials || 'TM',
+              skills: u.skills || t.skillsNeeded || [],
+              availability: 'Squad member',
+              workStyle: m.role || 'Contributor',
+            });
+          }
+        }
+      });
+    });
+    return Array.from(map.values());
+  }, [teams, profile]);
+
+  const people = useMemo(() => [you, ...teamMembers], [you, teamMembers]);
 
   const [aId, setAId] = useState('you');
-  const [bId, setBId] = useState(ROSTER[0]?.id);
+  const [bId, setBId] = useState(() => teamMembers[0]?.id || 'you');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
 
@@ -27,29 +61,42 @@ export default function CompatibilityCheck() {
       const shared = overlap(a.skills, b.skills);
       setResult({ score, shared });
       setLoading(false);
-    }, 900);
+    }, 600);
   }
 
   return (
     <div className="ai-feature">
       <div className="ai-feature-intro">
         <h2>Check 1:1 compatibility</h2>
-        <p>Pick two people to see how well they'd likely work together, based on skills and availability.</p>
+        <p>Pick two builders to analyze synergy, skill overlap, and workstyle compatibility.</p>
       </div>
 
-      <div className="ai-pair-row">
-        <select className="ai-select" value={aId} onChange={(e) => { setAId(e.target.value); setResult(null); }}>
-          {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
-        <span className="ai-pair-vs">vs</span>
-        <select className="ai-select" value={bId} onChange={(e) => { setBId(e.target.value); setResult(null); }}>
-          {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
-        <button className="join-btn" onClick={runCheck} disabled={loading || !a || !b || a.id === b.id}>
-          {loading ? 'Checking...' : 'Check compatibility'}
-        </button>
-      </div>
-      {a && b && a.id === b.id && <p className="ai-hint">Pick two different people.</p>}
+      {people.length < 2 ? (
+        <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted, #888)' }}>
+          <p style={{ fontSize: '14px', marginBottom: '8px', color: 'var(--text-main, #fff)', fontWeight: 600 }}>
+            No teammates in your squads yet
+          </p>
+          <p style={{ fontSize: '13px', margin: 0, maxWidth: '420px', marginLeft: 'auto', marginRight: 'auto' }}>
+            Assemble or join a team in Teams & Workspace to run 1:1 AI skill and workstyle compatibility checks.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="ai-pair-row">
+            <select className="ai-select" value={aId} onChange={(e) => { setAId(e.target.value); setResult(null); }}>
+              {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+            <span className="ai-pair-vs">vs</span>
+            <select className="ai-select" value={bId} onChange={(e) => { setBId(e.target.value); setResult(null); }}>
+              {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+            <button className="join-btn" onClick={runCheck} disabled={loading || !a || !b || a.id === b.id}>
+              {loading ? 'Checking...' : 'Check compatibility'}
+            </button>
+          </div>
+          {a && b && a.id === b.id && <p className="ai-hint">Pick two different people.</p>}
+        </>
+      )}
 
       {loading && <div className="ai-loading"><span className="ai-spinner" /> comparing skills and availability...</div>}
 

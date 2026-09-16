@@ -144,7 +144,7 @@ export function ProfileHeader({
               </span>
             </h1>
             <div className="handle">
-              @{handle} · {college}
+              @{handle}{college ? ` · ${college}` : ''}
             </div>
             {bio && <p className="identity-bio">{bio}</p>}
           </div>
@@ -210,61 +210,6 @@ export function ProfileHeader({
                   }}
                 >
                   {following ? 'Following' : 'Follow'}
-                </button>
-
-                {/* Direct Report Button */}
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  id="reportBtn"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (onOpenReport) onOpenReport();
-                  }}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    borderColor: 'rgba(255, 152, 162, 0.35)',
-                    color: 'var(--coral, #ff98a2)',
-                  }}
-                  title={`Report @${handle}`}
-                >
-                  <Flag size={14} color="var(--coral, #ff98a2)" />
-                  <span>Report</span>
-                </button>
-
-                {/* Direct Block / Unblock Button */}
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  id="blockBtn"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (onBlockToggle) onBlockToggle();
-                  }}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    borderColor: isBlocked ? 'rgba(74, 222, 128, 0.4)' : 'rgba(255, 123, 123, 0.4)',
-                    color: isBlocked ? '#4ade80' : '#ff7b7b',
-                  }}
-                  title={isBlocked ? `Unblock @${handle}` : `Block @${handle}`}
-                >
-                  {isBlocked ? (
-                    <>
-                      <ShieldCheck size={14} color="#4ade80" />
-                      <span>Unblock</span>
-                    </>
-                  ) : (
-                    <>
-                      <ShieldBan size={14} color="#ff7b7b" />
-                      <span>Block</span>
-                    </>
-                  )}
                 </button>
               </>
             ) : (

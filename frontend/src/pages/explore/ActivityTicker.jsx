@@ -1,33 +1,41 @@
 import { useEffect, useState } from 'react';
-import { ALL, TICKER_NAMES } from './data.js';
+import { useTeams } from '../../context/TeamsContext.jsx';
 
 export default function ActivityTicker() {
+  const { teams } = useTeams() || {};
   const [visible, setVisible] = useState(false);
   const [line, setLine] = useState(null);
 
   useEffect(() => {
+    const activeTeams = (teams || []).filter((t) => t?.members && t.members.length > 0);
+    if (activeTeams.length === 0) return;
+
     let hideTimer;
     function next() {
-      const item = ALL[Math.floor(Math.random() * ALL.length)];
-      const name = TICKER_NAMES[Math.floor(Math.random() * TICKER_NAMES.length)];
-      setLine({ name, target: item.name });
+      const team = activeTeams[Math.floor(Math.random() * activeTeams.length)];
+      if (!team) return;
+      const recentMember = team.members[team.members.length - 1]?.user;
+      const name = recentMember?.name || recentMember?.username || 'A builder';
+      setLine({ name, target: team.name });
       setVisible(true);
       hideTimer = setTimeout(() => setVisible(false), 4200);
     }
-    const firstTimer = setTimeout(next, 2600);
-    const interval = setInterval(next, 8500);
+    const firstTimer = setTimeout(next, 3500);
+    const interval = setInterval(next, 12000);
     return () => {
       clearTimeout(firstTimer);
       clearTimeout(hideTimer);
       clearInterval(interval);
     };
-  }, []);
+  }, [teams]);
+
+  if (!line) return null;
 
   return (
     <div id="activityTicker" className={visible ? 'visible' : ''}>
       <div className="ticker-dot" />
       <div className="ticker-text">
-        {line && <><b>{line.name}</b> just joined <b>{line.target}</b></>}
+        <b>{line.name}</b> joined <b>{line.target}</b>
       </div>
     </div>
   );

@@ -62,6 +62,7 @@ export default function App() {
               <Route element={<Layout />}>
               {/* Public Routes */}
               <Route path="/" element={<Landing />} />
+              <Route path="/about" element={<About />} />
 
               {/* Protected Routes */}
               <Route
@@ -77,14 +78,6 @@ export default function App() {
                 element={
                   <ProtectedRoute>
                     <Explore />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/about"
-                element={
-                  <ProtectedRoute>
-                    <About />
                   </ProtectedRoute>
                 }
               />

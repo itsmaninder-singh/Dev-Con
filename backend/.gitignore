@@ -1,3 +1,19 @@
+# Dependencies
 node_modules/
+
+# Environment files & secrets
 .env
-devcon-frontend/
+.env.*
+!.env.example
+
+# Temporary uploads and caches
+temp/
+logs/
+*.log
+npm-debug.log*
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -90,6 +90,7 @@ const getTeams = asyncHandler(async(req,res)=>{
     const [teams, total] = await Promise.all([
         Team.find(filter)
             .populate("creator","name username profilePicture")
+            .populate("members.user", "name username profilePicture")
             .sort({createdAt: -1})
             .skip((pageNum - 1) * limitNum)
             .limit(limitNum),

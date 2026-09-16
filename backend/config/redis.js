@@ -155,17 +155,35 @@ class InMemoryRedisClient {
 export const isRedisAvailable = () => !_isFallback && _client?.isOpen;
 
 const buildRealClient = () => {
-  return createClient({
+  const client = createClient({
     url: process.env.REDIS_URL || "redis://127.0.0.1:6379",
     socket: {
-      connectTimeout: 1500,
-      reconnectStrategy: false,
+      connectTimeout: 5000,
+      reconnectStrategy: (retries) => {
+        if (retries > 5) {
+          return new Error("Redis reconnection limit reached");
+        }
+        return Math.min(retries * 200, 2000);
+      },
     },
   });
+
+  client.on("error", (err) => {
+    console.warn(`[redis] Error: ${err.message}`);
+  });
+
+  return client;
 };
 
 export const connectRedis = async () => {
   if (_client) return;
+
+  if (!process.env.REDIS_URL) {
+    console.log("[redis] REDIS_URL is not set in .env. Using built-in in-memory cache/presence store.");
+    _client = new InMemoryRedisClient();
+    _isFallback = true;
+    return;
+  }
 
   const candidate = buildRealClient();
   try {
@@ -174,8 +192,8 @@ export const connectRedis = async () => {
     _client = candidate;
     _isFallback = false;
   } catch (err) {
-    console.warn(`[redis] Redis not running locally (${err.message}).`);
-    console.log("[redis] Using built-in in-memory cache/presence store for local development.");
+    console.warn(`[redis] Redis connection failed (${err.message}).`);
+    console.log("[redis] Falling back to built-in in-memory cache/presence store.");
     _client = new InMemoryRedisClient();
     _isFallback = true;
   }

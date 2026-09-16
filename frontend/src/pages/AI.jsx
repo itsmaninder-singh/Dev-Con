@@ -57,7 +57,7 @@ export default function AI() {
               color="#f7f2e8"
             />
           </div>
-          <p>Mocked for now — every result below is simulated client-side, not a real model call. Swap in your actual API where noted in each file.</p>
+          <p>AI-driven team formation, skill compatibility analysis, and roadmap scaffolding for your projects.</p>
         </div>
 
         <div className="ai-tabs" role="tablist">

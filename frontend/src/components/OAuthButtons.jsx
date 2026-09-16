@@ -9,14 +9,50 @@ const GITHUB_REDIRECT_URI = import.meta.env.VITE_GITHUB_REDIRECT_URI || `${windo
 export default function OAuthButtons({ onError, onSuccess }) {
   const { loginWithGoogle, login } = useAuth();
   const navigate = useNavigate();
-  const googleBtnRef = useRef(null);
-  const [googleReady, setGoogleReady] = useState(false);
+  const tokenClientRef = useRef(null);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   // Initialize Google Identity Services (GIS)
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID || typeof window === "undefined") return;
 
-    const initGsi = () => {
+    const initTokenClient = () => {
+      if (window.google?.accounts?.oauth2) {
+        try {
+          tokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
+            client_id: GOOGLE_CLIENT_ID,
+            scope: "openid email profile",
+            callback: async (response) => {
+              setGoogleLoading(false);
+              if (response?.error) {
+                if (response.error === "popup_closed_by_user") return;
+                onError?.(`Google sign-in error: ${response.error_description || response.error}`);
+                return;
+              }
+              if (response?.access_token) {
+                try {
+                  await loginWithGoogle({ accessToken: response.access_token });
+                  if (onSuccess) onSuccess();
+                  else navigate("/workspace", { replace: true });
+                } catch (err) {
+                  onError?.(err.message || "Google sign-in failed. Please try again.");
+                }
+              }
+            },
+            error_callback: (err) => {
+              setGoogleLoading(false);
+              console.warn("Google token client error:", err);
+              if (err?.type === "popup_closed") return;
+              onError?.(`Google sign-in error: ${err?.message || "Popup blocked or closed"}`);
+            },
+          });
+        } catch (err) {
+          console.warn("Google oauth2 init error:", err);
+        }
+      }
+    };
+
+    const initIdService = () => {
       if (window.google?.accounts?.id) {
         try {
           window.google.accounts.id.initialize({
@@ -24,7 +60,7 @@ export default function OAuthButtons({ onError, onSuccess }) {
             callback: async (response) => {
               if (response?.credential) {
                 try {
-                  await loginWithGoogle(response.credential);
+                  await loginWithGoogle({ idToken: response.credential });
                   if (onSuccess) onSuccess();
                   else navigate("/workspace", { replace: true });
                 } catch (err) {
@@ -35,33 +71,26 @@ export default function OAuthButtons({ onError, onSuccess }) {
             auto_select: false,
             cancel_on_tap_outside: true,
           });
-
-          if (googleBtnRef.current) {
-            window.google.accounts.id.renderButton(googleBtnRef.current, {
-              type: "standard",
-              theme: "filled_black",
-              size: "large",
-              text: "continue_with",
-              shape: "rectangular",
-              width: 340,
-            });
-          }
-          setGoogleReady(true);
         } catch (err) {
-          console.warn("Google GIS init error:", err);
+          console.warn("Google GIS ID init error:", err);
         }
       }
     };
 
-    if (window.google?.accounts?.id) {
-      initGsi();
+    const tryInit = () => {
+      if (window.google?.accounts?.oauth2) initTokenClient();
+      if (window.google?.accounts?.id) initIdService();
+    };
+
+    if (window.google?.accounts) {
+      tryInit();
     } else {
       const timer = setInterval(() => {
-        if (window.google?.accounts?.id) {
+        if (window.google?.accounts) {
           clearInterval(timer);
-          initGsi();
+          tryInit();
         }
-      }, 200);
+      }, 150);
       return () => clearInterval(timer);
     }
   }, [loginWithGoogle, onError, onSuccess, navigate]);
@@ -72,17 +101,54 @@ export default function OAuthButtons({ onError, onSuccess }) {
       return;
     }
 
-    // Trigger Google One-Tap or button click
+    if (tokenClientRef.current) {
+      setGoogleLoading(true);
+      tokenClientRef.current.requestAccessToken({ prompt: "select_account" });
+      return;
+    }
+
+    if (window.google?.accounts?.oauth2) {
+      try {
+        const client = window.google.accounts.oauth2.initTokenClient({
+          client_id: GOOGLE_CLIENT_ID,
+          scope: "openid email profile",
+          callback: async (response) => {
+            setGoogleLoading(false);
+            if (response?.error) {
+              if (response.error === "popup_closed_by_user") return;
+              onError?.(`Google sign-in error: ${response.error_description || response.error}`);
+              return;
+            }
+            if (response?.access_token) {
+              try {
+                await loginWithGoogle({ accessToken: response.access_token });
+                if (onSuccess) onSuccess();
+                else navigate("/workspace", { replace: true });
+              } catch (err) {
+                onError?.(err.message || "Google sign-in failed. Please try again.");
+              }
+            }
+          },
+          error_callback: (err) => {
+            setGoogleLoading(false);
+            if (err?.type === "popup_closed") return;
+            onError?.(`Google sign-in error: ${err?.message || "Popup blocked or closed"}`);
+          },
+        });
+        tokenClientRef.current = client;
+        setGoogleLoading(true);
+        client.requestAccessToken({ prompt: "select_account" });
+        return;
+      } catch (err) {
+        setGoogleLoading(false);
+        console.warn("initTokenClient failed:", err);
+      }
+    }
+
     if (window.google?.accounts?.id) {
-      window.google.accounts.id.prompt((notification) => {
-        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-          // If prompt was skipped or blocked, click the rendered standard button
-          const btn = googleBtnRef.current?.querySelector("div[role=button]");
-          if (btn) btn.click();
-        }
-      });
+      window.google.accounts.id.prompt();
     } else {
-      onError?.("Google authentication service is still loading. Please wait 2 seconds and try again.");
+      onError?.("Google authentication service is still loading. Please wait a moment and try again.");
     }
   };
 
@@ -131,32 +197,18 @@ export default function OAuthButtons({ onError, onSuccess }) {
       </div>
 
       <div style={styles.buttons}>
-        {/* Google Button with GIS overlay */}
-        <div style={{ position: "relative", width: "100%" }}>
-          <button
-            type="button"
-            onClick={handleGoogleClick}
-            style={styles.oauthButton}
-            onMouseEnter={hoverIn}
-            onMouseLeave={hoverOut}
-          >
-            <GoogleMark />
-            <span>Continue with Google</span>
-          </button>
-          <div
-            ref={googleBtnRef}
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              width: "100%",
-              height: "100%",
-              opacity: 0.001,
-              overflow: "hidden",
-              pointerEvents: googleReady ? "auto" : "none",
-            }}
-          />
-        </div>
+        {/* Google Button */}
+        <button
+          type="button"
+          onClick={handleGoogleClick}
+          style={styles.oauthButton}
+          onMouseEnter={hoverIn}
+          onMouseLeave={hoverOut}
+          disabled={googleLoading}
+        >
+          <GoogleMark />
+          <span>{googleLoading ? "Connecting to Google..." : "Continue with Google"}</span>
+        </button>
 
         {/* GitHub Button */}
         <button

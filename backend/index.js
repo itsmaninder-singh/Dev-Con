@@ -1,5 +1,10 @@
 import dotenv from "dotenv";
 dotenv.config({ path: "./.env" });
+import { validateEnv } from "./config/env.js";
+
+// Validate required environment variables before initializing services
+validateEnv();
+
 import http from "http";
 import { Server } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
@@ -12,7 +17,7 @@ import { connectRedis, isRedisAvailable } from "./config/redis.js";
 import redisClient from "./config/redis.js";
 import { startGithubSyncCron } from "./cron-job/syncGithub.cron.js";
 
-const PORT = process.env.PORT || 8000;
+const PORT = Number(process.env.PORT) || 6969;
 
 let httpServerInstance;
 
@@ -25,6 +30,8 @@ const startServer = async () => {
     try {
       const pubClient = redisClient.duplicate();
       const subClient = redisClient.duplicate();
+      pubClient.on("error", (err) => console.warn("[redis pub] Adapter error:", err.message));
+      subClient.on("error", (err) => console.warn("[redis sub] Adapter error:", err.message));
       await pubClient.connect();
       await subClient.connect();
       socketAdapter = createAdapter(pubClient, subClient);

@@ -24,23 +24,36 @@ export function AuthProvider({ children }) {
   const applySession = useCallback((session) => {
     setAccessToken(session.accessToken);
     setUser(session.user);
+    if (session?.accessToken && session?.user) {
+      localStorage.setItem("devconnect_auth_session", JSON.stringify(session));
+    }
   }, []);
 
   useEffect(() => {
     let active = true;
 
-    // Check for saved demo session
-    const savedDemo = localStorage.getItem("devconnect_demo_session");
-    if (savedDemo) {
+    // Check for saved session in localStorage to prevent reload bootouts
+    const saved =
+      localStorage.getItem("devconnect_auth_session") ||
+      localStorage.getItem("devconnect_demo_session");
+
+    if (saved) {
       try {
-        const parsed = JSON.parse(savedDemo);
+        const parsed = JSON.parse(saved);
         if (parsed?.accessToken && parsed?.user) {
           applySession(parsed);
           setInitializing(false);
+          // Verify/refresh in background
+          authApi
+            .refresh()
+            .then((fresh) => {
+              if (active && fresh?.accessToken) applySession(fresh);
+            })
+            .catch(() => {});
           return;
         }
       } catch {
-        localStorage.removeItem("devconnect_demo_session");
+        localStorage.removeItem("devconnect_auth_session");
       }
     }
 
@@ -79,30 +92,14 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(
     async (payload) => {
-      const id = (payload.identifier || "").toLowerCase().trim();
-      const pw = payload.password || "";
-
-      // Allow quick demo credentials for seamless testing
-      if (
-        (id === "demo" || id === "demo@devconnect.io" || id === "rajneesh" || id === "alex") &&
-        (pw === "password123" || pw === "demo123" || pw === "demo" || pw === "password")
-      ) {
-        const demoSession = {
-          user: DEMO_USER,
-          accessToken: "mock-jwt-token-" + Date.now(),
-        };
-        applySession(demoSession);
-        localStorage.setItem("devconnect_demo_session", JSON.stringify(demoSession));
-        return demoSession.user;
-      }
-
+      const id = (payload?.identifier || "").toLowerCase().trim();
       try {
         const session = await authApi.login(payload);
         applySession(session);
         return session.user;
       } catch (err) {
-        // Fallback for demo credentials even if network/server is down
-        if (id === "demo" || id === "demo@devconnect.io") {
+        // In local development only, allow 'demo' fallback if backend is offline
+        if (import.meta.env.DEV && (id === "demo" || id === "demo@devconnect.io")) {
           const demoSession = {
             user: DEMO_USER,
             accessToken: "mock-jwt-token-" + Date.now(),
@@ -118,8 +115,8 @@ export function AuthProvider({ children }) {
   );
 
   const loginWithGoogle = useCallback(
-    async (idToken) => {
-      const session = await authApi.google(idToken);
+    async (tokenPayload) => {
+      const session = await authApi.google(tokenPayload);
       applySession(session);
       return session.user;
     },
@@ -139,6 +136,7 @@ export function AuthProvider({ children }) {
     try {
       await authApi.logout();
     } catch {}
+    localStorage.removeItem("devconnect_auth_session");
     localStorage.removeItem("devconnect_demo_session");
     setAccessToken(null);
     setUser(null);

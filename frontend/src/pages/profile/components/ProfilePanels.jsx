@@ -14,20 +14,39 @@ export function ProfilePanels({
   const userBio =
     bio ||
     profile?.bio ||
-    'Full-stack dev who likes shipping fast and breaking things in staging, not prod. Currently focused on building high-performance web applications and open to hackathons.';
-  const userCollege = college || profile?.college || 'Lovely Professional University';
-  const experience = profile?.experience || '2-5 years';
+    (isOwnProfile
+      ? 'No bio added yet. Click "Edit profile" to introduce yourself.'
+      : 'No bio provided.');
+  const userCollege = college || profile?.college || 'Not specified';
+  const experience = profile?.experience || profile?.experienceLevel || 'Fresher';
   const isAvailable = profile?.isAvailable !== false;
 
   const displaySkills =
     skills && skills.length > 0
       ? skills
-      : ['TypeScript', 'React', 'Node.js', 'Vite', 'Tailwind', 'PostgreSQL'];
+      : (profile?.skills && profile.skills.length > 0 ? profile.skills : []);
 
   const displayOpenTo =
     openTo && openTo.length > 0
       ? openTo
-      : ['Hackathons', 'Open Source', 'Freelance'];
+      : (profile?.availableFor && profile.availableFor.length > 0
+          ? profile.availableFor
+          : (profile?.openTo && profile.openTo.length > 0 ? profile.openTo : []));
+
+  const reputation = profile?.reputation || {};
+  const repScore = reputation.score ?? 0;
+  const rawLevel = reputation.level || 'newcomer';
+  const repLevel = `${rawLevel.charAt(0).toUpperCase() + rawLevel.slice(1)} Tier`;
+
+  const devActivity = profile?.badges?.devconnectActivity || repScore;
+  const ghBadges = profile?.badges?.github || 0;
+  const communityRep = Math.max(0, repScore - devActivity);
+
+  const githubProfile = profile?.githubProfile || {};
+  const currentStreak = githubProfile?.streak?.current ?? 0;
+  const longestStreak = githubProfile?.streak?.longest ?? 0;
+  const repoCount = githubProfile?.publicRepoCount ?? 0;
+  const topRepos = Array.isArray(githubProfile?.topRepos) ? githubProfile.topRepos : [];
 
   return (
     <div className="left-col">
@@ -75,41 +94,53 @@ export function ProfilePanels({
             </svg>
           </div>
           <div>
-            <div className="rep-level">Builder Tier</div>
-            <div className="rep-score" ref={repScoreRef}>640 / 1000</div>
+            <div className="rep-level">{repLevel}</div>
+            <div className="rep-score" ref={repScoreRef}>{repScore} / 1000</div>
           </div>
           <div className="rep-tooltip">
             <div className="rep-tooltip-title">Score breakdown</div>
-            <div className="rep-tooltip-row"><span>Commits</span><b>240</b></div>
-            <div className="rep-tooltip-row"><span>Code reviews</span><b>180</b></div>
-            <div className="rep-tooltip-row"><span>Community help</span><b>220</b></div>
+            <div className="rep-tooltip-row"><span>DevConnect Activity</span><b>{devActivity}</b></div>
+            <div className="rep-tooltip-row"><span>GitHub Badges</span><b>{ghBadges}</b></div>
+            <div className="rep-tooltip-row"><span>Community Rep</span><b>{communityRep}</b></div>
           </div>
         </div>
         <div className="rep-breakdown-row">
-          <div className="rep-stat-item"><span>Commits</span><b>240</b></div>
-          <div className="rep-stat-item"><span>Code reviews</span><b>180</b></div>
-          <div className="rep-stat-item"><span>Community</span><b>220</b></div>
+          <div className="rep-stat-item"><span>DevConnect</span><b>{devActivity}</b></div>
+          <div className="rep-stat-item"><span>GitHub</span><b>{ghBadges}</b></div>
+          <div className="rep-stat-item"><span>Community</span><b>{communityRep}</b></div>
         </div>
       </div>
 
       {/* Available For Panel */}
       <div className="profile-panel" id="panelAvail">
         <h4>Available for</h4>
-        <div className="chip-row">
-          {displayOpenTo.map((c) => (
-            <span className="avail-chip" data-chip key={c}>{c}</span>
-          ))}
-        </div>
+        {displayOpenTo.length > 0 ? (
+          <div className="chip-row">
+            {displayOpenTo.map((c) => (
+              <span className="avail-chip" data-chip key={c}>{c}</span>
+            ))}
+          </div>
+        ) : (
+          <p style={{ color: 'var(--text-muted, #888)', fontSize: '13px', margin: '6px 0 0 0' }}>
+            {isOwnProfile ? 'None selected. Add in profile edit.' : 'Not specified'}
+          </p>
+        )}
       </div>
 
       {/* Skills Panel */}
       <div className="profile-panel" id="panelSkills">
         <h4>Skills & Tech Stack</h4>
-        <div className="chip-row">
-          {displaySkills.map((s) => (
-            <span className="skill-chip" data-chip key={s}>{s}</span>
-          ))}
-        </div>
+        {displaySkills.length > 0 ? (
+          <div className="chip-row">
+            {displaySkills.map((s) => (
+              <span className="skill-chip" data-chip key={s}>{s}</span>
+            ))}
+          </div>
+        ) : (
+          <p style={{ color: 'var(--text-muted, #888)', fontSize: '13px', margin: '6px 0 0 0' }}>
+            {isOwnProfile ? 'No skills added yet. Add in profile edit.' : 'No skills listed'}
+          </p>
+        )}
       </div>
 
       {/* GitHub Panel */}
@@ -117,35 +148,37 @@ export function ProfilePanels({
         <h4>GitHub Highlights</h4>
         <div className="streak-row">
           <div className="streak-stat">
-            <div className="num" data-count="37">37</div>
+            <div className="num" data-count={currentStreak}>{currentStreak}</div>
             <div className="lbl">Current streak</div>
           </div>
           <div className="streak-stat">
-            <div className="num" data-count="112">112</div>
+            <div className="num" data-count={longestStreak}>{longestStreak}</div>
             <div className="lbl">Longest streak</div>
           </div>
           <div className="streak-stat">
-            <div className="num" data-count="48">48</div>
+            <div className="num" data-count={repoCount}>{repoCount}</div>
             <div className="lbl">Public repos</div>
           </div>
         </div>
         <div style={{ marginTop: '18px' }}>
-          <div className="repo-item">
-            <a href="#formless" onClick={(e) => e.preventDefault()}>formless</a>
-            <p>Headless, framework-agnostic form builder with a tiny runtime.</p>
-            <div className="repo-meta">
-              <span>★ <b className="star-count" data-count="312">312</b></span>
-              <span>TypeScript</span>
-            </div>
-          </div>
-          <div className="repo-item">
-            <a href="#querylite" onClick={(e) => e.preventDefault()}>query-lite</a>
-            <p>A 2kb data-fetching hook, no cache invalidation ceremony.</p>
-            <div className="repo-meta">
-              <span>★ <b className="star-count" data-count="94">94</b></span>
-              <span>TypeScript</span>
-            </div>
-          </div>
+          {topRepos.length > 0 ? (
+            topRepos.map((repo, idx) => (
+              <div className="repo-item" key={repo.url || repo.name || idx}>
+                <a href={repo.url || '#'} target="_blank" rel="noopener noreferrer">
+                  {repo.name}
+                </a>
+                {repo.description && <p>{repo.description}</p>}
+                <div className="repo-meta">
+                  <span>★ <b className="star-count" data-count={repo.stars || 0}>{repo.stars || 0}</b></span>
+                  {repo.language && <span>{repo.language}</span>}
+                </div>
+              </div>
+            ))
+          ) : (
+            <p style={{ color: 'var(--text-muted, #888)', fontSize: '13px', margin: '8px 0 0 0' }}>
+              {isOwnProfile ? 'Connect your GitHub in Settings to showcase repositories & streaks.' : 'No repositories synced.'}
+            </p>
+          )}
         </div>
       </div>
     </div>

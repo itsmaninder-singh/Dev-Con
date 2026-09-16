@@ -1,6 +1,7 @@
 import { io } from "socket.io-client";
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:6969";
+const defaultSocket = import.meta.env.DEV ? "http://localhost:6969" : (typeof window !== "undefined" ? window.location.origin : "");
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || defaultSocket;
 
 let socketInstance = null;
 

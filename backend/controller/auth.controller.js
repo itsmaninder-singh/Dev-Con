@@ -75,11 +75,26 @@ const register = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Password must be at least 8 characters");
   }
 
+  const trimmedPhone = (phoneNumber && String(phoneNumber).trim()) || undefined;
+
   const existing = await User.findOne({
-    $or: [{ email: email.toLowerCase() }, { username: username.toLowerCase() }],
+    $or: [
+      { email: email.toLowerCase() },
+      { username: username.toLowerCase() },
+      ...(trimmedPhone ? [{ phoneNumber: trimmedPhone }] : []),
+    ],
   });
   if (existing) {
-    throw new ApiError(409, "An account with this email or username already exists");
+    if (existing.email === email.toLowerCase()) {
+      throw new ApiError(409, "An account with this email already exists");
+    }
+    if (existing.username === username.toLowerCase()) {
+      throw new ApiError(409, "This username is already taken");
+    }
+    if (trimmedPhone && existing.phoneNumber === trimmedPhone) {
+      throw new ApiError(409, "An account with this phone number already exists");
+    }
+    throw new ApiError(409, "An account with these details already exists");
   }
 
   const user = await User.create({
@@ -87,7 +102,7 @@ const register = asyncHandler(async (req, res) => {
     username: username.toLowerCase(),
     email: email.toLowerCase(),
     password,
-    phoneNumber,
+    phoneNumber: (phoneNumber && String(phoneNumber).trim()) || undefined,
     authProvider: "local",
   });
 
@@ -114,28 +129,43 @@ const login = asyncHandler(async (req, res) => {
 
 
 const googleAuth = asyncHandler(async (req, res) => {
-  const { idToken } = req.body;
-  if (!idToken) {
-    throw new ApiError(400, "idToken is required");
+  const { idToken, accessToken } = req.body;
+  if (!idToken && !accessToken) {
+    throw new ApiError(400, "idToken or accessToken is required");
   }
 
   let payload;
-  try {
-    const ticket = await googleClient.verifyIdToken({
-      idToken,
-      audience: process.env.GOOGLE_CLIENT_ID,
-    });
-    payload = ticket.getPayload();
-  } catch (err) {
-    throw new ApiError(401, "Invalid Google token");
+  if (idToken) {
+    try {
+      const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+      const ticket = await client.verifyIdToken({
+        idToken,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+      payload = ticket.getPayload();
+    } catch (err) {
+      console.error("[googleAuth] verifyIdToken failed:", err?.message);
+      throw new ApiError(401, "Invalid Google ID token");
+    }
+  } else if (accessToken) {
+    try {
+      const userinfoRes = await axios.get("https://www.googleapis.com/oauth2/v3/userinfo", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      payload = userinfoRes.data;
+    } catch (err) {
+      console.error("[googleAuth] userinfo fetch failed:", err?.response?.data || err?.message);
+      throw new ApiError(401, "Failed to verify Google access token");
+    }
   }
 
   if (!payload?.email) {
     throw new ApiError(401, "Google account has no verified email");
   }
 
+  const googleId = payload.sub || payload.id;
   let user = await User.findOne({
-    $or: [{ googleId: payload.sub }, { email: payload.email.toLowerCase() }],
+    $or: [{ googleId }, { email: payload.email.toLowerCase() }],
   });
 
   if (!user) {
@@ -144,13 +174,15 @@ const googleAuth = asyncHandler(async (req, res) => {
       name: payload.name || username,
       username,
       email: payload.email.toLowerCase(),
-      googleId: payload.sub,
+      googleId,
       authProvider: "google",
       profilePicture: payload.picture || "",
     });
   } else if (!user.googleId) {
-    
-    user.googleId = payload.sub;
+    user.googleId = googleId;
+    if (payload.picture && !user.profilePicture) {
+      user.profilePicture = payload.picture;
+    }
     await user.save({ validateModifiedOnly: true });
   }
 

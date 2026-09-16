@@ -1,24 +1,56 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useProfile } from '../../context/ProfileContext.jsx';
 import { useTeams } from '../../context/TeamsContext.jsx';
-import { ROSTER } from './mockPeople.js';
 import { scoreCandidateVsTeam } from './scoring.js';
 import { aiApi } from '../../lib/api.js';
 
 export default function TeamFitCheck() {
   const { profile } = useProfile();
-  const { teams } = useTeams();
-  const you = { id: 'you', name: profile.name || 'You', initials: 'YO', skills: profile.skills || [] };
-  const people = [you, ...ROSTER];
+  const { teams = [] } = useTeams() || {};
+
+  const you = useMemo(
+    () => ({
+      id: 'you',
+      _id: profile?._id,
+      name: profile?.name || 'You',
+      initials: 'YO',
+      skills: profile?.skills || [],
+    }),
+    [profile]
+  );
+
+  const teamMembers = useMemo(() => {
+    const map = new Map();
+    (teams || []).forEach((t) => {
+      (t.members || []).forEach((m) => {
+        const u = m.user;
+        if (u && (u._id || u.name) && u.name !== profile?.name) {
+          const uid = u._id || u.name;
+          if (!map.has(uid)) {
+            map.set(uid, {
+              id: uid,
+              _id: u._id,
+              name: u.name || u.username || 'Teammate',
+              initials: u.initials || 'TM',
+              skills: u.skills || t.skillsNeeded || [],
+            });
+          }
+        }
+      });
+    });
+    return Array.from(map.values());
+  }, [teams, profile]);
+
+  const people = useMemo(() => [you, ...teamMembers], [you, teamMembers]);
 
   const [personId, setPersonId] = useState('you');
-  const [teamId, setTeamId] = useState(teams[0]?.id || '');
+  const [teamId, setTeamId] = useState(teams[0]?._id || teams[0]?.id || '');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [aiAnalysisSource, setAiAnalysisSource] = useState(null); // 'api' | 'local'
 
   const person = people.find((p) => p.id === personId);
-  const team = teams.find((t) => t.id === teamId || t._id === teamId);
+  const team = teams.find((t) => (t._id || t.id) === teamId) || teams[0];
 
   async function runCheck() {
     if (!person || !team) return;
@@ -75,22 +107,54 @@ export default function TeamFitCheck() {
     <div className="ai-feature">
       <div className="ai-feature-intro">
         <h2>Check candidate-to-team fit</h2>
-        <p>How well would this person cover what the team is missing?</p>
+        <p>Analyze how effectively a developer covers what a squad is looking for.</p>
       </div>
 
-      <div className="ai-pair-row">
-        <select className="ai-select" value={personId} onChange={(e) => { setPersonId(e.target.value); setResult(null); }}>
-          {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
-        <span className="ai-pair-vs">→</span>
-        <select className="ai-select" value={teamId} onChange={(e) => { setTeamId(e.target.value); setResult(null); }}>
-          {teams.length === 0 && <option value="">No teams yet</option>}
-          {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-        </select>
-        <button className="join-btn" onClick={runCheck} disabled={loading || !person || !team}>
-          {loading ? 'Checking...' : 'Check fit'}
-        </button>
-      </div>
+      {teams.length === 0 ? (
+        <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted, #888)' }}>
+          <p style={{ fontSize: '14px', marginBottom: '8px', color: 'var(--text-main, #fff)', fontWeight: 600 }}>
+            No teams created yet
+          </p>
+          <p style={{ fontSize: '13px', margin: 0, maxWidth: '420px', marginLeft: 'auto', marginRight: 'auto' }}>
+            Create or join a team in Teams & Workspace to run candidate-to-team skill fit evaluations.
+          </p>
+        </div>
+      ) : (
+        <div className="ai-pair-row">
+          <select
+            className="ai-select"
+            value={personId}
+            onChange={(e) => {
+              setPersonId(e.target.value);
+              setResult(null);
+            }}
+          >
+            {people.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <span className="ai-pair-vs">→</span>
+          <select
+            className="ai-select"
+            value={team?._id || team?.id || ''}
+            onChange={(e) => {
+              setTeamId(e.target.value);
+              setResult(null);
+            }}
+          >
+            {teams.map((t) => (
+              <option key={t._id || t.id} value={t._id || t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+          <button className="join-btn" onClick={runCheck} disabled={loading || !person || !team}>
+            {loading ? 'Checking...' : 'Check fit'}
+          </button>
+        </div>
+      )}
 
       {loading && <div className="ai-loading"><span className="ai-spinner" /> comparing against team needs...</div>}
 

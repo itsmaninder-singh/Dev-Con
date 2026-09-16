@@ -82,7 +82,7 @@ export default function TeamDetail() {
   const [dragId, setDragId] = useState(null);
 
   useEffect(() => {
-    const found = getTeam(id) || (id === 'nightwatch' ? teams[0] : teams.find(t => t.id === id || t._id === id));
+    const found = getTeam(id) || teams.find(t => t.id === id || t._id === id);
     if (found) {
       setTeam(found);
       if (found.roadmapTasks) {

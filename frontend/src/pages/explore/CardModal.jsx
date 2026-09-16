@@ -6,11 +6,15 @@ import { scoreCandidateVsTeam } from '../ai/scoring.js';
 import { Sparkles, Check, AlertCircle, MessageSquare } from 'lucide-react';
 import soundManager from '../../utils/soundManager.js';
 import { aiApi } from '../../lib/api.js';
+import { useProfile } from '../../context/ProfileContext.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
 
 const CIRC = 75.4;
 
 export default function CardModal({ item, onClose, onJoin }) {
   const navigate = useNavigate();
+  const { profile } = useProfile() || {};
+  const { user } = useAuth() || {};
   const [joined, setJoined] = useState(false);
   const [fitOpen, setFitOpen] = useState(false);
   const [fitLoading, setFitLoading] = useState(false);
@@ -38,25 +42,31 @@ export default function CardModal({ item, onClose, onJoin }) {
   }, [item, onClose]);
 
   const visible = !!item;
-  const full = item && item.membersCount >= item.maxMembers;
-  const openSpots = item ? item.maxMembers - item.membersCount : 0;
+  const maxMembers = Math.max(1, Math.min(Number(item?.maxMembers) || 4, 20));
+  const membersCount = Number(item?.membersCount) || 1;
+  const full = membersCount >= maxMembers;
+  const openSpots = Math.max(0, maxMembers - membersCount);
+
+  const creatorName = item?.creator?.name || 'Developer';
+  const creatorInitials = item?.creator?.initials || (creatorName ? creatorName.slice(0, 2).toUpperCase() : 'DV');
+  const creatorUsername = item?.creator?.username || (creatorName ? creatorName.toLowerCase().replace(/\s+/g, '') : 'builder');
 
   async function handleCheckFit() {
     setFitOpen(true);
     setFitLoading(true);
     setFitResult(null);
 
-    // Baseline current user skills from profile
-    const userSkills = ['React', 'Node.js', 'PostgreSQL', 'TypeScript', 'Socket.io'];
-    const teamSkills = item.skillsNeeded || [];
+    // User skills from profile or auth
+    const userSkills = profile?.skills?.length ? profile.skills : (user?.skills || []);
+    const teamSkills = item?.skillsNeeded || [];
 
-    const isRealTeamId = item._id && /^[0-9a-fA-F]{24}$/.test(item._id);
+    const isRealTeamId = item?._id && /^[0-9a-fA-F]{24}$/.test(item._id);
     if (isRealTeamId) {
       try {
-        const aiData = await aiApi.analyzeTeamFit({ teamId: item._id, candidateUserId: 'user_current' });
+        const aiData = await aiApi.analyzeTeamFit({ teamId: item._id, candidateUserId: user?._id || 'user_current' });
         if (aiData) {
           setFitResult({
-            score: aiData.teamBalanceScore || 88,
+            score: aiData.teamBalanceScore || (userSkills.length ? 85 : 50),
             missing: aiData.missingSkills || [],
             extra: userSkills.filter((s) => !teamSkills.includes(s)),
             role: aiData.suggestedRole,
@@ -101,11 +111,11 @@ export default function CardModal({ item, onClose, onJoin }) {
           </button>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span className="type-badge">{item.type.replace('-', ' ')}</span>
+            <span className="type-badge">{String(item.type || 'team').replace('-', ' ')}</span>
             {item.postedAgo && <span style={{ fontSize: '11.5px', color: 'var(--dim)' }}>Posted {item.postedAgo}</span>}
           </div>
 
-          <h2>{item.name}</h2>
+          <h2>{item.name || 'Untitled'}</h2>
 
           <div className="modal-meta">
             {item.matchScore != null && (
@@ -125,22 +135,21 @@ export default function CardModal({ item, onClose, onJoin }) {
               className="card-owner"
               style={{ cursor: 'pointer' }}
               onClick={() => {
-                const handle = item.creator?.username || item.creator?.name?.toLowerCase().replace(/\s+/g, '');
-                if (handle) navigate(`/profile/${handle}`);
+                if (creatorUsername) navigate(`/profile/${creatorUsername}`);
               }}
               title="View creator profile"
             >
-              <div className="avatar-sm">{item.creator.initials}</div>
-              <div className="owner-name">by <b>{item.creator.name}</b></div>
+              <div className="avatar-sm">{creatorInitials}</div>
+              <div className="owner-name">by <b>{creatorName}</b></div>
             </div>
           </div>
 
           <div className="modal-section-label">About</div>
-          <p className="desc">{item.description}</p>
+          <p className="desc">{item.description || ''}</p>
 
           <div className="modal-section-label">What they're looking for</div>
           <div className="chip-row" style={{ marginBottom: '24px' }}>
-            {item.skillsNeeded.map(s => <span className="skill-chip" key={s}>{s}</span>)}
+            {(item.skillsNeeded || []).map(s => <span className="skill-chip" key={s}>{s}</span>)}
           </div>
 
           <div className="modal-section-label">Team</div>
@@ -149,16 +158,15 @@ export default function CardModal({ item, onClose, onJoin }) {
               className="card-owner"
               style={{ cursor: 'pointer', marginBottom: 0 }}
               onClick={() => {
-                const handle = item.creator?.username || item.creator?.name?.toLowerCase().replace(/\s+/g, '');
-                if (handle) navigate(`/profile/${handle}`);
+                if (creatorUsername) navigate(`/profile/${creatorUsername}`);
               }}
               title="View creator profile"
             >
-              <div className="avatar-sm">{item.creator.initials}</div>
+              <div className="avatar-sm">{creatorInitials}</div>
               <div className="owner-name">
-                <b>{item.creator.name}</b> (owner) + {
-                  item.membersCount - 1 > 0
-                    ? `${item.membersCount - 1} member${item.membersCount - 1 > 1 ? 's' : ''}`
+                <b>{creatorName}</b> (owner) + {
+                  membersCount - 1 > 0
+                    ? `${membersCount - 1} member${membersCount - 1 > 1 ? 's' : ''}`
                     : 'no members yet'
                 }{openSpots > 0 ? ` · ${openSpots} open spot${openSpots > 1 ? 's' : ''}` : ' · full'}
               </div>
@@ -170,9 +178,9 @@ export default function CardModal({ item, onClose, onJoin }) {
                 window.dispatchEvent(
                   new CustomEvent('devconnect:open-chat', {
                     detail: {
-                      userId: item.creator?._id || item.creator?.id,
-                      name: item.creator?.name,
-                      initial: item.creator?.initials,
+                      userId: item.creator?._id || item.creator?.id || item.owner,
+                      name: creatorName,
+                      initial: creatorInitials,
                     },
                   })
                 );

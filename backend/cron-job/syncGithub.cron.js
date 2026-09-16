@@ -2,7 +2,7 @@ import cron from "node-cron";
 import { User } from "../models/user.model.js";
 import { syncGithubProfileForUser } from "../utils/githubSync.js";
 
-const SYNC_INTERVAL = 24*60*60*60*1000;
+const SYNC_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
 const DELAY_BETWEEN_SYNCS_MS = 1500;
 
 const sleep =(ms)=> new Promise((reso)=> setTimeout(reso,ms));

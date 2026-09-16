@@ -274,7 +274,7 @@ export default function ProjectPage() {
                 </div>
                 <div style={{ marginTop: 20, display: "flex", gap: 10 }}>
                   <button className="dc-btn dc-btn-ghost" onClick={openEdit}>Edit team</button>
-                  <button className="dc-btn dc-btn-primary" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <button className="dc-btn dc-btn-primary" onClick={() => window.location.href = '/rooms'} style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <MessageCircle size={15} /> Open group chat
                   </button>
                 </div>

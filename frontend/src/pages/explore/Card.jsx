@@ -5,7 +5,7 @@ const BURST_COLORS = ['#ff98a2', '#ffd58c', '#ffffff'];
 
 export default function Card({ item, saved, onToggleSave, onJoin, onOpen }) {
   const cardRef = useRef(null);
-  const [inView, setInView] = useState(false);
+  const [inView, setInView] = useState(true);
   const [scoreText, setScoreText] = useState('0%');
   const [ringOffset, setRingOffset] = useState(CIRC);
   const [joined, setJoined] = useState(false);
@@ -14,7 +14,9 @@ export default function Card({ item, saved, onToggleSave, onJoin, onOpen }) {
   const [joinPop, setJoinPop] = useState(false);
   const [scoreParticles, setScoreParticles] = useState([]);
 
-  const full = item.membersCount >= item.maxMembers;
+  const maxMembers = Math.max(1, Math.min(Number(item?.maxMembers) || 4, 12));
+  const membersCount = Number(item?.membersCount) || 1;
+  const full = membersCount >= maxMembers;
   const reduceMotion = !window.matchMedia('(prefers-reduced-motion: no-preference)').matches;
   const canHover = window.matchMedia('(hover:hover) and (prefers-reduced-motion: no-preference)').matches;
 
@@ -23,23 +25,25 @@ export default function Card({ item, saved, onToggleSave, onJoin, onOpen }) {
     const el = cardRef.current;
     if (!el) return;
     const observer = new IntersectionObserver(
-      ([entry]) => setInView(entry.isIntersecting),
-      { threshold: 0.08, rootMargin: '0px 0px -5% 0px' }
+      ([entry]) => {
+        if (entry.isIntersecting) setInView(true);
+      },
+      { threshold: 0.05, rootMargin: '0px 0px 50px 0px' }
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [item.id]);
+  }, [item?.id]);
 
   // count-up the match score + sweep the ring once the card is in view
   useEffect(() => {
-    if (!inView || !item.matchScore) return;
+    if (!inView || !item?.matchScore) return;
     let raf;
     const duration = 1000;
     const start = performance.now() + 250; // small delay to match original stagger feel
     function tick(now) {
       const t = Math.min(1, Math.max(0, (now - start) / duration));
       const eased = 1 - Math.pow(1 - t, 3);
-      const value = eased * item.matchScore;
+      const value = eased * (item.matchScore || 80);
       setScoreText(Math.round(value) + '%');
       setRingOffset(CIRC - (CIRC * value) / 100);
       if (t < 1) {
@@ -113,6 +117,9 @@ export default function Card({ item, saved, onToggleSave, onJoin, onOpen }) {
     onToggleSave(item);
   }
 
+  const creatorName = item?.creator?.name || 'Developer';
+  const creatorInitials = item?.creator?.initials || (creatorName ? creatorName.slice(0, 2).toUpperCase() : 'DV');
+
   return (
     <div
       className={`card ${inView ? 'in-view' : ''}`}
@@ -122,9 +129,9 @@ export default function Card({ item, saved, onToggleSave, onJoin, onOpen }) {
       onClick={() => onOpen(item)}
     >
       <div className="card-top">
-        <span className="type-badge">{item.type.replace('-', ' ')}</span>
+        <span className="type-badge">{String(item?.type || 'team').replace('-', ' ')}</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          {item.matchScore != null && (
+          {item?.matchScore != null && (
             <span className="match-score">
               <svg className="score-ring" viewBox="0 0 30 30">
                 <circle className="track" cx="15" cy="15" r="12" />
@@ -152,26 +159,26 @@ export default function Card({ item, saved, onToggleSave, onJoin, onOpen }) {
         </div>
       </div>
 
-      <h3>{item.name}</h3>
-      <p className="desc">{item.description}</p>
+      <h3>{item?.name || 'Untitled'}</h3>
+      <p className="desc">{item?.description || ''}</p>
 
       <div className="chip-row">
-        {item.skillsNeeded.map(s => <span className="skill-chip" key={s}>{s}</span>)}
+        {(item?.skillsNeeded || []).map(s => <span className="skill-chip" key={s}>{s}</span>)}
       </div>
 
       <div className="card-owner">
-        <div className="avatar-sm">{item.creator.initials}</div>
-        <div className="owner-name">by <b>{item.creator.name}</b></div>
+        <div className="avatar-sm">{creatorInitials}</div>
+        <div className="owner-name">by <b>{creatorName}</b></div>
       </div>
 
       <div className="card-footer">
         <div className="seats-row">
           <div className="seat-dots">
-            {Array.from({ length: item.maxMembers }, (_, i) => (
-              <span key={i} className={`seat-dot ${i < item.membersCount ? 'filled' : ''}`} />
+            {Array.from({ length: maxMembers }, (_, i) => (
+              <span key={i} className={`seat-dot ${i < membersCount ? 'filled' : ''}`} />
             ))}
           </div>
-          <span className="seats-label">{item.membersCount}/{item.maxMembers}</span>
+          <span className="seats-label">{membersCount}/{maxMembers}</span>
         </div>
         <button
           className={`join-btn ${joinPop ? 'pop' : ''}`}

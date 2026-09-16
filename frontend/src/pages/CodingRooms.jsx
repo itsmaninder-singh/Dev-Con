@@ -33,7 +33,7 @@ function greetCollaborators(teamName, memberCount) {
   return { status: "ready", team: teamName, active: true };
 }
 
-greetCollaborators("Nightwatch Devs", 3);
+greetCollaborators("DevConnect Squad", 1);
 `,
   'matchmaker.ts': `// Candidate matching algorithm
 function scoreFit(skills, required) {
@@ -44,7 +44,7 @@ function scoreFit(skills, required) {
   return { score, matched };
 }
 
-scoreFit(["React", "Node.js", "Socket.io"], ["React", "Socket.io", "Redis"]);
+scoreFit(["React", "Node.js", "TypeScript"], ["React", "TypeScript", "Next.js"]);
 `,
 };
 
@@ -59,15 +59,15 @@ const LANGUAGE_PRESETS = [
   { id: 'go', label: 'Go', ext: 'go', icon: '🐹', defaultName: 'main.go', starter: `// Go Package\npackage main\n\nimport "fmt"\n\nfunc main() {\n    fmt.Println("Hello from Go!")\n}\n` },
   { id: 'rust', label: 'Rust', ext: 'rs', icon: '🦀', defaultName: 'main.rs', starter: `// Rust Program\nfn main() {\n    println!("Hello from Rust!");\n}\n` },
   { id: 'sql', label: 'SQL', ext: 'sql', icon: '🗄️', defaultName: 'query.sql', starter: `-- SQL Query\nSELECT id, name, email, created_at\nFROM users\nWHERE status = 'active'\nORDER BY created_at DESC;\n` },
-  { id: 'markdown', label: 'Markdown', ext: 'md', icon: '📝', defaultName: 'README.md', starter: `# Collaborative Project Notes\n\n- Room Code: NW8K4P\n- Stack: React, Socket.IO, Node.js\n- Files: Multiple language support enabled\n` },
+  { id: 'markdown', label: 'Markdown', ext: 'md', icon: '📝', defaultName: 'README.md', starter: `# Collaborative Project Notes\n\n- Room Code: DEVCON\n- Stack: React, Socket.IO, Node.js\n- Files: Multiple language support enabled\n` },
 ];
 
 export default function CodingRooms() {
   const [screen, setScreen] = useState('lobby');
-  const [room, setRoom] = useState({ name: 'Nightwatch build session', code: 'NW8K4P' });
+  const [room, setRoom] = useState({ name: 'Live Coding Room', code: 'DEVCON' });
 
   const enterRoom = (name, code) => {
-    setRoom({ name, code: (code || 'NW8K4P').toUpperCase() });
+    setRoom({ name, code: (code || 'DEVCON').toUpperCase() });
     setScreen('live');
   };
 
@@ -2148,7 +2148,7 @@ function LiveRoom({ room, onCreate, onLeave }) {
                     onChange={(e) => setMessage(e.target.value)}
                     placeholder="Message the room…"
                   />
-                  <button aria-label="Send message">↑</button>
+                  <button type="submit" aria-label="Send message">↑</button>
                 </form>
               </section>
             </aside>

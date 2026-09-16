@@ -34,10 +34,10 @@ export function ProfileTabs({
       <div id="tabContent">
         <div className="items-list">
           {tabData.length > 0 ? (
-            tabData.map((item) => (
+            tabData.map((item, idx) => (
               <div
                 className="item-card"
-                key={item.id}
+                key={item.id || item._id || item.name || idx}
                 onClick={() => navigate(activeTab === 'teams' ? `/teams` : '/explore')}
               >
                 <div>
@@ -49,8 +49,22 @@ export function ProfileTabs({
               </div>
             ))
           ) : (
-            <div className="profile-panel empty-panel">
-              <p className="bio-text">Nothing here yet.</p>
+            <div className="profile-panel empty-panel" style={{ textAlign: 'center', padding: '36px 16px' }}>
+              <p className="bio-text" style={{ marginBottom: '14px', color: 'var(--text-muted, #888)' }}>
+                {activeTab === 'teams'
+                  ? 'No squads or teams joined yet.'
+                  : 'No projects or repositories showcased yet.'}
+              </p>
+              {navigate && (
+                <button
+                  type="button"
+                  className="mini-edit-btn"
+                  onClick={() => navigate(activeTab === 'teams' ? '/teams' : '/teams')}
+                  style={{ cursor: 'pointer' }}
+                >
+                  {activeTab === 'teams' ? '+ Find or Create Squad' : '+ Create Project'}
+                </button>
+              )}
             </div>
           )}
         </div>

@@ -3,49 +3,7 @@ import { chatApi } from "../lib/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useChatUI, AVATAR_COLORS } from "../context/ChatUIContext.jsx";
 
-const INITIAL_CONVERSATIONS = [
-  {
-    id: 'aditi', name: 'Aditi Rao · Nightwatch', initial: 'A', online: true, colorIdx: 0,
-    unread: 2,
-    messages: [
-      { from: 'them', text: 'Hey! 👋 Have you started on the WebSocket layer?', time: '10:02 AM' },
-      { from: 'me', text: 'Yeah, writing the socket reconnect logic right now', time: '10:03 AM' },
-      { from: 'them', text: 'Perfect, send the PR over for review 🔥', time: '10:04 AM' },
-    ],
-  },
-  {
-    id: 'kabir', name: 'Kabir Mehta', initial: 'K', online: true, colorIdx: 1,
-    unread: 2,
-    messages: [
-      { from: 'them', text: 'Hey, did you deploy the Ledger Loop demo?', time: '9:40 AM' },
-      { from: 'them', text: 'The UPI split flow looks great 🔥', time: '9:41 AM' },
-    ],
-  },
-  {
-    id: 'meera', name: 'Meera Pillai', initial: 'M', online: false, colorIdx: 2,
-    unread: 0,
-    messages: [
-      { from: 'me', text: 'Let\u2019s hop on a call tomorrow about Fable\u2019s frontend', time: 'Yesterday' },
-      { from: 'them', text: 'Done, send over a calendar invite', time: 'Yesterday' },
-    ],
-  },
-  {
-    id: 'formless', name: 'Formless Team 👩💻', initial: 'F', online: true, colorIdx: 3,
-    unread: 1,
-    messages: [
-      { from: 'them', text: 'There\u2019s a new PR pending review', time: '8:15 AM' },
-      { from: 'them', text: 'Should I merge it into main?', time: '8:16 AM' },
-    ],
-  },
-  {
-    id: 'yusuf', name: 'Yusuf Sheikh', initial: 'Y', online: false, colorIdx: 4,
-    unread: 0,
-    messages: [
-      { from: 'them', text: 'Thanks for accepting my Nightwatch join request!', time: 'Mon' },
-      { from: 'me', text: 'Welcome to the team 🙌', time: 'Mon' },
-    ],
-  },
-];
+const INITIAL_CONVERSATIONS = [];
 
 const REPLIES = [
   "Got it, I\u2019ll add it to the PR.",
@@ -426,24 +384,31 @@ export default function ChatWidget() {
               <input type="text" placeholder="Search..." />
             </div>
             <div className="chat-list">
-              {conversations.map((conv) => {
-                const last = conv.messages[conv.messages.length - 1];
-                return (
-                  <div className={`chat-item${conv.unread === 0 ? ' read' : ''}`} key={conv.id} onClick={() => openChat(conv.id)}>
-                    <div className={`avatar${conv.online ? ' online' : ''}`} style={{ background: AVATAR_COLORS[conv.colorIdx] }}>{conv.initial}</div>
-                    <div className="info">
-                      <div className="row1">
-                        <span className="name">{conv.name}</span>
-                        <span className="time">{last.time}</span>
-                      </div>
-                      <div className="row2">
-                        <span className="preview">{last.from === 'me' ? 'You: ' : ''}{last.text}</span>
-                        {conv.unread > 0 && <span className="unread-pill tabular">{conv.unread}</span>}
+              {conversations.length === 0 ? (
+                <div style={{ padding: '36px 16px', textAlign: 'center', color: 'var(--text-muted, #888)' }}>
+                  <p style={{ margin: '0 0 6px 0', fontSize: '13.5px', fontWeight: 600, color: 'var(--text-main, #fff)' }}>No conversations yet</p>
+                  <p style={{ margin: 0, fontSize: '12px', opacity: 0.8 }}>Start a chat with teammates or connect with developers on Explore.</p>
+                </div>
+              ) : (
+                conversations.map((conv) => {
+                  const last = conv.messages?.[conv.messages.length - 1] || { text: 'No messages yet', time: '' };
+                  return (
+                    <div className={`chat-item${conv.unread === 0 ? ' read' : ''}`} key={conv.id} onClick={() => openChat(conv.id)}>
+                      <div className={`avatar${conv.online ? ' online' : ''}`} style={{ background: AVATAR_COLORS[conv.colorIdx] || AVATAR_COLORS[0] }}>{conv.initial}</div>
+                      <div className="info">
+                        <div className="row1">
+                          <span className="name">{conv.name}</span>
+                          <span className="time">{last.time}</span>
+                        </div>
+                        <div className="row2">
+                          <span className="preview">{last.from === 'me' ? 'You: ' : ''}{last.text}</span>
+                          {conv.unread > 0 && <span className="unread-pill tabular">{conv.unread}</span>}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </div>
 
