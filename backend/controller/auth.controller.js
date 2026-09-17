@@ -29,13 +29,15 @@ const toSafeUser = (user) => ({
   availableFor: user.availableFor,
   authProvider: user.authProvider,
   isPlatformAdmin: user.isPlatformAdmin,
+  isProfileComplete: Boolean(user.isProfileComplete),
+  connections: user.connections || [],
   reputation: user.reputation,
   createdAt: user.createdAt,
 });
 
 
 const sendAuthResponse = (res, statusCode, user, message) => {
-  const accessToken = generateAccessToken(user._id);
+  const accessToken = generateAccessToken(user._id, { isProfileComplete: Boolean(user.isProfileComplete) });
   const refreshToken = generateRefreshToken(user._id);
 
   res.cookie(REFRESH_COOKIE_NAME, refreshToken, refreshCookieOptions());
@@ -120,8 +122,13 @@ const login = asyncHandler(async (req, res) => {
     $or: [{ email: identifier.toLowerCase() }, { username: identifier.toLowerCase() }],
   }).select("+password");
 
-  if (!user || !(await user.matchPassword(password))) {
-    throw new ApiError(401, "Invalid credentials");
+  if (!user) {
+    throw new ApiError(404, "No account found with this email/username. Please register first.");
+  }
+
+  const isMatch = await user.matchPassword(password);
+  if (!isMatch) {
+    throw new ApiError(401, "Invalid password. Please check your credentials and try again.");
   }
 
   return sendAuthResponse(res, 200, user, "Logged in successfully");
@@ -177,6 +184,7 @@ const googleAuth = asyncHandler(async (req, res) => {
       googleId,
       authProvider: "google",
       profilePicture: payload.picture || "",
+      isProfileComplete: false,
     });
   } else if (!user.googleId) {
     user.googleId = googleId;
@@ -254,6 +262,7 @@ const githubAuth = asyncHandler(async (req, res) => {
       githubUsername: (profile.login || "").toLowerCase() || null,
       authProvider: "github",
       profilePicture: profile.avatar_url || "",
+      isProfileComplete: false,
     });
   } else if (!user.githubId) {
     user.githubId = String(profile.id);

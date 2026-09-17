@@ -42,6 +42,14 @@ const processQueue = (error, token = null) => {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    // Global handling for incomplete profile: redirect to onboarding
+    if (error.response?.status === 403 && error.response?.data?.code === "PROFILE_INCOMPLETE") {
+      if (typeof window !== "undefined" && window.location.pathname !== "/onboarding") {
+        window.location.href = "/onboarding";
+      }
+      return Promise.reject(error);
+    }
+
     const originalRequest = error.config;
 
     if (
@@ -230,6 +238,30 @@ export const userApi = {
   unblockUser: async (userId) => {
     try {
       const { data } = await api.post(`/users/${userId}/unblock`);
+      return data.data;
+    } catch (err) {
+      throw new Error(extractMessage(err));
+    }
+  },
+  sendConnectRequest: async (userId) => {
+    try {
+      const { data } = await api.post(`/users/${userId}/connect`);
+      return data.data;
+    } catch (err) {
+      throw new Error(extractMessage(err));
+    }
+  },
+  acceptConnectRequest: async (notifId) => {
+    try {
+      const { data } = await api.post(`/users/connect/${notifId}/accept`);
+      return data.data;
+    } catch (err) {
+      throw new Error(extractMessage(err));
+    }
+  },
+  getUserConnections: async (usernameOrId) => {
+    try {
+      const { data } = await api.get(`/users/${usernameOrId}/connections`);
       return data.data;
     } catch (err) {
       throw new Error(extractMessage(err));

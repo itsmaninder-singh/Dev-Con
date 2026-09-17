@@ -7,7 +7,9 @@ import { RandomLetterSwap } from './ui/random-letter-swap';
 import { INITIAL_NOTIFICATIONS } from '../data/notifications.js';
 import useUISound from '../hooks/useUISound.js';
 import NavSearchBar from './NavSearchBar.jsx';
-import { notificationApi, joinRequestApi } from '../lib/api.js';
+import { notificationApi, joinRequestApi, userApi } from '../lib/api.js';
+import { useChatUI } from '../context/ChatUIContext.jsx';
+import { connectSocket } from '../lib/socket.js';
 import '../SiteNav.css';
 
 const NAV_LINKS = [
@@ -36,6 +38,7 @@ export default function SiteNav() {
   const { user, logout } = useAuth() || {};
   const { profile } = useProfile() || {};
   const { soundEnabled, toggleSound, playClick } = useUISound();
+  const { openDirectChatWith } = useChatUI() || {};
 
   const avatarUrl = profile?.avatarUrl || profile?.profilePicture || user?.profilePicture;
 
@@ -52,6 +55,8 @@ export default function SiteNav() {
             const mapped = serverList.map((sn) => {
               const sUser = sn.sender || {};
               const sName = sUser.name || 'User';
+              const sUsername = sUser.username || '';
+              const sId = sUser._id || sUser.id || '';
               const sInitials = sName
                 .split(' ')
                 .map((w) => w[0])
@@ -64,7 +69,7 @@ export default function SiteNav() {
                 type: sn.type || 'message',
                 unread: !sn.read,
                 fitScore: sn.fitScore || 85,
-                sender: { name: sName, initials: sInitials },
+                sender: { id: sId, _id: sId, name: sName, username: sUsername, initials: sInitials },
                 text: sn.text || '',
                 target: sn.target || '',
                 time: 'just now',
@@ -80,6 +85,50 @@ export default function SiteNav() {
         });
     }
   }, [user?._id]);
+
+  useEffect(() => {
+    if (!user?._id) return;
+    const socket = connectSocket();
+
+    const handleNewNotification = (sn) => {
+      if (!sn) return;
+      const sUser = sn.sender || {};
+      const sName = sUser.name || 'Developer';
+      const sUsername = sUser.username || '';
+      const sId = sUser._id || sUser.id || '';
+      const sInitials = sName
+        .split(' ')
+        .filter(Boolean)
+        .map((w) => w[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase() || 'DV';
+
+      const mapped = {
+        id: sn._id || `notif_${Date.now()}`,
+        _id: sn._id || `notif_${Date.now()}`,
+        type: sn.type || 'connect_request',
+        unread: true,
+        fitScore: sn.fitScore || 85,
+        sender: { id: sId, _id: sId, name: sName, username: sUsername, initials: sInitials },
+        text: sn.text || '',
+        target: sn.target || '',
+        time: 'just now',
+        message: sn.message || '',
+        joinRequestId: sn.joinRequest?._id || sn.joinRequest || null,
+      };
+
+      setNotifications((prev) => [mapped, ...prev.filter((p) => p.id !== mapped.id)]);
+      if (soundEnabled && playClick) {
+        playClick();
+      }
+    };
+
+    socket.on('notification:new', handleNewNotification);
+    return () => {
+      socket.off('notification:new', handleNewNotification);
+    };
+  }, [user?._id, soundEnabled, playClick]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -124,12 +173,54 @@ export default function SiteNav() {
     notificationApi.markAllAsRead().catch(() => {});
   };
 
+  const handleNotificationClick = (n, e) => {
+    if (e?.target?.closest('.sn-notif-actions')) return;
+
+    setNotifOpen(false);
+    if (n.id && n.id.length === 24) {
+      notificationApi.markAsRead(n.id).catch(() => {});
+      setNotifications((prev) =>
+        prev.map((item) => (item.id === n.id ? { ...item, unread: false } : item))
+      );
+    }
+
+    if (n.type === 'connect_request' || n.type === 'connect_accepted' || n.type === 'message' || n.type === 'mention') {
+      const slug = n.sender?.username || n.sender?.id || n.sender?._id;
+      if (slug) {
+        navigate(`/profile/${slug}`);
+      }
+    } else if (n.type === 'join_request' || n.type === 'join_request_accepted') {
+      navigate('/workspace');
+    }
+  };
+
   const handleResolveNotif = (id, action) => {
     const targetNotif = notifications.find((n) => n.id === id);
     setNotifications((prev) => prev.filter((n) => n.id !== id));
     if (activePreviewId === id) {
       const remaining = notifications.filter((n) => n.id !== id && n.message);
       setActivePreviewId(remaining.length > 0 ? remaining[0].id : null);
+    }
+
+    if (targetNotif?.type === 'connect_request') {
+      if (action === 'accept') {
+        if (id && id.length === 24) {
+          userApi.acceptConnectRequest(id).catch(() => {});
+        }
+        const senderId = targetNotif.sender?.id || targetNotif.sender?._id;
+        if (senderId && openDirectChatWith) {
+          setNotifOpen(false);
+          openDirectChatWith(senderId, {
+            name: targetNotif.sender?.name || 'Developer',
+            initial: targetNotif.sender?.initials || 'DV',
+          });
+        }
+      } else {
+        if (id && id.length === 24) {
+          notificationApi.markAsRead(id).catch(() => {});
+        }
+      }
+      return;
     }
 
     // Backend sync
@@ -387,6 +478,8 @@ export default function SiteNav() {
                       <div
                         key={n.id}
                         className={`sn-notif-item ${isPreviewing ? 'active-preview' : ''}`}
+                        onClick={(e) => handleNotificationClick(n, e)}
+                        style={{ cursor: 'pointer' }}
                         onMouseEnter={(e) => {
                           if (n.message) {
                             setActivePreviewId(n.id);
@@ -410,8 +503,8 @@ export default function SiteNav() {
                           </div>
                           <div className="sn-notif-time">{n.time} ago</div>
 
-                          {/* Action Buttons for join requests */}
-                          {n.type === 'join_request' && (
+                          {/* Action Buttons for join requests and connect requests */}
+                          {(n.type === 'join_request' || n.type === 'connect_request') && (
                             <div className="sn-notif-actions">
                               <button
                                 type="button"

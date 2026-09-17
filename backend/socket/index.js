@@ -229,6 +229,14 @@ const initSocket = (io) => {
           populated.content = clean;
 
           io.to(chatId).emit("message:new", populated);
+          if (Array.isArray(chat.participants)) {
+            chat.participants.forEach((p) => {
+              const pId = p.toString();
+              if (pId !== chatId) {
+                io.to(pId).emit("message:new", populated);
+              }
+            });
+          }
           callback?.({ ok: true, message: populated });
         } catch (error) {
           console.error("message:send error:", error);

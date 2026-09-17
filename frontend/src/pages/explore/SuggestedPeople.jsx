@@ -4,7 +4,7 @@ import { UserPlus, Code2, ChevronRight, Check, Flag, ShieldBan } from 'lucide-re
 import useUISound from '../../hooks/useUISound.js';
 import { useProfile } from '../../context/ProfileContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { matchupApi, searchApi } from '../../lib/api.js';
+import { matchupApi, searchApi, userApi } from '../../lib/api.js';
 import ReportUserModal from '../../components/ReportUserModal.jsx';
 
 export default function SuggestedPeople() {
@@ -96,8 +96,17 @@ export default function SuggestedPeople() {
     playClick();
     setFollowed((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      const isConnecting = !next.has(id);
+      if (isConnecting) {
+        next.add(id);
+        if (id && String(id).length === 24) {
+          userApi.sendConnectRequest(id).catch((err) => {
+            console.warn('Connect request deferred:', err?.message || err);
+          });
+        }
+      } else {
+        next.delete(id);
+      }
       return next;
     });
   };

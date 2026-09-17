@@ -47,6 +47,6 @@ export const callLLMForJSON = async(systemPrompt, userPrompt , tier = "fast")=>{
     try{
         return JSON.parse(cleaned);
     }catch(err){
-        throw new Error(`LLM sucked !! here's the reason: ${err.message}\nRaw Response: ${raw.slice(0,500)}`);
+        throw new Error(`Failed to parse structured JSON from LLM: ${err.message}\nRaw Response: ${raw.slice(0,500)}`);
     }
 };

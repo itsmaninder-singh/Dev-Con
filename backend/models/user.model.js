@@ -128,7 +128,12 @@ const userSchema = new mongoose.Schema(
         type: mongoose.Schema.Types.ObjectId,
         ref:"User"
     }],
+    connections:[{
+        type: mongoose.Schema.Types.ObjectId,
+        ref:"User"
+    }],
     isPlatformAdmin: { type: Boolean, default: false },
+    isProfileComplete: { type: Boolean, default: false },
     availableFor:[{
         type:String,
         enum:[
@@ -174,9 +179,19 @@ const userSchema = new mongoose.Schema(
 },{
     timestamps:true
 });
-userSchema.pre("save",async function(next){
+userSchema.methods.calculateIsProfileComplete = function () {
+    const hasName = Boolean(this.name && String(this.name).trim().length >= 2);
+    const hasBio = Boolean(this.bio && String(this.bio).trim().length >= 10);
+    const hasCollege = Boolean(this.college && String(this.college).trim().length >= 2);
+    const hasSkills = Boolean(Array.isArray(this.skills) && this.skills.filter(Boolean).length >= 1);
+
+    return Boolean(hasName && hasBio && hasCollege && hasSkills);
+};
+
+userSchema.pre("save", async function(next){
+    this.isProfileComplete = this.calculateIsProfileComplete();
     if(!this.isModified("password") || !this.password) return next();
-    this.password=await bcrypt.hash(this.password,10);
+    this.password = await bcrypt.hash(this.password, 10);
     next();
 });
 

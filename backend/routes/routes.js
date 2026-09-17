@@ -1,5 +1,5 @@
 import express from "express";
-import { protect } from "../middleware/auth.middleware.js";
+import { protect, requireCompleteProfile } from "../middleware/auth.middleware.js";
 import { requirePlatformAdmin } from "../middleware/isPlatformAdmin.middleware.js";
 import { upload } from "../middleware/upload.middleware.js";
 import { authLimiter, sensitiveActionLimiter } from "../middleware/rateLimiter.middleware.js";
@@ -26,6 +26,9 @@ import {
   uploadCoverPicture,
   blockUser,
   unblockUser,
+  sendConnectRequest,
+  acceptConnectRequest,
+  getUserConnections,
 } from "../controller/user.controller.js";
 
 import {
@@ -80,6 +83,7 @@ import {
   getMyChats,
   getOrCreateDirectChat,
   getMessages,
+  sendMessage,
   createGroupChat,
   markChatAsRead,
 } from "../controller/chat.controller.js";
@@ -97,57 +101,61 @@ router.post("/auth/change-password", protect, sensitiveActionLimiter, changePass
 router.get("/users/me", protect, getMe);
 router.get("/users/:username", getUserByUsername);
 router.patch("/users/me/profile", protect, updateProfile);
-router.patch("/users/me/availability", protect, toggleAvailability);
-router.patch("/users/me/available-for", protect, updateAvailableFor);
+router.patch("/users/me/availability", protect, requireCompleteProfile, toggleAvailability);
+router.patch("/users/me/available-for", protect, requireCompleteProfile, updateAvailableFor);
 router.post("/users/me/profile-picture", protect, upload.single("profilePicture"), uploadProfilePicture);
 router.post("/users/me/cover-picture", protect, upload.single("coverPicture"), uploadCoverPicture);
-router.post("/users/:userId/block", protect, blockUser);
-router.post("/users/:userId/unblock", protect, unblockUser);
+router.post("/users/:userId/block", protect, requireCompleteProfile, blockUser);
+router.post("/users/:userId/unblock", protect, requireCompleteProfile, unblockUser);
+router.post("/users/:userId/connect", protect, requireCompleteProfile, sendConnectRequest);
+router.post("/users/connect/:notifId/accept", protect, requireCompleteProfile, acceptConnectRequest);
+router.get("/users/:usernameOrId/connections", protect, requireCompleteProfile, getUserConnections);
 
-router.post("/teams", protect, createTeam);
+router.post("/teams", protect, requireCompleteProfile, createTeam);
 router.get("/teams", getTeams);
 router.get("/teams/:id", getTeamDetails);
-router.patch("/teams/:id", protect, editTeams);
-router.post("/teams/:id/join", protect, joinTeam);
-router.delete("/teams/:id/members/:userId", protect, removeMember);
+router.patch("/teams/:id", protect, requireCompleteProfile, editTeams);
+router.post("/teams/:id/join", protect, requireCompleteProfile, joinTeam);
+router.delete("/teams/:id/members/:userId", protect, requireCompleteProfile, removeMember);
 
-router.post("/projects", protect, createProject);
+router.post("/projects", protect, requireCompleteProfile, createProject);
 router.get("/projects", getProjects);
 router.get("/projects/:id", getProjectDetails);
-router.patch("/projects/:id", protect, editProject);
-router.post("/projects/:id/join", protect, joinProject);
+router.patch("/projects/:id", protect, requireCompleteProfile, editProject);
+router.post("/projects/:id/join", protect, requireCompleteProfile, joinProject);
 
-router.post("/join-requests", protect, sendJoinReq);
-router.get("/join-requests/received", protect, getReceivedRequests);
-router.get("/join-requests/sent", protect, getSentReqs);
-router.post("/join-requests/:id/accept", protect, acceptJoinReq);
-router.post("/join-requests/:id/ignore", protect, ignoreJoinRequest);
+router.post("/join-requests", protect, requireCompleteProfile, sendJoinReq);
+router.get("/join-requests/received", protect, requireCompleteProfile, getReceivedRequests);
+router.get("/join-requests/sent", protect, requireCompleteProfile, getSentReqs);
+router.post("/join-requests/:id/accept", protect, requireCompleteProfile, acceptJoinReq);
+router.post("/join-requests/:id/ignore", protect, requireCompleteProfile, ignoreJoinRequest);
 
-router.get("/matchup/users", protect, getRecommendedUsers);
-router.get("/matchup/teams", protect, getRecommendedTeams);
-router.get("/matchup/projects", protect, getRecommendedProjects);
+router.get("/matchup/users", protect, requireCompleteProfile, getRecommendedUsers);
+router.get("/matchup/teams", protect, requireCompleteProfile, getRecommendedTeams);
+router.get("/matchup/projects", protect, requireCompleteProfile, getRecommendedProjects);
 
 router.use("/search", searchRouter);
 
-router.get("/notifications", protect, getNotifications);
-router.get("/notifications/unread-count", protect, getUnreadCount);
-router.patch("/notifications/:id/read", protect, markAsRead);
-router.patch("/notifications/read-all", protect, markAllAsRead);
-router.delete("/notifications/:id", protect, deleteNotification);
+router.get("/notifications", protect, requireCompleteProfile, getNotifications);
+router.get("/notifications/unread-count", protect, requireCompleteProfile, getUnreadCount);
+router.patch("/notifications/:id/read", protect, requireCompleteProfile, markAsRead);
+router.patch("/notifications/read-all", protect, requireCompleteProfile, markAllAsRead);
+router.delete("/notifications/:id", protect, requireCompleteProfile, deleteNotification);
 
-router.post("/reports", protect, sensitiveActionLimiter, createReport);
-router.get("/reports/mine", protect, getMyReports);
+router.post("/reports", protect, requireCompleteProfile, sensitiveActionLimiter, createReport);
+router.get("/reports/mine", protect, requireCompleteProfile, getMyReports);
 router.get("/reports", protect, requirePlatformAdmin, getAllReports);
 router.patch("/reports/:id/status", protect, requirePlatformAdmin, updateReportStatus);
 
-router.post("/ai/generate-ideas", protect, generateIdeas);
-router.post("/ai/assign-roles", protect, assignRoles);
-router.post("/ai/analyze-compatibility", protect, analyzeCompatibility);
-router.post("/ai/analyze-team-fit", protect, analyzeTeamFit);
+router.post("/ai/generate-ideas", protect, requireCompleteProfile, generateIdeas);
+router.post("/ai/assign-roles", protect, requireCompleteProfile, assignRoles);
+router.post("/ai/analyze-compatibility", protect, requireCompleteProfile, analyzeCompatibility);
+router.post("/ai/analyze-team-fit", protect, requireCompleteProfile, analyzeTeamFit);
 
-router.get("/chats", protect, getMyChats);
-router.get("/chats/direct/:userId", protect, getOrCreateDirectChat);
-router.get("/chats/:chatId/messages", protect, getMessages);
-router.post("/chats/group", protect, createGroupChat);
-router.patch("/chats/:chatId/read", protect, markChatAsRead);
+router.get("/chats", protect, requireCompleteProfile, getMyChats);
+router.get("/chats/direct/:userId", protect, requireCompleteProfile, getOrCreateDirectChat);
+router.get("/chats/:chatId/messages", protect, requireCompleteProfile, getMessages);
+router.post("/chats/:chatId/messages", protect, requireCompleteProfile, sendMessage);
+router.post("/chats/group", protect, requireCompleteProfile, createGroupChat);
+router.patch("/chats/:chatId/read", protect, requireCompleteProfile, markChatAsRead);
 router.use("/projects", projectFileRouter);

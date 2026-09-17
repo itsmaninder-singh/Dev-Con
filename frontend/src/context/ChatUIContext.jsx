@@ -42,11 +42,12 @@ export function ChatUIProvider({ children }) {
             const mapped = serverChats.map((c, idx) => {
               const other = c.participants?.find((p) => p._id !== user._id) || c.participants?.[0] || {};
               const name = c.isGroup ? c.name : other.name || 'Chat Member';
-              const initial = name ? name[0].toUpperCase() : '?';
+              const hasLastMsg = !!c.lastMessage?.text;
               const lastMsg = c.lastMessage?.text || 'No messages yet';
               const lastTime = c.lastMessage?.timestamp
                 ? new Date(c.lastMessage.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
                 : 'Recent';
+              const isFromMe = (c.lastMessage?.sender?._id || c.lastMessage?.sender) === user._id;
               return {
                 id: c._id,
                 _id: c._id,
@@ -56,7 +57,7 @@ export function ChatUIProvider({ children }) {
                 online: !!other.lastSeen && Date.now() - new Date(other.lastSeen).getTime() < 300000,
                 colorIdx: idx % AVATAR_COLORS.length,
                 unread: c.unreadCount || 0,
-                messages: [{ from: 'them', text: lastMsg, time: lastTime }],
+                messages: hasLastMsg ? [{ from: isFromMe ? 'me' : 'them', text: lastMsg, time: lastTime }] : [],
               };
             });
             setConversations((prev) => {
@@ -112,9 +113,7 @@ export function ChatUIProvider({ children }) {
           online: true,
           colorIdx: Math.floor(Math.random() * AVATAR_COLORS.length),
           unread: 0,
-          messages: [
-            { from: 'them', text: `Hi! Let’s connect on DevConnect 👋`, time: timeNow() },
-          ],
+          messages: [],
         };
         setConversations((prev) => [optimisticConv, ...prev]);
         setActiveId(tempId);
@@ -153,9 +152,7 @@ export function ChatUIProvider({ children }) {
               online: true,
               colorIdx: Math.floor(Math.random() * AVATAR_COLORS.length),
               unread: 0,
-              messages: msgsFormatted.length > 0 ? msgsFormatted : [
-                { from: 'them', text: `Hi! Let’s connect on DevConnect 👋`, time: timeNow() },
-              ],
+              messages: msgsFormatted,
             };
 
             setConversations((prev) => {
@@ -215,9 +212,7 @@ export function ChatUIProvider({ children }) {
           online: true,
           colorIdx: Math.floor(Math.random() * AVATAR_COLORS.length),
           unread: 0,
-          messages: [
-            { from: 'them', text: `Welcome to ${targetName}! 💬`, time: timeNow() },
-          ],
+          messages: [],
         };
         setConversations((prev) => [optimisticConv, ...prev]);
         setActiveId(tempId);
@@ -257,9 +252,7 @@ export function ChatUIProvider({ children }) {
             online: true,
             colorIdx: Math.floor(Math.random() * AVATAR_COLORS.length),
             unread: 0,
-            messages: msgsFormatted.length > 0 ? msgsFormatted : [
-              { from: 'them', text: `Welcome to ${chat.name || targetName}! 💬`, time: timeNow() },
-            ],
+            messages: msgsFormatted,
           };
 
           setConversations((prev) => {

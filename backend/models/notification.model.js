@@ -17,6 +17,8 @@ const notificationSchema = new mongoose.Schema({
         enum:[
             "message",
             "mention",
+            "connect_request",
+            "connect_accepted",
             "join_request",
             "join_request_accepted",
             "group_promotion",

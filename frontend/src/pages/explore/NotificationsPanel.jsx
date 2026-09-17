@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 export default function NotificationsPanel({
   open,
@@ -8,11 +9,23 @@ export default function NotificationsPanel({
   onResolve,
   panelRef
 }) {
+  const navigate = useNavigate();
   const [previewId, setPreviewId] = useState(null);
   const [previewPos, setPreviewPos] = useState({ left: 0, top: 0 });
   const [leavingIds, setLeavingIds] = useState(new Set());
 
   const unreadCount = notifications.filter(n => n.unread).length;
+
+  function handleItemClick(n, e) {
+    if (e?.target?.closest('.notif-actions')) return;
+    if (n.unread && onMarkRead) onMarkRead(n.id);
+    if (n.type === 'connect_request' || n.type === 'connect_accepted' || n.type === 'message' || n.type === 'mention') {
+      const slug = n.sender?.username || n.sender?.id || n.sender?._id;
+      if (slug) navigate(`/profile/${slug}`);
+    } else if (n.type === 'join_request' || n.type === 'join_request_accepted') {
+      navigate('/workspace');
+    }
+  }
 
   function handleMouseEnter(e, n) {
     if (n.type !== 'join_request' || !n.message) return;
@@ -66,7 +79,8 @@ export default function NotificationsPanel({
                 previewId === n.id ? 'previewing' : '',
                 leavingIds.has(n.id) ? 'leaving' : ''
               ].join(' ').trim()}
-              onClick={() => n.unread && onMarkRead(n.id)}
+              onClick={(e) => handleItemClick(n, e)}
+              style={{ cursor: 'pointer' }}
               onMouseEnter={(e) => handleMouseEnter(e, n)}
               onMouseLeave={handleMouseLeave}
             >
@@ -76,7 +90,7 @@ export default function NotificationsPanel({
                   <b>{n.sender.name}</b> {n.text}{n.target ? <> <b>{n.target}</b></> : null}
                 </div>
                 <div className="notif-time">{n.time} ago</div>
-                {n.type === 'join_request' && (
+                {(n.type === 'join_request' || n.type === 'connect_request') && (
                   <div className="notif-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     {/* Requirement #4b: precomputed fit badge next to Accept/Decline */}
                     {n.fitScore != null && (

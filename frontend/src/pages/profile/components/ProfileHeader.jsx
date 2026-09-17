@@ -27,6 +27,8 @@ export function ProfileHeader({
   targetUserId,
   isOwnProfile = false,
   onMessage,
+  connectionsCount = 0,
+  onConnectionsClick,
 }) {
   const { openDirectChatWith } = useChatUI();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -143,8 +145,29 @@ export function ProfileHeader({
                 </svg>
               </span>
             </h1>
-            <div className="handle">
-              @{handle}{college ? ` · ${college}` : ''}
+            <div className="handle" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+              <span>@{handle}{college ? ` · ${college}` : ''}</span>
+              <button
+                type="button"
+                onClick={onConnectionsClick}
+                style={{
+                  background: 'rgba(255, 152, 162, 0.12)',
+                  border: '1px solid rgba(255, 152, 162, 0.3)',
+                  color: 'var(--coral, #ff98a2)',
+                  padding: '2px 9px',
+                  borderRadius: '12px',
+                  fontSize: '11.5px',
+                  fontWeight: 600,
+                  cursor: onConnectionsClick ? 'pointer' : 'default',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  transition: 'all 0.2s ease',
+                }}
+                title="View connections"
+              >
+                <span>👥 {connectionsCount} {connectionsCount === 1 ? 'connection' : 'connections'}</span>
+              </button>
             </div>
             {bio && <p className="identity-bio">{bio}</p>}
           </div>

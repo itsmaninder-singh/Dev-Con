@@ -132,11 +132,14 @@ export default function ProfilePage() {
   const [following, setFollowing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [toasts, setToasts] = useState([]);
+  const [connections, setConnections] = useState([]);
+  const [loadingConnections, setLoadingConnections] = useState(false);
 
   const avatarRef = useRef(null);
   const tabPillRef = useRef(null);
   const teamsBtnRef = useRef(null);
   const projectsBtnRef = useRef(null);
+  const connectionsBtnRef = useRef(null);
   const repFillRef = useRef(null);
   const repScoreRef = useRef(null);
   const coverRef = useRef(null);
@@ -235,14 +238,47 @@ export default function ProfilePage() {
   const handleFollowToggle = () => {
     setFollowing((prev) => {
       const next = !prev;
-      showToast(next ? `You're now following ${name}` : `Unfollowed ${name}`);
+      if (next) {
+        const destId = activeUser?._id || (targetUserId && String(targetUserId).length === 24 ? targetUserId : null);
+        if (destId) {
+          userApi.sendConnectRequest(destId)
+            .then(() => showToast(`Connection request sent to ${name}`))
+            .catch((err) => showToast(err?.message || `Could not send request to ${name}`));
+        } else {
+          showToast(`You're now following ${name}`);
+        }
+      } else {
+        showToast(`Unfollowed ${name}`);
+      }
       return next;
     });
   };
 
-  // Tab pill sliding between Teams and Projects
+  const fetchConnections = () => {
+    const slug = username || user?.username || profileUserId;
+    if (!slug) return;
+    setLoadingConnections(true);
+    userApi
+      .getUserConnections(slug)
+      .then((res) => {
+        setConnections(res?.connections || []);
+      })
+      .catch((err) => {
+        console.warn("Could not fetch connections:", err);
+      })
+      .finally(() => setLoadingConnections(false));
+  };
+
   useEffect(() => {
-    const activeBtn = activeTab === 'projects' ? projectsBtnRef.current : teamsBtnRef.current;
+    fetchConnections();
+  }, [username, user?.username, profileUserId]);
+
+  // Tab pill sliding between Teams, Projects, and Connections
+  useEffect(() => {
+    let activeBtn = teamsBtnRef.current;
+    if (activeTab === 'projects') activeBtn = projectsBtnRef.current;
+    else if (activeTab === 'connections') activeBtn = connectionsBtnRef.current;
+
     if (activeBtn && tabPillRef.current) {
       gsap.to(tabPillRef.current, {
         x: activeBtn.offsetLeft,
@@ -424,6 +460,8 @@ export default function ProfilePage() {
           }
         }}
         onOpenReport={() => setReportModalOpen(true)}
+        connectionsCount={connections.length}
+        onConnectionsClick={() => setActiveTab('connections')}
       />
 
       {isBlocked && (
@@ -507,10 +545,19 @@ export default function ProfilePage() {
           tabPillRef={tabPillRef}
           teamsBtnRef={teamsBtnRef}
           projectsBtnRef={projectsBtnRef}
+          connectionsBtnRef={connectionsBtnRef}
           tabData={tabData}
           displayTeams={displayTeams}
           displayProjects={displayProjects}
+          displayConnections={connections}
+          onMessageConnection={(conn) => {
+            const cid = conn._id || conn.id;
+            const cname = conn.name || 'Developer';
+            const cinit = (cname || 'D')[0].toUpperCase();
+            openDirectChatWith(cid, { name: cname, initial: cinit });
+          }}
           navigate={navigate}
+          isOwnProfile={isOwnProfile}
         />
       </div>
 

@@ -6,8 +6,10 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { sendNotification } from "../utils/notify.js";
-import { decryptText } from "../utils/crypto.js";
+import { decryptText, encryptText } from "../utils/crypto.js";
 import { isBlocked } from "../utils/blockGuard.js";
+import { getIO } from "../utils/SocketManager.js";
+import xss from "xss";
 
 const PARTICIPANT_FIELDS = "name username profilePicture lastSeen";
 
@@ -235,10 +237,69 @@ const notifyForNewMessage = async (chat, message, sender, mentionedUserIds = [])
   );
 };
 
+const sendMessage = asyncHandler(async (req, res) => {
+  const { chatId } = req.params;
+  const { content, mentions = [] } = req.body;
+
+  if (!content || !content.trim()) {
+    throw new ApiError(400, "Message content is required");
+  }
+
+  const chat = await Chat.findById(chatId);
+  if (!chat) throw new ApiError(404, "Chat not found");
+
+  const isParticipant = chat.participants.some((p) => p.toString() === req.user._id.toString());
+  if (!isParticipant) throw new ApiError(403, "Not a participant of this chat");
+
+  const clean = xss(content.trim());
+  const validMentions = [
+    ...new Set(mentions.filter((id) => typeof id === "string")),
+  ].filter((id) => chat.participants.some((p) => p.toString() === id));
+
+  const message = await Message.create({
+    chat: chatId,
+    sender: req.user._id,
+    content: encryptText(clean),
+    mentions: validMentions,
+  });
+
+  chat.lastMessage = {
+    text: encryptText(clean),
+    sender: req.user._id,
+    sentAt: new Date(),
+  };
+  await chat.save();
+
+  await notifyForNewMessage(chat, message, req.user, validMentions);
+
+  const populatedDoc = await message.populate(
+    "sender",
+    "name username profilePicture"
+  );
+  const populated = populatedDoc.toObject();
+  populated.content = clean;
+
+  try {
+    const io = getIO();
+    io.to(chatId).emit("message:new", populated);
+    if (Array.isArray(chat.participants)) {
+      chat.participants.forEach((p) => {
+        const pId = p.toString();
+        if (pId !== chatId) {
+          io.to(pId).emit("message:new", populated);
+        }
+      });
+    }
+  } catch (err) {}
+
+  return res.status(201).json(new ApiResponse(201, "Message sent", populated));
+});
+
 export {
   getMyChats,
   getOrCreateDirectChat,
   getMessages,
+  sendMessage,
   createGroupChat,
   markChatAsRead,
   notifyForNewMessage,

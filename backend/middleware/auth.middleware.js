@@ -43,4 +43,28 @@ const attachUserIfPresent = asyncHandler(async (req, res, next) => {
     next();
 });
 
-export {protect, attachUserIfPresent};
+const requireCompleteProfile = asyncHandler(async (req, res, next) => {
+    if (!req.user) {
+        throw new ApiError(401, "Unauthorized, user not authenticated");
+    }
+    if (!req.user.isProfileComplete) {
+        return res.status(403).json({
+            statusCode: 403,
+            success: false,
+            code: "PROFILE_INCOMPLETE",
+            message: "Please complete your profile onboarding before accessing this feature.",
+            data: {
+                isProfileComplete: false,
+                missingFields: [
+                    !req.user.name || req.user.name.length < 2 ? "name" : null,
+                    !req.user.bio || req.user.bio.length < 10 ? "bio" : null,
+                    !req.user.college ? "college" : null,
+                    !req.user.skills || req.user.skills.length === 0 ? "skills" : null,
+                ].filter(Boolean),
+            }
+        });
+    }
+    next();
+});
+
+export { protect, attachUserIfPresent, requireCompleteProfile };

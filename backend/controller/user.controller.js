@@ -5,6 +5,8 @@ import {asyncHandler} from "../utils/asyncHandler.js"
 import {ApiResponse} from "../utils/ApiResponse.js"
 import { toSafeUser } from "./auth.controller.js";
 import { uploadOnCloudinary, deleteFromCloudinary } from "../utils/cloudinary.js";
+import { Notification } from "../models/notification.model.js";
+import { sendNotification } from "../utils/notify.js";
 
 const ALLOWED_EXPERIENCE = ["Fresher", "1-2 years", "2-5 years", "5+ years"];
 const ALLOWED_AVAILABLE_FOR = [
@@ -68,13 +70,19 @@ const updateProfile = asyncHandler(async (req, res) => {
     throw new ApiError(400, "bio must be 200 characters or fewer");
   }
 
-  const user = await User.findByIdAndUpdate(req.user._id, updates, {
-    new: true,
-    runValidators: true,
-  });
+  const user = await User.findById(req.user._id);
   if (!user) {
     throw new ApiError(404, "User not found");
   }
+
+  for (const field of editable) {
+    if (updates[field] !== undefined) {
+      user[field] = updates[field];
+    }
+  }
+
+  user.isProfileComplete = user.calculateIsProfileComplete();
+  await user.save();
 
   return res.status(200).json(new ApiResponse(200, "Profile updated successfully", toSafeUser(user)));
 });
@@ -232,6 +240,114 @@ const unblockUser = asyncHandler(async (req, res) => {
   );
 });
 
+const sendConnectRequest = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    throw new ApiError(400, "Invalid user ID");
+  }
+  if (userId.toString() === req.user._id.toString()) {
+    throw new ApiError(400, "You cannot send a connection request to yourself");
+  }
+
+  const targetUser = await User.findById(userId);
+  if (!targetUser) {
+    throw new ApiError(404, "User not found");
+  }
+
+  const currentUser = await User.findById(req.user._id);
+  if (
+    currentUser?.blockedUsers?.some((id) => id.toString() === userId.toString()) ||
+    targetUser?.blockedUsers?.some((id) => id.toString() === req.user._id.toString())
+  ) {
+    throw new ApiError(403, "Cannot connect with this user");
+  }
+
+  // Create or refresh connect_request notification
+  const notification = await sendNotification({
+    recipient: targetUser._id,
+    sender: req.user._id,
+    type: "connect_request",
+    text: "sent you a connection request",
+  });
+
+  return res.status(200).json(
+    new ApiResponse(200, `Connection request sent to ${targetUser.name}`, {
+      recipientId: targetUser._id,
+      notification,
+    })
+  );
+});
+
+const acceptConnectRequest = asyncHandler(async (req, res) => {
+  const { notifId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(notifId)) {
+    throw new ApiError(400, "Invalid notification ID");
+  }
+
+  const notif = await Notification.findOne({ _id: notifId, recipient: req.user._id });
+  if (!notif) {
+    throw new ApiError(404, "Notification not found");
+  }
+
+  notif.read = true;
+  await notif.save();
+
+  if (notif.sender) {
+    // Add each other to mutual connections list
+    await User.findByIdAndUpdate(req.user._id, {
+      $addToSet: { connections: notif.sender },
+    });
+    await User.findByIdAndUpdate(notif.sender, {
+      $addToSet: { connections: req.user._id },
+    });
+
+    // Send real-time notification to the sender that it was accepted
+    await sendNotification({
+      recipient: notif.sender,
+      sender: req.user._id,
+      type: "connect_accepted",
+      text: "accepted your connection request",
+    });
+  }
+
+  return res.status(200).json(
+    new ApiResponse(200, "Connection request accepted successfully", notif)
+  );
+});
+
+const getUserConnections = asyncHandler(async (req, res) => {
+  const { usernameOrId } = req.params;
+  let user;
+  if (mongoose.Types.ObjectId.isValid(usernameOrId)) {
+    user = await User.findById(usernameOrId).populate(
+      "connections",
+      "name username profilePicture college skills bio experience isAvailable"
+    );
+  }
+  if (!user) {
+    user = await User.findOne({ username: usernameOrId.toLowerCase() }).populate(
+      "connections",
+      "name username profilePicture college skills bio experience isAvailable"
+    );
+  }
+  if (!user && (usernameOrId === "me" || usernameOrId === req.user?.username)) {
+    user = await User.findById(req.user._id).populate(
+      "connections",
+      "name username profilePicture college skills bio experience isAvailable"
+    );
+  }
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  return res.status(200).json(
+    new ApiResponse(200, "Connections fetched successfully", {
+      connections: user.connections || [],
+      count: (user.connections || []).length,
+    })
+  );
+});
+
 export {
   getMe,
   getUserByUsername,
@@ -242,5 +358,8 @@ export {
   uploadCoverPicture,
   blockUser,
   unblockUser,
+  sendConnectRequest,
+  acceptConnectRequest,
+  getUserConnections,
 };
 

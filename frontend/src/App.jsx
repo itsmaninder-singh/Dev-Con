@@ -23,6 +23,7 @@ const CreateTeam = lazy(() => import("./pages/CreateTeam.jsx"));
 const TeamDetail = lazy(() => import("./pages/TeamDetail.jsx"));
 const AI = lazy(() => import("./pages/AI.jsx"));
 const CodingRooms = lazy(() => import("./pages/CodingRooms.jsx"));
+const Onboarding = lazy(() => import("./pages/Onboarding.jsx"));
 const NotFound = lazy(() => import("./pages/NotFound.jsx"));
 
 function RouteFallback() {
@@ -162,7 +163,17 @@ export default function App() {
                 }
               />
 
+              <Route
+                path="/onboarding"
+                element={
+                  <ProtectedRoute allowIncomplete={true}>
+                    <Onboarding />
+                  </ProtectedRoute>
+                }
+              />
+
               {/* Route Aliases */}
+              <Route path="/complete-profile" element={<Navigate to="/onboarding" replace />} />
               <Route path="/coding-rooms" element={<Navigate to="/rooms" replace />} />
               <Route path="/dashboard" element={<Navigate to="/workspace" replace />} />
               <Route path="/edit-profile" element={<Navigate to="/profile/edit" replace />} />

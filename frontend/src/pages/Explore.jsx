@@ -207,20 +207,34 @@ export default function Explore() {
 
   function handleJoin(item) {
     const tid = item._id || item.id;
-    if (item.kind !== 'project') {
-      joinTeam(tid);
-      showToast(`Joined ${item.name}! Added to your teams.`);
-      if (tid && tid.length === 24) {
+    const isProj = item.kind === 'project';
+    if (!isProj) {
+      if (tid && String(tid).length === 24) {
         joinRequestApi
           .sendJoinReq({ targetType: 'team', targetId: tid, message: 'I would love to collaborate with the team!' })
-          .catch(() => {});
+          .then(() => {
+            showToast(`Join request sent to ${item.name}!`);
+            joinTeam(tid);
+          })
+          .catch((err) => {
+            showToast(err?.message || `Could not join ${item.name}`);
+          });
+      } else {
+        joinTeam(tid);
+        showToast(`Joined ${item.name}!`);
       }
     } else {
-      showToast(`Request sent to ${item.name}`);
-      if (tid && tid.length === 24) {
+      if (tid && String(tid).length === 24) {
         joinRequestApi
           .sendJoinReq({ targetType: 'project', targetId: tid, message: 'Interested in contributing to this project!' })
-          .catch(() => {});
+          .then(() => {
+            showToast(`Request sent to ${item.name}`);
+          })
+          .catch((err) => {
+            showToast(err?.message || `Could not send request to ${item.name}`);
+          });
+      } else {
+        showToast(`Request sent to ${item.name}`);
       }
     }
   }

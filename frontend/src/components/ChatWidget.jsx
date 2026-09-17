@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { chatApi } from "../lib/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useChatUI, AVATAR_COLORS } from "../context/ChatUIContext.jsx";
+import { connectSocket } from "../lib/socket.js";
 
 const INITIAL_CONVERSATIONS = [];
 
@@ -290,11 +291,66 @@ export default function ChatWidget() {
     return () => { document.removeEventListener('click', onDocClick); document.removeEventListener('keydown', onKey); };
   }, [open, setOpen]);
 
+  // Connect socket and listen for live incoming messages
+  useEffect(() => {
+    if (!user?._id) return;
+    const socket = connectSocket();
+
+    const handleIncomingMessage = (msg) => {
+      if (!msg) return;
+      const isFromMe = (msg.sender?._id || msg.sender) === user._id;
+      const mText = msg.content || '';
+      const mTime = msg.createdAt
+        ? new Date(msg.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+        : timeNow();
+      const chatId = msg.chat?._id || msg.chat;
+
+      setConversations((all) => {
+        return all.map((c) => {
+          const matches = c.id === chatId || c._id === chatId;
+          if (matches) {
+            const alreadyExists = c.messages?.some(
+              (m) => (m._id && m._id === msg._id) || (m.text === mText && m.from === (isFromMe ? 'me' : 'them'))
+            );
+            if (alreadyExists) return c;
+
+            const updatedMessages = [
+              ...(c.messages || []),
+              {
+                _id: msg._id,
+                from: isFromMe ? 'me' : 'them',
+                text: mText,
+                time: mTime,
+              },
+            ];
+
+            return {
+              ...c,
+              unread: (activeId === c.id || isFromMe) ? 0 : (c.unread || 0) + 1,
+              messages: updatedMessages,
+            };
+          }
+          return c;
+        });
+      });
+    };
+
+    socket.on('message:new', handleIncomingMessage);
+    return () => {
+      socket.off('message:new', handleIncomingMessage);
+    };
+  }, [user?._id, activeId, setConversations]);
+
   function openChat(id) {
     setConversations((list) => list.map((c) => (c.id === id ? { ...c, unread: 0 } : c)));
     setActiveId(id);
     setView('chat');
     setTimeout(() => textareaRef.current?.focus(), 150);
+
+    const socket = connectSocket();
+    if (id && id.length === 24) {
+      socket.emit('chat:join', id);
+    }
 
     // If it's a server chat, fetch message history
     const target = conversations.find((c) => c.id === id);
@@ -305,6 +361,7 @@ export default function ChatWidget() {
           const list = Array.isArray(msgs) ? msgs : msgs?.messages || [];
           if (list.length > 0) {
             const formatted = list.map((m) => ({
+              _id: m._id,
               from: m.sender?._id === user?._id || m.sender === user?._id ? 'me' : 'them',
               text: m.content || '',
               time: m.createdAt
@@ -329,7 +386,7 @@ export default function ChatWidget() {
     setConversations((list) => list.map((c) => (c.id === active.id ? { ...c, messages: [...c.messages, { from: 'me', text, time }] } : c)));
     setInputValue('');
 
-    // If server chat, send via chatApi
+    // If server chat, send via socket and fallback to chatApi
     const serverChatId = (active.isServerChat && active.id && active.id.length === 24)
       ? active.id
       : (active._id && typeof active._id === 'string' && active._id.length === 24)
@@ -337,7 +394,12 @@ export default function ChatWidget() {
       : null;
 
     if (serverChatId) {
-      chatApi.sendMessage(serverChatId, text).catch(() => {});
+      const socket = connectSocket();
+      socket.emit('message:send', serverChatId, text, [], (res) => {
+        if (!res?.ok) {
+          chatApi.sendMessage(serverChatId, text).catch(() => {});
+        }
+      });
     } else {
       setTyping(true);
       setTimeout(() => {
@@ -391,7 +453,15 @@ export default function ChatWidget() {
                 </div>
               ) : (
                 conversations.map((conv) => {
-                  const last = conv.messages?.[conv.messages.length - 1] || { text: 'No messages yet', time: '' };
+                  const realMsgs = (conv.messages || []).filter(
+                    (m) =>
+                      m &&
+                      m.text &&
+                      !m.text.includes("connect on DevConnect") &&
+                      !m.text.includes("Let's connect") &&
+                      !m.text.includes("Let’s connect")
+                  );
+                  const last = realMsgs[realMsgs.length - 1] || { text: 'No messages yet', time: '' };
                   return (
                     <div className={`chat-item${conv.unread === 0 ? ' read' : ''}`} key={conv.id} onClick={() => openChat(conv.id)}>
                       <div className={`avatar${conv.online ? ' online' : ''}`} style={{ background: AVATAR_COLORS[conv.colorIdx] || AVATAR_COLORS[0] }}>{conv.initial}</div>
@@ -436,9 +506,22 @@ export default function ChatWidget() {
             </div>
             <div className="messages" ref={messagesRef}>
               <div className="day-divider">Today</div>
-              {active && active.messages.map((m, i) => (
-                <div className={`msg ${m.from}`} key={i}>{m.text}<span className="time">{m.time}</span></div>
-              ))}
+              {active &&
+                active.messages
+                  ?.filter(
+                    (m) =>
+                      m &&
+                      m.text &&
+                      !m.text.includes("connect on DevConnect") &&
+                      !m.text.includes("Let's connect") &&
+                      !m.text.includes("Let’s connect")
+                  )
+                  .map((m, i) => (
+                    <div className={`msg ${m.from}`} key={i}>
+                      {m.text}
+                      <span className="time">{m.time}</span>
+                    </div>
+                  ))}
               {typing && <div className="typing"><span /><span /><span /></div>}
             </div>
             <div className="composer">

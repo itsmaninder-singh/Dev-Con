@@ -21,7 +21,7 @@ const sendJoinReq = asyncHandler(async(req,res)=>{
             throw new ApiError(404,"team not found");
         }
         receiver = target.creator;
-        if(target.status!=="open" || target.members.length>=target.maxMembers){
+        if(target.status === "closed" || target.status === "full" || (target.members && target.members.length >= target.maxMembers)){
             throw new ApiError(400,"team is not open for join requests");
         }
     }else{
@@ -29,10 +29,13 @@ const sendJoinReq = asyncHandler(async(req,res)=>{
         if(!target){
             throw new ApiError(404,"project not found");
         }
-        receiver = target.creator;
-        if(target.status!=="open" ){
+        receiver = target.owner || target.creator;
+        if(target.status === "completed" || target.status === "on-hold"){
             throw new ApiError(400,"project is not open for join requests");
         }
+    }
+    if(!receiver){
+        throw new ApiError(400, "Could not determine recipient for this team/project");
     }
     if(receiver.toString()===req.user._id.toString()){
         throw new ApiError(400,"you cannot send join request to your own team/project");
@@ -51,17 +54,17 @@ const sendJoinReq = asyncHandler(async(req,res)=>{
         targetType,
         [targetType]:targetId,
         receiver,
-        message,
-        roleAppliedFor,
+        message: message || `I would like to join your ${targetType}`,
+        roleAppliedFor: roleAppliedFor || "Member",
     });
     await sendNotification({
-    recipient: receiver,
-    sender: req.user._id,
-    type: "join_request",
-    text: `${req.user.name} wants to join your ${targetType} "${target.name || target.title}"`,
-    joinRequest: joinRequest._id,
-  });
-    return res.status(201).json(new ApiResponse(201,"Join Request SenT Successfully", JOINREQUEST))
+      recipient: receiver,
+      sender: req.user._id,
+      type: "join_request",
+      text: `wants to join your ${targetType} "${target.name || target.title}"`,
+      joinRequest: JOINREQUEST._id,
+    });
+    return res.status(201).json(new ApiResponse(201,"Join Request Sent Successfully", JOINREQUEST));
 
 });
 
@@ -121,17 +124,17 @@ const acceptJoinReq= asyncHandler(async(req,res)=>{
     await joinReq.save();
 
     await sendNotification({
-    recipient: joinReq.sender,
-    sender: req.user._id,
-    type: "join_request_accepted",
-    text: `${req.user.name} accepted your request to join`,
-    joinRequest: joinReq._id,
-  });
+      recipient: joinReq.sender,
+      sender: req.user._id,
+      type: "join_request_accepted",
+      text: `accepted your request to join ${joinReq.targetType || "team"}`,
+      joinRequest: joinReq._id,
+    });
 
-   return res
-    .status(200)
-    .json(new ApiResponse(200, "Request accepted successfully", joinReq));
-})
+    return res
+      .status(200)
+      .json(new ApiResponse(200, "Request accepted successfully", joinReq));
+});
 
 const ignoreJoinRequest = asyncHandler(async (req, res) => {
   const joinRequest = await JoinRequest.findById(req.params.id);
@@ -156,17 +159,19 @@ const ignoreJoinRequest = asyncHandler(async (req, res) => {
     .status(200)
     .json(new ApiResponse(200, "Request ignored", joinRequest));
 });
-const getReceivedRequests = asyncHandler(async(req,res)=>{
-    const {status} = req.body;
-    const filter = {receiver: req.user._id};
-    if(status) filter.status = status;
 
-    const reqs = await JoinRequest.find(filter)
-    .populate("sender", "name username profilePicture skills reputatuion")
+const getReceivedRequests = asyncHandler(async (req, res) => {
+  const status = req.query.status || req.body?.status;
+  const filter = { receiver: req.user._id };
+  if (status) filter.status = status;
+
+  const reqs = await JoinRequest.find(filter)
+    .populate("sender", "name username profilePicture skills reputation")
     .populate("team", "name")
     .populate("project", "title")
     .sort({ createdAt: -1 });
-     return res
+
+  return res
     .status(200)
     .json(new ApiResponse(200, "Received requests fetched", reqs));
 });

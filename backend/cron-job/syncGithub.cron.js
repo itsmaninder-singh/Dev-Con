@@ -24,22 +24,22 @@ const runDueSync = async()=>{
         await sleep(DELAY_BETWEEN_SYNCS_MS);
 
     }
-    console.log(`github cron done babu...`);
+    console.log(`[github-sync-cron] GitHub sync run finished.`);
 };
 
 export const startGithubSyncCron = ()=>{
     cron.schedule("0 3 * * *",()=>{
         runDueSync()
         .catch((err)=>{
-            console.error("github-cron-failed",err.message)
+            console.error("[github-sync-cron] Scheduled sync error:", err.message);
         });
     });
 
     setTimeout(()=>{
         runDueSync()
         .catch((err)=>{
-            console.error("intial github cron failed", err.message)
+            console.error("[github-sync-cron] Initial sync error:", err.message);
         });
     },10_000);
-    console.log("scheduled plus initaial cron for github passed-- ghar jake sutti babu")
+    console.log("[github-sync-cron] GitHub sync cron job initialized.");
 }
