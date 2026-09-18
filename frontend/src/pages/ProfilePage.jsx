@@ -28,6 +28,7 @@ export default function ProfilePage() {
   useEffect(() => {
     if (username && (!user?.username || username.toLowerCase() !== user.username.toLowerCase())) {
       setLoadingUser(true);
+      setTargetUser(null);
       userApi
         .getUserByUsername(username)
         .then((res) => {
@@ -44,50 +45,36 @@ export default function ProfilePage() {
   }, [username, user?.username]);
 
   const activeUser = isOwnProfile ? (profile || user) : targetUser;
-  const name = activeUser?.name || (isOwnProfile ? (profile?.name || user?.name || 'Developer') : (username || 'Developer'));
-  const handle = activeUser?.username || (activeUser?.name ? activeUser.name.toLowerCase().replace(/\s+/g, '') : (username || 'user'));
-  const college = activeUser?.college || (isOwnProfile ? (profile?.college || '') : '');
-  const bio =
-    activeUser?.bio ||
-    (isOwnProfile
-      ? (profile?.bio || '')
-      : '');
-  const skills =
-    activeUser?.skills && activeUser.skills.length > 0
-      ? activeUser.skills
-      : (isOwnProfile && profile?.skills && profile.skills.length > 0
-        ? profile.skills
-        : []);
-  const openTo =
-    activeUser?.availableFor && activeUser.availableFor.length > 0
-      ? activeUser.availableFor
-      : (isOwnProfile && profile?.openTo && profile.openTo.length > 0
-        ? profile.openTo
-        : []);
+  const name = isOwnProfile
+    ? (profile?.name || user?.name || 'Developer')
+    : (targetUser?.name || username || 'Developer');
+  const handle = isOwnProfile
+    ? (profile?.username || user?.username || (user?.name ? user.name.toLowerCase().replace(/\s+/g, '') : 'user'))
+    : (targetUser?.username || username || 'user');
+  const college = isOwnProfile
+    ? (profile?.college || user?.college || '')
+    : (targetUser?.college || '');
+  const bio = isOwnProfile
+    ? (profile?.bio || user?.bio || '')
+    : (targetUser?.bio || '');
+  const skills = isOwnProfile
+    ? (profile?.skills && profile.skills.length > 0 ? profile.skills : (user?.skills || []))
+    : (targetUser?.skills || []);
+  const openTo = isOwnProfile
+    ? (profile?.openTo && profile.openTo.length > 0 ? profile.openTo : (user?.availableFor || []))
+    : (targetUser?.availableFor || targetUser?.openTo || []);
 
-  const initials =
-    activeUser?.initials ||
-    name
-      .split(' ')
-      .filter(Boolean)
-      .map((w) => w[0])
-      .slice(0, 2)
-      .join('')
-      .toUpperCase() || 'DV';
+  const initials = isOwnProfile
+    ? (profile?.initials || name.split(' ').filter(Boolean).map((w) => w[0]).slice(0, 2).join('').toUpperCase() || 'DV')
+    : (targetUser?.initials || name.split(' ').filter(Boolean).map((w) => w[0]).slice(0, 2).join('').toUpperCase() || 'DV');
 
-  const avatarUrl =
-    activeUser?.avatarUrl ||
-    activeUser?.profilePicture ||
-    profile?.avatarUrl ||
-    profile?.profilePicture ||
-    user?.profilePicture;
+  const avatarUrl = isOwnProfile
+    ? (profile?.avatarUrl || profile?.profilePicture || user?.profilePicture || user?.avatarUrl || '')
+    : (targetUser?.avatarUrl || targetUser?.profilePicture || '');
 
-  const coverUrl =
-    activeUser?.coverUrl ||
-    activeUser?.coverPicture ||
-    profile?.coverUrl ||
-    profile?.coverPicture ||
-    user?.coverPicture;
+  const coverUrl = isOwnProfile
+    ? (profile?.coverUrl || profile?.coverPicture || user?.coverPicture || user?.coverUrl || '')
+    : (targetUser?.coverUrl || targetUser?.coverPicture || '');
 
   const handleAvatarUpload = (file) => {
     if (!file) return;
@@ -528,7 +515,7 @@ export default function ProfilePage() {
       {/* Main Grid Layout */}
       <div className="profile-body">
         <ProfilePanels
-          profile={profile}
+          profile={isOwnProfile ? (profile || user || {}) : (targetUser || {})}
           bio={bio}
           college={college}
           openTo={openTo}

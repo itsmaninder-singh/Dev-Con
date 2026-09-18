@@ -8,7 +8,8 @@ const DEFAULT_PROFILE = {
   name: '',
   bio: '',
   college: '',
-  phone: '',
+  phone: { countryCode: '+91', number: '' },
+  phoneNumber: { countryCode: '+91', number: '' },
   coverUrl: null,
   avatarUrl: null,
   skills: [],
@@ -21,6 +22,19 @@ const DEFAULT_PROFILE = {
   isAvailable: true,
 };
 
+function normalizePhone(val) {
+  if (val && typeof val === 'object') {
+    return {
+      countryCode: val.countryCode || '+91',
+      number: val.number ? String(val.number).replace(/\D/g, '') : '',
+    };
+  }
+  if (typeof val === 'string' && val) {
+    return { countryCode: '+91', number: val.replace(/\D/g, '') };
+  }
+  return { countryCode: '+91', number: '' };
+}
+
 function loadInitial() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -30,7 +44,10 @@ function loadInitial() {
       localStorage.removeItem(STORAGE_KEY);
       return DEFAULT_PROFILE;
     }
-    return { ...DEFAULT_PROFILE, ...parsed };
+    const merged = { ...DEFAULT_PROFILE, ...parsed };
+    merged.phone = normalizePhone(parsed?.phone || parsed?.phoneNumber);
+    merged.phoneNumber = merged.phone;
+    return merged;
   } catch {
     return DEFAULT_PROFILE;
   }
@@ -93,6 +110,8 @@ export function ProfileProvider({ children }) {
             preferredRole: serverUser.preferredRole || prev.preferredRole,
             personality: serverUser.personality || prev.personality,
             isAvailable: serverUser.isAvailable !== undefined ? serverUser.isAvailable : prev.isAvailable,
+            phone: normalizePhone(serverUser.phoneNumber || serverUser.phone || prev.phone),
+            phoneNumber: normalizePhone(serverUser.phoneNumber || serverUser.phone || prev.phoneNumber),
           }));
         }
       })

@@ -78,9 +78,19 @@ const searchUsers = asyncHandler(async (req, res) => {
     User.countDocuments(filter),
   ]);
 
+  const myConnections = new Set(
+    (req.user?.connections || []).map((id) => id.toString())
+  );
+
+  const formattedResults = results.map((u) => {
+    const obj = u.toObject ? u.toObject() : { ...u };
+    obj.isConnected = myConnections.has(obj._id.toString());
+    return obj;
+  });
+
   return res.status(200).json(
     new ApiResponse(200, "Search results fetched", {
-      results,
+      results: formattedResults,
       total,
       page: pageNum,
       limit: limitNum,

@@ -345,10 +345,37 @@
   transform: scale(0.94);
 }
 
-.explore-root .suggested-action-btn.followed {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.12);
-  color: var(--text-muted, #a1a1aa);
+.explore-root .suggested-action-btn.followed,
+.explore-root .suggested-action-btn.connected {
+  background: rgba(52, 211, 153, 0.12);
+  border-color: rgba(52, 211, 153, 0.3);
+  color: #34d399;
+  cursor: default;
+}
+
+.explore-root .suggested-action-btn.followed:hover,
+.explore-root .suggested-action-btn.connected:hover {
+  background: rgba(52, 211, 153, 0.18);
+  color: #34d399;
+  transform: none;
+  box-shadow: none;
+}
+
+.explore-root .suggested-connected-badge {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 1.5px 6px;
+  border-radius: 10px;
+  background: rgba(52, 211, 153, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
 }
 
 /* Skills Strip */

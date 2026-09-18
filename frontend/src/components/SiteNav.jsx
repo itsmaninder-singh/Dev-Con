@@ -52,31 +52,40 @@ export default function SiteNav() {
         .then((res) => {
           const serverList = res?.notifications || (Array.isArray(res) ? res : []);
           if (serverList.length > 0) {
-            const mapped = serverList.map((sn) => {
-              const sUser = sn.sender || {};
-              const sName = sUser.name || 'User';
-              const sUsername = sUser.username || '';
-              const sId = sUser._id || sUser.id || '';
-              const sInitials = sName
-                .split(' ')
-                .map((w) => w[0])
-                .slice(0, 2)
-                .join('')
-                .toUpperCase() || 'U';
-              return {
-                id: sn._id,
-                _id: sn._id,
-                type: sn.type || 'message',
-                unread: !sn.read,
-                fitScore: sn.fitScore || 85,
-                sender: { id: sId, _id: sId, name: sName, username: sUsername, initials: sInitials },
-                text: sn.text || '',
-                target: sn.target || '',
-                time: 'just now',
-                message: sn.message || '',
-                joinRequestId: sn.joinRequest?._id || sn.joinRequest || null,
-              };
-            });
+            const currentUserId = String(user?._id || user?.id || '');
+            const mapped = serverList
+              .filter((sn) => {
+                const sId = String(sn.sender?._id || sn.sender?.id || sn.sender || '');
+                const rId = String(sn.recipient?._id || sn.recipient?.id || sn.recipient || '');
+                if (sId && currentUserId && sId === currentUserId) return false;
+                if (rId && currentUserId && rId !== currentUserId) return false;
+                return true;
+              })
+              .map((sn) => {
+                const sUser = sn.sender || {};
+                const sName = sUser.name || 'User';
+                const sUsername = sUser.username || '';
+                const sId = sUser._id || sUser.id || '';
+                const sInitials = sName
+                  .split(' ')
+                  .map((w) => w[0])
+                  .slice(0, 2)
+                  .join('')
+                  .toUpperCase() || 'U';
+                return {
+                  id: sn._id,
+                  _id: sn._id,
+                  type: sn.type || 'message',
+                  unread: !sn.read,
+                  fitScore: sn.fitScore || 85,
+                  sender: { id: sId, _id: sId, name: sName, username: sUsername, initials: sInitials },
+                  text: sn.text || '',
+                  target: sn.target || '',
+                  time: 'just now',
+                  message: sn.message || '',
+                  joinRequestId: sn.joinRequest?._id || sn.joinRequest || null,
+                };
+              });
             setNotifications(mapped);
           }
         })
@@ -92,10 +101,15 @@ export default function SiteNav() {
 
     const handleNewNotification = (sn) => {
       if (!sn) return;
+      const currentUserId = String(user?._id || user?.id || '');
       const sUser = sn.sender || {};
       const sName = sUser.name || 'Developer';
       const sUsername = sUser.username || '';
-      const sId = sUser._id || sUser.id || '';
+      const sId = String(sUser._id || sUser.id || sn.sender || '');
+      const rId = String(sn.recipient?._id || sn.recipient?.id || sn.recipient || '');
+      if (sId && currentUserId && sId === currentUserId) return;
+      if (rId && currentUserId && rId !== currentUserId) return;
+
       const sInitials = sName
         .split(' ')
         .filter(Boolean)

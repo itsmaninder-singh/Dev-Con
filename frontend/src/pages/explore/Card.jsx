@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
+import { useAuth } from '../../context/AuthContext';
 
 const CIRC = 75.4;
 const BURST_COLORS = ['#ff98a2', '#ffd58c', '#ffffff'];
 
 export default function Card({ item, saved, onToggleSave, onJoin, onOpen }) {
   const cardRef = useRef(null);
+  const { user } = useAuth() || {};
   const [inView, setInView] = useState(true);
   const [scoreText, setScoreText] = useState('0%');
   const [ringOffset, setRingOffset] = useState(CIRC);
@@ -13,6 +15,16 @@ export default function Card({ item, saved, onToggleSave, onJoin, onOpen }) {
   const [bookmarkPop, setBookmarkPop] = useState(false);
   const [joinPop, setJoinPop] = useState(false);
   const [scoreParticles, setScoreParticles] = useState([]);
+
+  const creatorId = String(item?.creator?._id || item?.creator?.id || item?.creator || item?.owner?._id || item?.owner?.id || item?.owner || '');
+  const creatorUsername = String(item?.creator?.username || item?.owner?.username || '').toLowerCase();
+  const currentUserId = String(user?._id || user?.id || '');
+  const currentUsername = String(user?.username || '').toLowerCase();
+
+  const isOwner = Boolean(
+    (currentUserId && creatorId && currentUserId === creatorId) ||
+    (currentUsername && creatorUsername && currentUsername === creatorUsername)
+  );
 
   const maxMembers = Math.max(1, Math.min(Number(item?.maxMembers) || 4, 12));
   const membersCount = Number(item?.membersCount) || 1;
@@ -103,6 +115,7 @@ export default function Card({ item, saved, onToggleSave, onJoin, onOpen }) {
 
   function handleJoinClick(e) {
     e.stopPropagation();
+    if (isOwner) return;
     setJoinPop(true);
     setTimeout(() => setJoinPop(false), 450);
     spawnParticles(10);
@@ -180,27 +193,45 @@ export default function Card({ item, saved, onToggleSave, onJoin, onOpen }) {
           </div>
           <span className="seats-label">{membersCount}/{maxMembers}</span>
         </div>
-        <button
-          className={`join-btn ${joinPop ? 'pop' : ''}`}
-          disabled={full || joined}
-          onClick={handleJoinClick}
-        >
-          <span className="btn-label">
-            {joined ? (
-              <>
-                <svg className="check-draw" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6" /></svg>
-                Requested
-              </>
-            ) : (full ? 'Full' : 'Join')}
-          </span>
-          {particles.map(p => (
-            <span
-              key={p.id}
-              className="burst-particle"
-              style={{ background: p.color, '--dx': `${p.dx}px`, '--dy': `${p.dy}px` }}
-            />
-          ))}
-        </button>
+        {isOwner ? (
+          <button
+            className="join-btn"
+            disabled
+            style={{
+              opacity: 0.85,
+              cursor: 'default',
+              background: 'rgba(255, 255, 255, 0.08)',
+              border: '1px solid rgba(255, 255, 255, 0.16)',
+              color: 'var(--muted)',
+            }}
+            title="You are the owner of this team/project"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span className="btn-label">Owner</span>
+          </button>
+        ) : (
+          <button
+            className={`join-btn ${joinPop ? 'pop' : ''}`}
+            disabled={full || joined}
+            onClick={handleJoinClick}
+          >
+            <span className="btn-label">
+              {joined ? (
+                <>
+                  <svg className="check-draw" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6" /></svg>
+                  Requested
+                </>
+              ) : (full ? 'Full' : 'Join')}
+            </span>
+            {particles.map(p => (
+              <span
+                key={p.id}
+                className="burst-particle"
+                style={{ background: p.color, '--dx': `${p.dx}px`, '--dy': `${p.dy}px` }}
+              />
+            ))}
+          </button>
+        )}
       </div>
     </div>
   );

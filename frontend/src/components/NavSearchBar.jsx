@@ -2,18 +2,84 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, X, Users, Rocket, User, Sparkles, Command } from 'lucide-react';
 import { useTeams } from '../context/TeamsContext.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
+import { searchApi, userApi } from '../lib/api.js';
 import useUISound from '../hooks/useUISound.js';
 
 export default function NavSearchBar() {
   const { teams = [], projects = [] } = useTeams() || {};
+  const { user } = useAuth() || {};
   const [open, setOpen] = useState(false);
   const [mobileExpanded, setMobileExpanded] = useState(false);
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [liveUsers, setLiveUsers] = useState([]);
+  const [connectionsSet, setConnectionsSet] = useState(() => {
+    const s = new Set();
+    (user?.connections || []).forEach((c) => {
+      const cid = String(c?._id || c?.id || c || '');
+      const cUser = String(c?.username || '').toLowerCase();
+      if (cid) s.add(cid);
+      if (cUser) s.add(cUser);
+    });
+    return s;
+  });
   const inputRef = useRef(null);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
   const { playClick } = useUISound();
+
+  // Load user connections to identify connected status
+  useEffect(() => {
+    if (!user?._id) return;
+    let active = true;
+    userApi
+      .getUserConnections('me')
+      .then((res) => {
+        if (!active) return;
+        const list = res?.connections || (Array.isArray(res) ? res : []);
+        setConnectionsSet((prev) => {
+          const next = new Set(prev);
+          list.forEach((c) => {
+            const cid = String(c?._id || c?.id || c || '');
+            const cUser = String(c?.username || '').toLowerCase();
+            if (cid) next.add(cid);
+            if (cUser) next.add(cUser);
+          });
+          return next;
+        });
+      })
+      .catch(() => {});
+
+    return () => {
+      active = false;
+    };
+  }, [user?._id]);
+
+  // Live search users from backend when query is entered
+  useEffect(() => {
+    const q = query.trim();
+    if (!q || q.length < 2) {
+      setLiveUsers([]);
+      return;
+    }
+    let active = true;
+    const t = setTimeout(() => {
+      searchApi
+        .searchUsers({ q, limit: 6 })
+        .then((res) => {
+          if (!active) return;
+          const list = res?.results || (Array.isArray(res) ? res : []);
+          setLiveUsers(list);
+        })
+        .catch(() => {});
+    }, 200);
+
+    return () => {
+      active = false;
+      clearTimeout(t);
+    };
+  }, [query]);
 
   // Aggregate frontend entities into a searchable dataset
   const searchDataset = useMemo(() => {
@@ -51,28 +117,54 @@ export default function NavSearchBar() {
       });
     });
 
-    // People from teams & projects
+    // People from teams, projects, and live backend search
     const peopleMap = new Map();
+
+    const addPerson = (u, defaultRole = 'Developer', forceConnected = false) => {
+      if (!u) return;
+      const uid = String(u._id || u.id || u.name || '');
+      if (!uid || peopleMap.has(uid)) return;
+      const uUsername = String(u.username || '').toLowerCase();
+      // Don't show current logged in user
+      if (user?._id && String(user._id) === uid) return;
+      if (user?.username && user.username.toLowerCase() === uUsername) return;
+
+      const isConnected = Boolean(
+        forceConnected ||
+        u.isConnected ||
+        (uid && connectionsSet.has(uid)) ||
+        (uUsername && connectionsSet.has(uUsername))
+      );
+
+      peopleMap.set(uid, {
+        id: `person-${uid}`,
+        title: u.name || u.username || 'Developer',
+        subtitle: isConnected
+          ? `${defaultRole} • Connected`
+          : (u.skills?.length ? `Skills: ${u.skills.slice(0, 3).join(', ')}` : defaultRole),
+        category: 'People',
+        icon: User,
+        badge: isConnected ? 'Connected' : (u.initials || 'DV'),
+        isConnected,
+        path: u.username ? `/profile/${u.username}` : '/explore',
+        state: { filterUser: u.name },
+      });
+    };
+
     (teams || []).forEach((t) => {
       (t.members || []).forEach((m) => {
-        const u = m.user;
-        if (u && (u._id || u.name)) {
-          const uid = u._id || u.name;
-          if (!peopleMap.has(uid)) {
-            peopleMap.set(uid, {
-              id: `person-${uid}`,
-              title: u.name || u.username || 'Developer',
-              subtitle: m.role || 'Team Member',
-              category: 'People',
-              icon: User,
-              badge: u.initials || 'DV',
-              path: u.username ? `/profile/${u.username}` : '/explore',
-              state: { filterUser: u.name },
-            });
-          }
-        }
+        addPerson(m.user, m.role || 'Team Member');
       });
     });
+
+    (liveUsers || []).forEach((u) => {
+      addPerson(
+        u,
+        u.skills?.[0] ? `${u.skills[0]} Developer` : (u.college ? `Student @ ${u.college}` : 'Developer'),
+        u.isConnected
+      );
+    });
+
     peopleMap.forEach((person) => items.push(person));
 
     // Unique skills
@@ -97,7 +189,7 @@ export default function NavSearchBar() {
     });
 
     return items;
-  }, [teams, projects]);
+  }, [teams, projects, liveUsers, connectionsSet, user]);
 
   // Filter items matching query
   const results = useMemo(() => {
@@ -289,11 +381,43 @@ export default function NavSearchBar() {
                         <Icon size={14} />
                       </div>
                       <div className="sn-search-item-body">
-                        <div className="sn-search-item-title">{item.title}</div>
+                        <div className="sn-search-item-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span>{item.title}</span>
+                          {item.category === 'People' && item.isConnected && (
+                            <span
+                              style={{
+                                fontSize: '10px',
+                                fontWeight: 700,
+                                color: '#34d399',
+                                background: 'rgba(52, 211, 153, 0.15)',
+                                border: '1px solid rgba(52, 211, 153, 0.35)',
+                                borderRadius: '8px',
+                                padding: '1px 5px',
+                                letterSpacing: '0.3px',
+                              }}
+                            >
+                              Connected
+                            </span>
+                          )}
+                        </div>
                         <div className="sn-search-item-sub">{item.subtitle}</div>
                       </div>
                       {item.badge && (
-                        <span className="sn-search-badge">{item.badge}</span>
+                        <span
+                          className={`sn-search-badge ${item.isConnected ? 'sn-badge-connected' : ''}`}
+                          style={
+                            item.isConnected
+                              ? {
+                                  color: '#34d399',
+                                  borderColor: 'rgba(52, 211, 153, 0.35)',
+                                  background: 'rgba(52, 211, 153, 0.12)',
+                                  fontWeight: 600,
+                                }
+                              : {}
+                          }
+                        >
+                          {item.isConnected ? '✓ Connected' : item.badge}
+                        </span>
                       )}
                     </div>
                   );

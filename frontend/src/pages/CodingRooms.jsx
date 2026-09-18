@@ -2336,8 +2336,8 @@ function LiveRoom({ room, onCreate, onLeave }) {
 
 function CreateRoom({ onBack, onCreate }) {
   const navigate = useNavigate();
-  const [room, setRoom] = useState('Nightwatch build session');
-  const [purpose, setPurpose] = useState('Ship the updated matchmaker flow.');
+  const [room, setRoom] = useState('');
+  const [purpose, setPurpose] = useState('');
   const [type, setType] = useState('Focus session');
   const [privateRoom, setPrivateRoom] = useState(true);
   const [created, setCreated] = useState(false);
@@ -2380,10 +2380,19 @@ function CreateRoom({ onBack, onCreate }) {
           </header>
           <form onSubmit={submit}>
             <Field label="ROOM NAME">
-              <input value={room} onChange={(e) => setRoom(e.target.value)} required />
+              <input
+                value={room}
+                onChange={(e) => setRoom(e.target.value)}
+                placeholder="e.g. Nightwatch build session"
+                required
+              />
             </Field>
             <Field label="WHAT ARE YOU WORKING ON?">
-              <textarea value={purpose} onChange={(e) => setPurpose(e.target.value)} />
+              <textarea
+                value={purpose}
+                onChange={(e) => setPurpose(e.target.value)}
+                placeholder="e.g. Ship the updated matchmaker flow."
+              />
             </Field>
             <Field label="SESSION TYPE">
               <div className="types">

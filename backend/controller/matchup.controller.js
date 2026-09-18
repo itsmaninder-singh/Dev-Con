@@ -8,11 +8,12 @@ import { rankMatches } from "../utils/matchingEngine.js";
 
 const getRecommendedUsers = asyncHandler(async(req,res)=>{
     const me = req.user;
+    const myConnections = Array.isArray(me.connections) ? me.connections : [];
+    const excludedIds = [me._id, ...myConnections];
 
     const candidates = await User.find({
-        _id: {$ne: me._id},
+        _id: { $nin: excludedIds },
         isAvailable: true,
-
     }).select("name username profilePicture skills reputation bio college");
 
     const formatted =  candidates.map((u)=>({
@@ -20,8 +21,6 @@ const getRecommendedUsers = asyncHandler(async(req,res)=>{
         skills: u.skills,
         reputationScore: u.reputation?.score || 0,
         completedProjectsCount: 0,
-
-
     }));
     const target ={
         skills: me.skills,

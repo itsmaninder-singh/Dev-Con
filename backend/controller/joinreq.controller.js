@@ -20,7 +20,7 @@ const sendJoinReq = asyncHandler(async(req,res)=>{
         if(!target){
             throw new ApiError(404,"team not found");
         }
-        receiver = target.creator;
+        receiver = target.creator?._id || target.creator;
         if(target.status === "closed" || target.status === "full" || (target.members && target.members.length >= target.maxMembers)){
             throw new ApiError(400,"team is not open for join requests");
         }
@@ -29,36 +29,53 @@ const sendJoinReq = asyncHandler(async(req,res)=>{
         if(!target){
             throw new ApiError(404,"project not found");
         }
-        receiver = target.owner || target.creator;
+        receiver = target.owner?._id || target.owner || target.creator?._id || target.creator;
         if(target.status === "completed" || target.status === "on-hold"){
             throw new ApiError(400,"project is not open for join requests");
         }
     }
+
     if(!receiver){
-        throw new ApiError(400, "Could not determine recipient for this team/project");
+        throw new ApiError(400, "Could not determine recipient/owner for this team or project");
     }
-    if(receiver.toString()===req.user._id.toString()){
-        throw new ApiError(400,"you cannot send join request to your own team/project");
+
+    const receiverIdStr = String(receiver._id || receiver);
+    const senderIdStr = String(req.user._id);
+
+    // Strict self-join guard
+    if(receiverIdStr === senderIdStr){
+        throw new ApiError(400, "You cannot send a join request to your own team/project as you are the owner");
     }
+
+    // Check if already a member
+    const isAlreadyMember = Array.isArray(target.members) && target.members.some((m) => {
+        const uid = String(m?.user?._id || m?.user || m || "");
+        return uid === senderIdStr;
+    });
+    if (isAlreadyMember) {
+        throw new ApiError(400, "You are already a member of this team/project");
+    }
+
     const existing = await JoinRequest.findOne({
-        sender:req.user._id,
-        [targetType]:targetId,
-        status:"pending",
+        sender: req.user._id,
+        [targetType]: targetId,
+        status: "pending",
     });
     if (existing) {
-    throw new ApiError(400, "You already have a pending request for this");
-  }
+        throw new ApiError(400, "You already have a pending request for this");
+    }
 
-    const JOINREQUEST= await JoinRequest.create({
+    const JOINREQUEST = await JoinRequest.create({
         sender: req.user._id,
         targetType,
-        [targetType]:targetId,
-        receiver,
+        [targetType]: targetId,
+        receiver: receiverIdStr,
         message: message || `I would like to join your ${targetType}`,
         roleAppliedFor: roleAppliedFor || "Member",
     });
+
     await sendNotification({
-      recipient: receiver,
+      recipient: receiverIdStr,
       sender: req.user._id,
       type: "join_request",
       text: `wants to join your ${targetType} "${target.name || target.title}"`,

@@ -97,6 +97,10 @@ const joinProject  = asyncHandler(async(req,res)=>{
     if(!project){
         throw new ApiError(404,"Project Not Found");
     }
+    const ownerId = String(project.owner?._id || project.owner || "");
+    if(ownerId && ownerId === req.user._id.toString()){
+        throw new ApiError(400, "You cannot join your own project as you are already the owner");
+    }
     if(project.status!=="recruiting"){
         throw new ApiError(403,"this project is not currently recruiting any members");
     }

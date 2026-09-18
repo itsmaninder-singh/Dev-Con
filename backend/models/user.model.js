@@ -16,10 +16,16 @@ const userSchema = new mongoose.Schema(
         trim:true,
     },
     phoneNumber:{
-        type:String,
-        trim:true,
-        unique:true,
-        sparse:true,
+        countryCode: {
+            type: String,
+            default: "+91",
+            trim: true,
+        },
+        number: {
+            type: String,
+            default: "",
+            trim: true,
+        },
     },
     password:{
         type:String,

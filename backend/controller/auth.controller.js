@@ -30,6 +30,8 @@ const toSafeUser = (user) => ({
   authProvider: user.authProvider,
   isPlatformAdmin: user.isPlatformAdmin,
   isProfileComplete: Boolean(user.isProfileComplete),
+  phoneNumber: user.phoneNumber || { countryCode: "+91", number: "" },
+  phone: user.phoneNumber || { countryCode: "+91", number: "" },
   connections: user.connections || [],
   reputation: user.reputation,
   createdAt: user.createdAt,

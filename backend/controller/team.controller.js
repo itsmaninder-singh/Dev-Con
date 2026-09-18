@@ -108,6 +108,10 @@ const joinTeam = asyncHandler(async(req,res)=>{
     if(!team){
         throw new ApiError(404,"Team not found");
     }
+    const creatorId = String(team.creator?._id || team.creator || "");
+    if(creatorId && creatorId === req.user._id.toString()){
+        throw new ApiError(400, "You cannot join your own team as you are already the owner");
+    }
     if(team.status!=="recruiting"){
         throw new ApiError(400, "This team is not open for joining");
     }

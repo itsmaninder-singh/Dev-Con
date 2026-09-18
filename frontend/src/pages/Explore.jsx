@@ -13,12 +13,14 @@ import ActivityTicker from './explore/ActivityTicker.jsx';
 import { INITIAL_NOTIFICATIONS } from '../data/notifications.js';
 import { useTeams } from '../context/TeamsContext.jsx';
 import { useProfile } from '../context/ProfileContext.jsx';
+import { useAuth } from '../context/AuthContext';
 import { joinRequestApi, teamApi, projectApi } from '../lib/api.js';
 import '../Explore.css';
 
 let toastId = 0;
 
 export default function Explore() {
+  const { user } = useAuth() || {};
   const { teams: contextTeams, projects: contextProjects, joinTeam, isMember } = useTeams();
   const { isUserBlocked } = useProfile();
   const [activeTab, setActiveTab] = useState('foryou');
@@ -206,6 +208,21 @@ export default function Explore() {
   }
 
   function handleJoin(item) {
+    const creatorId = String(item?.creator?._id || item?.creator?.id || item?.creator || item?.owner?._id || item?.owner?.id || item?.owner || '');
+    const creatorUsername = String(item?.creator?.username || item?.owner?.username || '').toLowerCase();
+    const currentUserId = String(user?._id || user?.id || '');
+    const currentUsername = String(user?.username || '').toLowerCase();
+
+    const isOwner = Boolean(
+      (currentUserId && creatorId && currentUserId === creatorId) ||
+      (currentUsername && creatorUsername && currentUsername === creatorUsername)
+    );
+
+    if (isOwner) {
+      showToast("You cannot join your own team/project as you are the owner.");
+      return;
+    }
+
     const tid = item._id || item.id;
     const isProj = item.kind === 'project';
     if (!isProj) {
@@ -271,7 +288,7 @@ export default function Explore() {
             onOpen={setModalItem}
           />
         </div>
-        <SuggestedPeople />
+        <SuggestedPeople searchTerm={searchTerm} />
       </div>
 
       <ActivityTicker />
@@ -280,7 +297,7 @@ export default function Explore() {
       <CardModal
         item={modalItem}
         onClose={() => setModalItem(null)}
-        onJoin={(item) => showToast(`Request sent to ${item.name}`)}
+        onJoin={handleJoin}
       />
     </div>
   );

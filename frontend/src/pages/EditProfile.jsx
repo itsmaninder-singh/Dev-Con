@@ -91,7 +91,7 @@ export default function EditProfile() {
                   college={college}
                   onCollegeChange={(v) => updateProfile({ college: v })}
                   phone={phone}
-                  onPhoneChange={(v) => updateProfile({ phone: v })}
+                  onPhoneChange={(v) => updateProfile({ phone: v, phoneNumber: v })}
                   skills={skills}
                   onAddSkill={addSkill}
                   onRemoveSkill={removeSkill}

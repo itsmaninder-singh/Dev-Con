@@ -48,7 +48,6 @@ const updateProfile = asyncHandler(async (req, res) => {
     "college",
     "skills",
     "experience",
-    "phoneNumber",
     "gender",
   ];
   const ALLOWED_GENDER = ["male", "female", "other", "prefer-not-to-say"];
@@ -78,6 +77,24 @@ const updateProfile = asyncHandler(async (req, res) => {
   for (const field of editable) {
     if (updates[field] !== undefined) {
       user[field] = updates[field];
+    }
+  }
+
+  // Handle phone / phoneNumber as { countryCode, number }
+  const rawPhone = req.body.phoneNumber !== undefined ? req.body.phoneNumber : req.body.phone;
+  if (rawPhone !== undefined) {
+    if (rawPhone && typeof rawPhone === "object") {
+      user.phoneNumber = {
+        countryCode: rawPhone.countryCode ? String(rawPhone.countryCode).trim() : (user.phoneNumber?.countryCode || "+91"),
+        number: rawPhone.number !== undefined ? String(rawPhone.number).replace(/\D/g, "").trim() : (user.phoneNumber?.number || ""),
+      };
+    } else if (typeof rawPhone === "string") {
+      user.phoneNumber = {
+        countryCode: user.phoneNumber?.countryCode || "+91",
+        number: rawPhone.replace(/\D/g, "").trim(),
+      };
+    } else {
+      user.phoneNumber = { countryCode: "+91", number: "" };
     }
   }
 
@@ -260,6 +277,10 @@ const sendConnectRequest = asyncHandler(async (req, res) => {
     targetUser?.blockedUsers?.some((id) => id.toString() === req.user._id.toString())
   ) {
     throw new ApiError(403, "Cannot connect with this user");
+  }
+
+  if (currentUser?.connections?.some((id) => id.toString() === userId.toString())) {
+    throw new ApiError(400, "You are already connected with this user");
   }
 
   // Create or refresh connect_request notification

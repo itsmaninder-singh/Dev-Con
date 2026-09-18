@@ -51,6 +51,16 @@ export default function CardModal({ item, onClose, onJoin }) {
   const creatorInitials = item?.creator?.initials || (creatorName ? creatorName.slice(0, 2).toUpperCase() : 'DV');
   const creatorUsername = item?.creator?.username || (creatorName ? creatorName.toLowerCase().replace(/\s+/g, '') : 'builder');
 
+  const creatorId = String(item?.creator?._id || item?.creator?.id || item?.creator || item?.owner?._id || item?.owner?.id || item?.owner || '');
+  const creatorUsernameVal = String(item?.creator?.username || item?.owner?.username || creatorUsername || '').toLowerCase();
+  const currentUserId = String(user?._id || user?.id || '');
+  const currentUsername = String(user?.username || '').toLowerCase();
+
+  const isOwner = Boolean(
+    (currentUserId && creatorId && currentUserId === creatorId) ||
+    (currentUsername && creatorUsernameVal && currentUsername === creatorUsernameVal)
+  );
+
   async function handleCheckFit() {
     setFitOpen(true);
     setFitLoading(true);
@@ -87,6 +97,7 @@ export default function CardModal({ item, onClose, onJoin }) {
   }
 
   function handleJoin() {
+    if (isOwner) return;
     setJoined(true);
     onJoin(item);
   }
@@ -308,16 +319,33 @@ export default function CardModal({ item, onClose, onJoin }) {
                 </button>
               )}
 
-              <button className="join-btn" disabled={full || joined} onClick={handleJoin}>
-                <span className="btn-label">
-                  {joined ? (
-                    <>
-                      <svg className="check-draw" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6" /></svg>
-                      Requested
-                    </>
-                  ) : (full ? 'Full' : 'Join')}
-                </span>
-              </button>
+              {isOwner ? (
+                <button
+                  className="join-btn"
+                  disabled
+                  style={{
+                    opacity: 0.85,
+                    cursor: 'default',
+                    background: 'rgba(255, 255, 255, 0.08)',
+                    border: '1px solid rgba(255, 255, 255, 0.16)',
+                    color: 'var(--muted)',
+                  }}
+                  title="You are the owner of this team/project"
+                >
+                  <span className="btn-label">You're the owner</span>
+                </button>
+              ) : (
+                <button className="join-btn" disabled={full || joined} onClick={handleJoin}>
+                  <span className="btn-label">
+                    {joined ? (
+                      <>
+                        <svg className="check-draw" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6" /></svg>
+                        Requested
+                      </>
+                    ) : (full ? 'Full' : 'Join')}
+                  </span>
+                </button>
+              )}
             </div>
           </div>
         </div>
