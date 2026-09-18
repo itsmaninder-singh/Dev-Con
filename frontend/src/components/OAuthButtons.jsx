@@ -6,7 +6,7 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID;
 const GITHUB_REDIRECT_URI = import.meta.env.VITE_GITHUB_REDIRECT_URI || `${window.location.origin}/auth/github/callback`;
 
-export default function OAuthButtons({ onError, onSuccess }) {
+export default function OAuthButtons({ mode = "login", onError, onSuccess }) {
   const { loginWithGoogle, login } = useAuth();
   const navigate = useNavigate();
   const tokenClientRef = useRef(null);
@@ -31,7 +31,7 @@ export default function OAuthButtons({ onError, onSuccess }) {
               }
               if (response?.access_token) {
                 try {
-                  await loginWithGoogle({ accessToken: response.access_token });
+                  await loginWithGoogle({ accessToken: response.access_token, mode });
                   if (onSuccess) onSuccess();
                   else navigate("/workspace", { replace: true });
                 } catch (err) {
@@ -60,7 +60,7 @@ export default function OAuthButtons({ onError, onSuccess }) {
             callback: async (response) => {
               if (response?.credential) {
                 try {
-                  await loginWithGoogle({ idToken: response.credential });
+                  await loginWithGoogle({ idToken: response.credential, mode });
                   if (onSuccess) onSuccess();
                   else navigate("/workspace", { replace: true });
                 } catch (err) {
@@ -93,7 +93,7 @@ export default function OAuthButtons({ onError, onSuccess }) {
       }, 150);
       return () => clearInterval(timer);
     }
-  }, [loginWithGoogle, onError, onSuccess, navigate]);
+  }, [loginWithGoogle, onError, onSuccess, navigate, mode]);
 
   const handleGoogleClick = () => {
     if (!GOOGLE_CLIENT_ID) {
@@ -121,7 +121,7 @@ export default function OAuthButtons({ onError, onSuccess }) {
             }
             if (response?.access_token) {
               try {
-                await loginWithGoogle({ accessToken: response.access_token });
+                await loginWithGoogle({ accessToken: response.access_token, mode });
                 if (onSuccess) onSuccess();
                 else navigate("/workspace", { replace: true });
               } catch (err) {
@@ -153,10 +153,12 @@ export default function OAuthButtons({ onError, onSuccess }) {
   };
 
   const handleGithub = () => {
+    localStorage.setItem("oauth_auth_mode", mode);
+
     if (!GITHUB_CLIENT_ID) {
       // Fallback: Inform user and provide quick dev bypass if needed
       const proceedDemo = window.confirm(
-        "GitHub Client ID is not configured yet in .env.\n\nWould you like to sign in with a demo GitHub account instead?\n(To use real GitHub sign-in, add GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET to .env)"
+        "GitHub Client ID is not configured yet in .env.\n\nWould you like to sign in with a demo GitHub account instead?\n(To use real GitHub sign-in, add VITE_GITHUB_CLIENT_ID to frontend/.env)"
       );
       if (proceedDemo) {
         login({ identifier: "demo@devconnect.io", password: "password123" })

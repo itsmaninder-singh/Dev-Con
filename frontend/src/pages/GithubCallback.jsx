@@ -26,9 +26,11 @@ export default function GithubCallback() {
     }
 
     let isMounted = true;
+    const mode = localStorage.getItem("oauth_auth_mode") || "login";
 
-    loginWithGithub(code)
+    loginWithGithub({ code, mode })
       .then(() => {
+        localStorage.removeItem("oauth_auth_mode");
         if (!isMounted) return;
         setStatus("Success! Redirecting to your workspace...");
         setTimeout(() => {
@@ -36,6 +38,7 @@ export default function GithubCallback() {
         }, 600);
       })
       .catch((err) => {
+        localStorage.removeItem("oauth_auth_mode");
         if (!isMounted) return;
         setError(
           err.message ||
@@ -60,9 +63,16 @@ export default function GithubCallback() {
             <AlertCircle size={28} color="#ff6b6b" style={{ marginBottom: "12px" }} />
             <h2 style={styles.title}>Authentication Failed</h2>
             <p style={styles.desc}>{error}</p>
-            <Link to="/login" style={styles.btn}>
-              Return to Login
-            </Link>
+            <div style={{ display: "flex", gap: "10px", justifyContent: "center" }}>
+              <Link to="/login" style={styles.btn}>
+                Return to Login
+              </Link>
+              {error.toLowerCase().includes("account does not exist") && (
+                <Link to="/register" style={{ ...styles.btn, background: "#fff", color: "#0a0a0c" }}>
+                  Register Here
+                </Link>
+              )}
+            </div>
           </div>
         ) : status.includes("Success") ? (
           <div style={styles.successBox}>

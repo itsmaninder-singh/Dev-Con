@@ -31,31 +31,58 @@ export default function Register() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const update = (key) => (e) =>
+  const update = (key) => (e) => {
+    const val = e.target.type === "checkbox" ? e.target.checked : e.target.value;
     setForm((f) => ({
       ...f,
-      [key]: e.target.type === "checkbox" ? e.target.checked : e.target.value,
+      [key]: val,
     }));
+    if (fieldErrors[key]) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    }
+  };
 
   const validate = () => {
     const errs = {};
-    if (!form.name.trim()) errs.name = "Full name is required";
-    if (!form.username.trim()) {
+    const nameTrimmed = form.name.trim();
+    if (!nameTrimmed) {
+      errs.name = "Full name is required";
+    } else if (nameTrimmed.length < 2) {
+      errs.name = "Full name must be at least 2 characters";
+    }
+
+    const userTrimmed = form.username.trim();
+    if (!userTrimmed) {
       errs.username = "Username is required";
-    } else if (!/^[a-z0-9_]+$/i.test(form.username)) {
-      errs.username = "Use letters, numbers, and underscores only";
+    } else if (userTrimmed.length < 3 || userTrimmed.length > 30) {
+      errs.username = "Username must be between 3 and 30 characters";
+    } else if (!/^[a-zA-Z0-9_]+$/.test(userTrimmed)) {
+      errs.username = "Invalid username! Only letters, numbers, and underscores are allowed";
     }
-    if (!form.email.trim()) {
+
+    const emailTrimmed = form.email.trim().toLowerCase();
+    if (!emailTrimmed) {
       errs.email = "Email address is required";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-      errs.email = "Enter a valid email address";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrimmed)) {
+      errs.email = "Invalid email format! Please enter a valid email (e.g. user@gmail.com)";
+    } else if (emailTrimmed.includes("@gmail") && !/@gmail\.com$/i.test(emailTrimmed)) {
+      errs.email = "Invalid gmail! Please check your email domain (e.g. @gmail.com)";
     }
-    if (form.password.length < 8) {
-      errs.password = "Password must be at least 8 characters";
+
+    if (!form.password) {
+      errs.password = "Password is required";
+    } else if (form.password.length < 8) {
+      errs.password = "Password must be at least 8 characters long";
     }
+
     if (!form.terms) {
       errs.terms = "Please accept the terms to create an account";
     }
+
     setFieldErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -72,7 +99,29 @@ export default function Register() {
       await register(payload);
       navigate(nextParam || "/workspace", { replace: true });
     } catch (err) {
-      setError(err.message || "Registration failed. Please try again.");
+      const errMsg = err.message || "Registration failed. Please try again.";
+      setError(errMsg);
+
+      const newFieldErrors = {};
+      const lower = errMsg.toLowerCase();
+      if (lower.includes("email") || lower.includes("gmail")) {
+        newFieldErrors.email = errMsg;
+      }
+      if (lower.includes("username")) {
+        newFieldErrors.username = errMsg;
+      }
+      if (lower.includes("password")) {
+        newFieldErrors.password = errMsg;
+      }
+      if (lower.includes("name") && !lower.includes("username")) {
+        newFieldErrors.name = errMsg;
+      }
+      if (lower.includes("phone")) {
+        newFieldErrors.phoneNumber = errMsg;
+      }
+      if (Object.keys(newFieldErrors).length > 0) {
+        setFieldErrors((prev) => ({ ...prev, ...newFieldErrors }));
+      }
     } finally {
       setLoading(false);
     }
@@ -208,7 +257,7 @@ export default function Register() {
         </div>
       </form>
 
-      <OAuthButtons onError={setError} onSuccess={() => navigate("/workspace")} />
+      <OAuthButtons mode="register" onError={setError} onSuccess={() => navigate(nextParam || "/workspace", { replace: true })} />
 
       <p style={styles.footerText}>
         Already have an account?{" "}

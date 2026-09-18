@@ -124,7 +124,7 @@ export default function Onboarding() {
     } catch (err) {
       console.error("Failed to complete onboarding:", err);
       setErrorMsg(
-        err.response?.data?.message || "Failed to save profile. Please check your network and try again."
+        err.message || err.response?.data?.message || "Failed to save profile. Please try again."
       );
       setSaving(false);
     }

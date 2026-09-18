@@ -83,19 +83,25 @@ const updateProfile = asyncHandler(async (req, res) => {
   // Handle phone / phoneNumber as { countryCode, number }
   const rawPhone = req.body.phoneNumber !== undefined ? req.body.phoneNumber : req.body.phone;
   if (rawPhone !== undefined) {
+    let countryCode = "+91";
+    let number = "";
+
     if (rawPhone && typeof rawPhone === "object") {
-      user.phoneNumber = {
-        countryCode: rawPhone.countryCode ? String(rawPhone.countryCode).trim() : (user.phoneNumber?.countryCode || "+91"),
-        number: rawPhone.number !== undefined ? String(rawPhone.number).replace(/\D/g, "").trim() : (user.phoneNumber?.number || ""),
-      };
+      countryCode = rawPhone.countryCode ? String(rawPhone.countryCode).trim() : (user.phoneNumber?.countryCode || "+91");
+      number = rawPhone.number !== undefined ? String(rawPhone.number).replace(/\D/g, "").trim() : (user.phoneNumber?.number || "");
     } else if (typeof rawPhone === "string") {
-      user.phoneNumber = {
-        countryCode: user.phoneNumber?.countryCode || "+91",
-        number: rawPhone.replace(/\D/g, "").trim(),
-      };
-    } else {
-      user.phoneNumber = { countryCode: "+91", number: "" };
+      countryCode = user.phoneNumber?.countryCode || "+91";
+      number = rawPhone.replace(/\D/g, "").trim();
     }
+
+    if (number && (number.length < 6 || number.length > 15)) {
+      throw new ApiError(400, "Invalid phone number format. Phone number should be between 7 and 15 digits.");
+    }
+
+    user.phoneNumber = {
+      countryCode,
+      number,
+    };
   }
 
   user.isProfileComplete = user.calculateIsProfileComplete();

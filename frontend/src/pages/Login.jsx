@@ -181,7 +181,7 @@ export default function Login() {
       </form>
 
 
-      <OAuthButtons onError={setError} onSuccess={() => navigate(redirectTo, { replace: true })} />
+      <OAuthButtons mode="login" onError={setError} onSuccess={() => navigate(redirectTo, { replace: true })} />
 
       <p style={styles.footerText}>
         Don't have an account?{" "}

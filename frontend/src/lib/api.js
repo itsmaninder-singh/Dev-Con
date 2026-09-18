@@ -138,9 +138,10 @@ export const authApi = {
     }
   },
 
-  github: async (code) => {
+  github: async (payload) => {
     try {
-      const { data } = await api.post("/auth/github", { code });
+      const body = typeof payload === "string" ? { code: payload } : payload;
+      const { data } = await api.post("/auth/github", body);
       return data.data;
     } catch (err) {
       throw new Error(extractMessage(err));

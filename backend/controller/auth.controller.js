@@ -72,41 +72,76 @@ const generateUniqueUsername = async (seed) => {
 const register = asyncHandler(async (req, res) => {
   const { name, username, email, password, phoneNumber } = req.body;
 
-  if (!name || !username || !email || !password) {
-    throw new ApiError(400, "name, username, email and password are required");
+  if (!name || !name.trim()) {
+    throw new ApiError(400, "Full name is required");
+  }
+  if (name.trim().length < 2) {
+    throw new ApiError(400, "Full name must be at least 2 characters");
+  }
+
+  if (!username || !username.trim()) {
+    throw new ApiError(400, "Username is required");
+  }
+  const cleanUsername = username.trim();
+  if (cleanUsername.length < 3 || cleanUsername.length > 30) {
+    throw new ApiError(400, "Username must be between 3 and 30 characters");
+  }
+  if (!/^[a-zA-Z0-9_]+$/.test(cleanUsername)) {
+    throw new ApiError(400, "Invalid username! Username can only contain letters, numbers, and underscores");
+  }
+
+  if (!email || !email.trim()) {
+    throw new ApiError(400, "Email address is required");
+  }
+  const cleanEmail = email.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+    throw new ApiError(400, "Invalid email address! Please enter a valid email (e.g. user@gmail.com)");
+  }
+  if (cleanEmail.includes("@gmail") && !/@gmail\.com$/i.test(cleanEmail)) {
+    throw new ApiError(400, "Invalid gmail! Please check your email domain (e.g. @gmail.com)");
+  }
+
+  if (!password) {
+    throw new ApiError(400, "Password is required");
   }
   if (password.length < 8) {
-    throw new ApiError(400, "Password must be at least 8 characters");
+    throw new ApiError(400, "Password must be at least 8 characters long");
   }
 
-  const trimmedPhone = (phoneNumber && String(phoneNumber).trim()) || undefined;
+  let formattedPhone = { countryCode: "+91", number: "" };
+  if (phoneNumber) {
+    if (typeof phoneNumber === "object") {
+      const code = phoneNumber.countryCode ? String(phoneNumber.countryCode).trim() : "+91";
+      const num = phoneNumber.number !== undefined ? String(phoneNumber.number).replace(/\D/g, "").trim() : "";
+      if (num && (num.length < 6 || num.length > 15)) {
+        throw new ApiError(400, "Invalid phone number format. Phone number should be between 7 and 15 digits.");
+      }
+      formattedPhone = { countryCode: code, number: num };
+    } else if (typeof phoneNumber === "string" && phoneNumber.trim()) {
+      const num = phoneNumber.replace(/\D/g, "").trim();
+      if (num && (num.length < 6 || num.length > 15)) {
+        throw new ApiError(400, "Invalid phone number format. Phone number should be between 7 and 15 digits.");
+      }
+      formattedPhone = { countryCode: "+91", number: num };
+    }
+  }
 
-  const existing = await User.findOne({
-    $or: [
-      { email: email.toLowerCase() },
-      { username: username.toLowerCase() },
-      ...(trimmedPhone ? [{ phoneNumber: trimmedPhone }] : []),
-    ],
-  });
-  if (existing) {
-    if (existing.email === email.toLowerCase()) {
-      throw new ApiError(409, "An account with this email already exists");
-    }
-    if (existing.username === username.toLowerCase()) {
-      throw new ApiError(409, "This username is already taken");
-    }
-    if (trimmedPhone && existing.phoneNumber === trimmedPhone) {
-      throw new ApiError(409, "An account with this phone number already exists");
-    }
-    throw new ApiError(409, "An account with these details already exists");
+  const existingEmail = await User.findOne({ email: cleanEmail });
+  if (existingEmail) {
+    throw new ApiError(409, "An account with this email already exists");
+  }
+
+  const existingUsername = await User.findOne({ username: cleanUsername.toLowerCase() });
+  if (existingUsername) {
+    throw new ApiError(409, "This username is already taken");
   }
 
   const user = await User.create({
-    name,
-    username: username.toLowerCase(),
-    email: email.toLowerCase(),
+    name: name.trim(),
+    username: cleanUsername.toLowerCase(),
+    email: cleanEmail,
     password,
-    phoneNumber: (phoneNumber && String(phoneNumber).trim()) || undefined,
+    phoneNumber: formattedPhone,
     authProvider: "local",
   });
 
@@ -121,11 +156,11 @@ const login = asyncHandler(async (req, res) => {
   }
 
   const user = await User.findOne({
-    $or: [{ email: identifier.toLowerCase() }, { username: identifier.toLowerCase() }],
+    $or: [{ email: identifier.toLowerCase().trim() }, { username: identifier.toLowerCase().trim() }],
   }).select("+password");
 
   if (!user) {
-    throw new ApiError(404, "No account found with this email/username. Please register first.");
+    throw new ApiError(404, "Account does not exist. Please register first.");
   }
 
   const isMatch = await user.matchPassword(password);
@@ -138,7 +173,7 @@ const login = asyncHandler(async (req, res) => {
 
 
 const googleAuth = asyncHandler(async (req, res) => {
-  const { idToken, accessToken } = req.body;
+  const { idToken, accessToken, mode = "login" } = req.body;
   if (!idToken && !accessToken) {
     throw new ApiError(400, "idToken or accessToken is required");
   }
@@ -178,6 +213,9 @@ const googleAuth = asyncHandler(async (req, res) => {
   });
 
   if (!user) {
+    if (mode === "login") {
+      throw new ApiError(404, "Account does not exist. Please register first.");
+    }
     const username = await generateUniqueUsername(payload.email.split("@")[0]);
     user = await User.create({
       name: payload.name || username,
@@ -200,7 +238,7 @@ const googleAuth = asyncHandler(async (req, res) => {
 });
 
 const githubAuth = asyncHandler(async (req, res) => {
-  const { code } = req.body;
+  const { code, mode = "login" } = req.body;
   if (!code) {
     throw new ApiError(400, "code is required");
   }
@@ -255,6 +293,9 @@ const githubAuth = asyncHandler(async (req, res) => {
   });
 
   if (!user) {
+    if (mode === "login") {
+      throw new ApiError(404, "Account does not exist. Please register first.");
+    }
     const username = await generateUniqueUsername(profile.login || primaryEmail.split("@")[0]);
     user = await User.create({
       name: profile.name || profile.login,

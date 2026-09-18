@@ -111,8 +111,8 @@ export function AuthProvider({ children }) {
   );
 
   const loginWithGithub = useCallback(
-    async (code) => {
-      const session = await authApi.github(code);
+    async (payload) => {
+      const session = await authApi.github(payload);
       applySession(session);
       return session.user;
     },
