@@ -42,22 +42,42 @@ export function ChatUIProvider({ children }) {
             const mapped = serverChats.map((c, idx) => {
               const other = c.participants?.find((p) => p._id !== user._id) || c.participants?.[0] || {};
               const name = c.isGroup ? c.name : other.name || 'Chat Member';
+              const chatInitial = name ? name.trim()[0].toUpperCase() : 'C';
               const hasLastMsg = !!c.lastMessage?.text;
               const lastMsg = c.lastMessage?.text || 'No messages yet';
-              const lastTime = c.lastMessage?.timestamp
-                ? new Date(c.lastMessage.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+              const lastTime = c.lastMessage?.sentAt || c.lastMessage?.timestamp
+                ? new Date(c.lastMessage.sentAt || c.lastMessage.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
                 : 'Recent';
               const isFromMe = (c.lastMessage?.sender?._id || c.lastMessage?.sender) === user._id;
               return {
                 id: c._id,
                 _id: c._id,
+                team: c.team,
+                isGroup: Boolean(c.isGroup),
+                leader: c.leader,
+                groupAdmin: c.groupAdmin,
+                admins: c.admins || [],
                 isServerChat: true,
                 name,
-                initial,
+                initial: chatInitial,
                 online: !!other.lastSeen && Date.now() - new Date(other.lastSeen).getTime() < 300000,
                 colorIdx: idx % AVATAR_COLORS.length,
                 unread: c.unreadCount || 0,
-                messages: hasLastMsg ? [{ from: isFromMe ? 'me' : 'them', text: lastMsg, time: lastTime }] : [],
+                lastMessageText: lastMsg,
+                lastMessageTime: lastTime,
+                lastMessageFrom: isFromMe ? 'me' : 'them',
+                messages: hasLastMsg
+                  ? [
+                      {
+                        _id: `last_${c._id}`,
+                        from: isFromMe ? 'me' : 'them',
+                        text: lastMsg,
+                        content: lastMsg,
+                        time: lastTime,
+                        createdAt: c.lastMessage?.sentAt || new Date().toISOString(),
+                      },
+                    ]
+                  : [],
               };
             });
             setConversations((prev) => {
@@ -294,6 +314,8 @@ export function ChatUIProvider({ children }) {
     return () => window.removeEventListener('devconnect:open-chat', handleEvent);
   }, [openDirectChatWith, openGroupChat]);
 
+  const totalUnread = conversations.reduce((sum, c) => sum + (c.unread || 0), 0);
+
   const value = {
     open,
     setOpen,
@@ -307,6 +329,7 @@ export function ChatUIProvider({ children }) {
     setActiveId,
     openDirectChatWith,
     openGroupChat,
+    totalUnread,
   };
 
   return <ChatUIContext.Provider value={value}>{children}</ChatUIContext.Provider>;

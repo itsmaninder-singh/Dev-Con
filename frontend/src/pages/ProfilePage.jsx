@@ -666,6 +666,64 @@ export default function ProfilePage() {
         .identity-text .handle {
           font-family: 'Inter', sans-serif; color: var(--dim); font-size: 13px; margin-top: 6px;
         }
+        .profile-conn-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          padding: 4px 12px 4px 8px;
+          border-radius: 9999px;
+          background: linear-gradient(135deg, rgba(255, 152, 162, 0.12) 0%, rgba(26, 26, 32, 0.75) 100%);
+          border: 1px solid rgba(255, 152, 162, 0.28);
+          color: #f2f1ed;
+          font-family: 'Inter', -apple-system, sans-serif;
+          font-size: 12px;
+          font-weight: 500;
+          cursor: pointer;
+          backdrop-filter: blur(14px);
+          -webkit-backdrop-filter: blur(14px);
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+          transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+          user-select: none;
+        }
+        .profile-conn-badge:hover {
+          background: linear-gradient(135deg, rgba(255, 152, 162, 0.22) 0%, rgba(36, 36, 46, 0.85) 100%);
+          border-color: rgba(255, 152, 162, 0.65);
+          color: #fff;
+          transform: translateY(-1.5px);
+          box-shadow: 0 6px 20px rgba(255, 152, 162, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+        }
+        .profile-conn-badge:active {
+          transform: translateY(0) scale(0.97);
+        }
+        .profile-conn-icon-box {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 22px;
+          height: 22px;
+          border-radius: 50%;
+          background: rgba(255, 152, 162, 0.2);
+          color: #ff98a2;
+          flex-shrink: 0;
+        }
+        .profile-conn-count {
+          font-weight: 700;
+          font-variant-numeric: tabular-nums;
+          color: #ff98a2;
+        }
+        .profile-conn-label {
+          color: rgba(242, 241, 237, 0.82);
+          font-weight: 500;
+        }
+        .profile-conn-arrow {
+          color: rgba(255, 152, 162, 0.6);
+          transition: transform 0.25s ease, color 0.25s ease;
+          margin-left: 2px;
+        }
+        .profile-conn-badge:hover .profile-conn-arrow {
+          transform: translate(1.5px, -1.5px);
+          color: #ff98a2;
+        }
         .identity-bio {
           font-size: 13.5px;
           color: var(--muted);

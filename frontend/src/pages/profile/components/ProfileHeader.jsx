@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MoreHorizontal, Flag, ShieldBan, ShieldCheck, Camera } from 'lucide-react';
+import { MoreHorizontal, Flag, ShieldBan, ShieldCheck, Camera, Users, ArrowUpRight } from 'lucide-react';
 import { useChatUI } from '../../../context/ChatUIContext.jsx';
 
 export function ProfileHeader({
@@ -149,24 +149,17 @@ export function ProfileHeader({
               <span>@{handle}{college ? ` · ${college}` : ''}</span>
               <button
                 type="button"
+                className="profile-conn-badge"
                 onClick={onConnectionsClick}
-                style={{
-                  background: 'rgba(255, 152, 162, 0.12)',
-                  border: '1px solid rgba(255, 152, 162, 0.3)',
-                  color: 'var(--coral, #ff98a2)',
-                  padding: '2px 9px',
-                  borderRadius: '12px',
-                  fontSize: '11.5px',
-                  fontWeight: 600,
-                  cursor: onConnectionsClick ? 'pointer' : 'default',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  transition: 'all 0.2s ease',
-                }}
-                title="View connections"
+                title={`View ${connectionsCount} connection${connectionsCount === 1 ? '' : 's'}`}
+                aria-label={`View ${connectionsCount} connections`}
               >
-                <span>👥 {connectionsCount} {connectionsCount === 1 ? 'connection' : 'connections'}</span>
+                <span className="profile-conn-icon-box">
+                  <Users size={12} strokeWidth={2.4} />
+                </span>
+                <span className="profile-conn-count">{connectionsCount}</span>
+                <span className="profile-conn-label">{connectionsCount === 1 ? 'connection' : 'connections'}</span>
+                <ArrowUpRight size={12} className="profile-conn-arrow" strokeWidth={2.2} />
               </button>
             </div>
             {bio && <p className="identity-bio">{bio}</p>}

@@ -31,8 +31,9 @@ export default function OAuthButtons({ mode = "login", onError, onSuccess }) {
               }
               if (response?.access_token) {
                 try {
-                  await loginWithGoogle({ accessToken: response.access_token, mode });
-                  if (onSuccess) onSuccess();
+                  const loggedUser = await loginWithGoogle({ accessToken: response.access_token, mode });
+                  if (onSuccess) onSuccess(loggedUser);
+                  else if (loggedUser && !loggedUser.isProfileComplete) navigate("/onboarding", { replace: true });
                   else navigate("/workspace", { replace: true });
                 } catch (err) {
                   onError?.(err.message || "Google sign-in failed. Please try again.");
@@ -60,8 +61,9 @@ export default function OAuthButtons({ mode = "login", onError, onSuccess }) {
             callback: async (response) => {
               if (response?.credential) {
                 try {
-                  await loginWithGoogle({ idToken: response.credential, mode });
-                  if (onSuccess) onSuccess();
+                  const loggedUser = await loginWithGoogle({ idToken: response.credential, mode });
+                  if (onSuccess) onSuccess(loggedUser);
+                  else if (loggedUser && !loggedUser.isProfileComplete) navigate("/onboarding", { replace: true });
                   else navigate("/workspace", { replace: true });
                 } catch (err) {
                   onError?.(err.message || "Google sign-in failed. Please try again.");
@@ -119,15 +121,16 @@ export default function OAuthButtons({ mode = "login", onError, onSuccess }) {
               onError?.(`Google sign-in error: ${response.error_description || response.error}`);
               return;
             }
-            if (response?.access_token) {
-              try {
-                await loginWithGoogle({ accessToken: response.access_token, mode });
-                if (onSuccess) onSuccess();
-                else navigate("/workspace", { replace: true });
-              } catch (err) {
-                onError?.(err.message || "Google sign-in failed. Please try again.");
+              if (response?.access_token) {
+                try {
+                  const loggedUser = await loginWithGoogle({ accessToken: response.access_token, mode });
+                  if (onSuccess) onSuccess(loggedUser);
+                  else if (loggedUser && !loggedUser.isProfileComplete) navigate("/onboarding", { replace: true });
+                  else navigate("/workspace", { replace: true });
+                } catch (err) {
+                  onError?.(err.message || "Google sign-in failed. Please try again.");
+                }
               }
-            }
           },
           error_callback: (err) => {
             setGoogleLoading(false);

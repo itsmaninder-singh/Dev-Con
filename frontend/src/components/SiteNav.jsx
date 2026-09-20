@@ -55,6 +55,8 @@ export default function SiteNav() {
             const currentUserId = String(user?._id || user?.id || '');
             const mapped = serverList
               .filter((sn) => {
+                // Decouple chat messages from notifications dropdown
+                if (sn.type === 'message' || sn.type === 'chat') return false;
                 const sId = String(sn.sender?._id || sn.sender?.id || sn.sender || '');
                 const rId = String(sn.recipient?._id || sn.recipient?.id || sn.recipient || '');
                 if (sId && currentUserId && sId === currentUserId) return false;
@@ -101,6 +103,7 @@ export default function SiteNav() {
 
     const handleNewNotification = (sn) => {
       if (!sn) return;
+      if (sn.type === 'message' || sn.type === 'chat') return;
       const currentUserId = String(user?._id || user?.id || '');
       const sUser = sn.sender || {};
       const sName = sUser.name || 'Developer';

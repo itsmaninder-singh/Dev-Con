@@ -451,6 +451,30 @@ export const chatApi = {
       throw new Error(extractMessage(err));
     }
   },
+  editMessage: async (chatId, messageId, content) => {
+    try {
+      const { data } = await api.patch(`/chats/${chatId}/messages/${messageId}`, { content });
+      return data.data;
+    } catch (err) {
+      throw new Error(extractMessage(err));
+    }
+  },
+  deleteMessage: async (chatId, messageId) => {
+    try {
+      const { data } = await api.delete(`/chats/${chatId}/messages/${messageId}`);
+      return data.data;
+    } catch (err) {
+      throw new Error(extractMessage(err));
+    }
+  },
+  markChatAsRead: async (chatId) => {
+    try {
+      const { data } = await api.patch(`/chats/${chatId}/read`);
+      return data.data;
+    } catch (err) {
+      throw new Error(extractMessage(err));
+    }
+  },
   createGroupChat: async ({ name, participantIds, team = null, project = null }) => {
     try {
       const { data } = await api.post("/chats/group", { name, participantIds, team, project });

@@ -61,6 +61,28 @@ export default function CardModal({ item, onClose, onJoin }) {
     (currentUsername && creatorUsernameVal && currentUsername === creatorUsernameVal)
   );
 
+  const isMember = Boolean(
+    item?.isJoined ||
+    (Array.isArray(item?.members) && item.members.some((m) => {
+      const u = m?.user || m;
+      const mId = String(u?._id || u?.id || u || '');
+      const mUsername = String(u?.username || '').toLowerCase();
+      return (
+        (currentUserId && mId && currentUserId === mId) ||
+        (currentUsername && mUsername && currentUsername === mUsername)
+      );
+    })) ||
+    (Array.isArray(item?.collaborators) && item.collaborators.some((c) => {
+      const u = c?.user || c;
+      const cId = String(u?._id || u?.id || u || '');
+      const cUsername = String(u?.username || '').toLowerCase();
+      return (
+        (currentUserId && cId && currentUserId === cId) ||
+        (currentUsername && cUsername && currentUsername === cUsername)
+      );
+    }))
+  );
+
   async function handleCheckFit() {
     setFitOpen(true);
     setFitLoading(true);
@@ -97,7 +119,7 @@ export default function CardModal({ item, onClose, onJoin }) {
   }
 
   function handleJoin() {
-    if (isOwner) return;
+    if (isOwner || isMember || full) return;
     setJoined(true);
     onJoin(item);
   }
@@ -333,6 +355,22 @@ export default function CardModal({ item, onClose, onJoin }) {
                   title="You are the owner of this team/project"
                 >
                   <span className="btn-label">You're the owner</span>
+                </button>
+              ) : isMember ? (
+                <button
+                  className="join-btn is-joined clickable"
+                  type="button"
+                  title={item.kind !== 'project' ? "You are a member. Click to view team workspace" : "You are already a member"}
+                  onClick={() => {
+                    const tid = item._id || item.id;
+                    if (item.kind !== 'project' && tid) {
+                      handleClose();
+                      navigate(`/teams/${tid}`);
+                    }
+                  }}
+                >
+                  <Check size={14} />
+                  <span className="btn-label">Joined</span>
                 </button>
               ) : (
                 <button className="join-btn" disabled={full || joined} onClick={handleJoin}>

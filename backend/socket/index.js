@@ -6,7 +6,7 @@ import { Message } from "../models/message.model.js";
 import { evaluateSendPermission } from "../utils/chatGuard.js";
 import { canSendInGroup } from "../utils/chatPermission.js";
 import { isBlocked } from "../utils/blockGuard.js";
-import { notifyForNewMessage } from "../controller/chat.controller.js";
+import { notifyForNewMessage, toMessageDTO } from "../controller/chat.controller.js";
 import { encryptText } from "../utils/crypto.js";
 import redisClient from "../config/redis.js";
 
@@ -35,14 +35,9 @@ const initSocket = (io) => {
       const token =
         socket.handshake.auth?.token ||
         socket.handshake.headers?.authorization?.split(" ")[1];
+
       if (!token) {
-        const guestName = socket.handshake.auth?.name || `Dev_${socket.id.slice(0, 4)}`;
-        socket.user = {
-          _id: `guest_${socket.id}`,
-          name: guestName,
-          isGuest: true,
-        };
-        return next();
+        return next(new Error("Authentication error: No token provided"));
       }
 
       try {
@@ -52,17 +47,12 @@ const initSocket = (io) => {
           socket.user = user;
           return next();
         }
-      } catch {}
-
-      const guestName = socket.handshake.auth?.name || `Dev_${socket.id.slice(0, 4)}`;
-      socket.user = {
-        _id: `guest_${socket.id}`,
-        name: guestName,
-        isGuest: true,
-      };
-      next();
+        return next(new Error("Authentication error: User not found"));
+      } catch (jwtErr) {
+        return next(new Error("Authentication error: Invalid or expired token"));
+      }
     } catch (err) {
-      next();
+      next(new Error("Authentication error"));
     }
   });
 
@@ -197,8 +187,10 @@ const initSocket = (io) => {
 
           const message = await Message.create({
             chat: chatId,
+            conversationId: chatId,
+            team: chat.team || null,
             sender: socket.user._id,
-            content: encryptText(clean), 
+            content: clean,
             mentions: validMentions,
           });
           const roomSockets = await io.in(chatId).fetchSockets();
@@ -213,7 +205,7 @@ const initSocket = (io) => {
 
           Object.assign(chat, permission.updates);
           chat.lastMessage = {
-            text: encryptText(clean),
+            text: clean,
             sender: socket.user._id,
             sentAt: new Date(),
           };
@@ -225,19 +217,18 @@ const initSocket = (io) => {
             "sender",
             "name username profilePicture",
           );
-          const populated = populatedDoc.toObject();
-          populated.content = clean;
+          const dto = toMessageDTO(populatedDoc);
 
-          io.to(chatId).emit("message:new", populated);
+          io.to(chatId).emit("message:new", dto);
           if (Array.isArray(chat.participants)) {
             chat.participants.forEach((p) => {
               const pId = p.toString();
               if (pId !== chatId) {
-                io.to(pId).emit("message:new", populated);
+                io.to(pId).emit("message:new", dto);
               }
             });
           }
-          callback?.({ ok: true, message: populated });
+          callback?.({ ok: true, message: dto });
         } catch (error) {
           console.error("message:send error:", error);
           callback?.({ ok: false, error: "Server error" });
@@ -245,11 +236,94 @@ const initSocket = (io) => {
       },
     );
 
-    socket.on("typing:start", (chatId) => {
-      socket.to(chatId).emit("typing:start", { chatId, userId });
+    socket.on("message:edit", async ({ chatId, messageId, content }, callback) => {
+      try {
+        if (!content || !content.trim()) {
+          return callback?.({ ok: false, error: "Content cannot be empty" });
+        }
+        const message = await Message.findOne({ _id: messageId, chat: chatId });
+        if (!message) return callback?.({ ok: false, error: "Message not found" });
+
+        if (message.sender.toString() !== userId) {
+          return callback?.({ ok: false, error: "You can only edit your own messages" });
+        }
+
+        if (message.isDeleted || message.deletedForEveryone) {
+          return callback?.({ ok: false, error: "Cannot edit a deleted message" });
+        }
+
+        const clean = xss(content.trim());
+        message.content = clean;
+        message.edited = true;
+        message.editedAt = new Date();
+        await message.save();
+
+        const populatedDoc = await message.populate("sender", "name username profilePicture");
+        const dto = toMessageDTO(populatedDoc);
+
+        io.to(chatId).emit("message:edited", dto);
+        if (Array.isArray(chatId)) {
+          // just to be safe
+        }
+        callback?.({ ok: true, message: dto });
+      } catch (err) {
+        console.error("message:edit error:", err);
+        callback?.({ ok: false, error: "Server error" });
+      }
     });
-    socket.on("typing:stop", (chatId) => {
-      socket.to(chatId).emit("typing:stop", { chatId, userId });
+
+    socket.on("message:delete", async ({ chatId, messageId }, callback) => {
+      try {
+        const chat = await Chat.findById(chatId);
+        if (!chat) return callback?.({ ok: false, error: "Chat not found" });
+
+        const message = await Message.findOne({ _id: messageId, chat: chatId });
+        if (!message) return callback?.({ ok: false, error: "Message not found" });
+
+        const isSender = message.sender.toString() === userId;
+        const isLeader = chat.leader && chat.leader.toString() === userId;
+        const isAdmin = (chat.admins || []).some((a) => a.toString() === userId) ||
+                        (chat.groupAdmin && chat.groupAdmin.toString() === userId);
+
+        if (!isSender && !isLeader && !isAdmin) {
+          return callback?.({ ok: false, error: "Not authorized to delete this message" });
+        }
+
+        message.isDeleted = true;
+        message.deletedForEveryone = true;
+        message.content = "";
+        await message.save();
+
+        const payload = {
+          messageId: String(messageId),
+          chatId: String(chatId),
+          isDeleted: true,
+        };
+
+        io.to(chatId).emit("message:deleted", payload);
+        callback?.({ ok: true, ...payload });
+      } catch (err) {
+        console.error("message:delete error:", err);
+        callback?.({ ok: false, error: "Server error" });
+      }
+    });
+
+    socket.on("typing:start", (payload) => {
+      const targetChatId = typeof payload === "string" ? payload : payload?.chatId;
+      if (targetChatId) {
+        const username = socket.user?.name || socket.user?.username || "Someone";
+        socket.to(targetChatId).emit("typing:update", { chatId: targetChatId, userId, username, typing: true });
+        socket.to(targetChatId).emit("typing:start", { chatId: targetChatId, userId, username });
+      }
+    });
+
+    socket.on("typing:stop", (payload) => {
+      const targetChatId = typeof payload === "string" ? payload : payload?.chatId;
+      if (targetChatId) {
+        const username = socket.user?.name || socket.user?.username || "Someone";
+        socket.to(targetChatId).emit("typing:update", { chatId: targetChatId, userId, username, typing: false });
+        socket.to(targetChatId).emit("typing:stop", { chatId: targetChatId, userId });
+      }
     });
     // Real-time Collaborative Coding Rooms
     socket.on("room:join", ({ roomCode, user: userInfo }, callback) => {

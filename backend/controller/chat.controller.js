@@ -6,12 +6,66 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { sendNotification } from "../utils/notify.js";
-import { decryptText, encryptText } from "../utils/crypto.js";
+import { decryptText, encryptText, isCipherHex } from "../utils/crypto.js";
 import { isBlocked } from "../utils/blockGuard.js";
 import { getIO } from "../utils/SocketManager.js";
 import xss from "xss";
 
 const PARTICIPANT_FIELDS = "name username profilePicture lastSeen";
+
+export const toMessageDTO = (msgDoc) => {
+  if (!msgDoc) return null;
+  const m = msgDoc.toObject ? msgDoc.toObject() : { ...msgDoc };
+
+  let sender = m.sender;
+  if (sender && typeof sender === "object" && (sender._id || sender.id)) {
+    sender = {
+      _id: String(sender._id || sender.id),
+      name: sender.name || "Developer",
+      username: sender.username || "builder",
+      profilePicture: sender.profilePicture || "",
+    };
+  } else {
+    sender = {
+      _id: String(sender || ""),
+      name: "Developer",
+      username: "builder",
+      profilePicture: "",
+    };
+  }
+
+  const isDel = Boolean(m.isDeleted || m.deletedForEveryone);
+  let content = isDel ? "" : String(m.content || "");
+  if (!isDel && content) {
+    const dec = decryptText(content);
+    if (dec) {
+      content = dec;
+    } else if (isCipherHex(content)) {
+      content = "💬 Message";
+    }
+  }
+
+  const chatId = String(m.chat?._id || m.chat || m.conversationId || "");
+
+  return {
+    _id: String(m._id || ""),
+    id: String(m._id || ""),
+    chat: chatId,
+    chatId: chatId,
+    conversationId: chatId,
+    team: m.team ? String(m.team._id || m.team) : null,
+    sender,
+    content,
+    isDeleted: isDel,
+    deletedForEveryone: isDel,
+    edited: Boolean(m.edited),
+    editedAt: m.editedAt || null,
+    createdAt: m.createdAt ? new Date(m.createdAt).toISOString() : new Date().toISOString(),
+    readBy: Array.isArray(m.readBy) ? m.readBy.map((id) => String(id?._id || id)) : [],
+    deliveredTo: Array.isArray(m.deliveredTo) ? m.deliveredTo.map((id) => String(id?._id || id)) : [],
+    mentions: Array.isArray(m.mentions) ? m.mentions.map((id) => String(id?._id || id)) : [],
+  };
+};
 
 const getMyChats = asyncHandler(async (req, res) => {
   const chats = await Chat.find({ participants: req.user._id })
@@ -23,7 +77,12 @@ const getMyChats = asyncHandler(async (req, res) => {
     chats.map(async (chat) => {
       const obj = chat.toObject();
       if (obj.lastMessage?.text) {
-        obj.lastMessage.text = decryptText(obj.lastMessage.text) || obj.lastMessage.text;
+        const dec = decryptText(obj.lastMessage.text);
+        if (dec) {
+          obj.lastMessage.text = dec;
+        } else if (isCipherHex(obj.lastMessage.text)) {
+          obj.lastMessage.text = "💬 Message";
+        }
       }
 
       const myMeta = chat.participantsMeta.find(
@@ -88,22 +147,37 @@ const getMessages = asyncHandler(async (req, res) => {
   const isParticipant = chat.participants.some((p) => p.toString() === req.user._id.toString());
   if (!isParticipant) throw new ApiError(403, "Not a participant of this chat");
 
-  const messages = await Message.find({
+  const pageNum = Math.max(1, Number(page) || 1);
+  const limitNum = Math.min(100, Math.max(1, Number(limit) || 30));
+
+  const filter = {
     chat: chatId,
     deletedFor: { $ne: req.user._id },
-  })
+  };
+
+  const total = await Message.countDocuments(filter);
+  const messages = await Message.find(filter)
     .populate("sender", "name username profilePicture")
     .sort({ createdAt: -1 })
-    .skip((Number(page) - 1) * Number(limit))
-    .limit(Number(limit));
+    .skip((pageNum - 1) * limitNum)
+    .limit(limitNum);
 
-  const decorated = messages.map((m) => {
-    const obj = m.toObject();
-    obj.content = decryptText(obj.content) || obj.content;
-    return obj;
-  });
+  const dtoList = messages.map((m) => toMessageDTO(m));
 
-  return res.status(200).json(new ApiResponse(200, "Messages fetched", decorated.reverse()));
+  // Return chronological order (oldest to newest for current page slice)
+  const chronological = dtoList.reverse();
+
+  return res.status(200).json(
+    new ApiResponse(200, "Messages fetched", {
+      messages: chronological,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        hasMore: pageNum * limitNum < total,
+      },
+    })
+  );
 });
 
 const createGroupChat = asyncHandler(async (req, res) => {
@@ -217,19 +291,23 @@ const markChatAsRead = asyncHandler(async (req, res) => {
 });
 
 const notifyForNewMessage = async (chat, message, sender, mentionedUserIds = []) => {
+  // Only notify when users are explicitly mentioned, not on regular messages.
+  // This keeps chat messages in the chat panel and keeps the notification bell clean for events.
+  if (!mentionedUserIds || mentionedUserIds.length === 0) return;
+
   const recipients = chat.participants
     .map((p) => p.toString())
-    .filter((id) => id !== sender._id.toString());
+    .filter((id) => id !== sender._id.toString() && mentionedUserIds.includes(id));
 
-  const plainText = decryptText(message.content) || message.content;
+  const plainText = message.content || "Mentioned you in chat";
 
   await Promise.all(
     recipients.map((recipientId) =>
       sendNotification({
         recipient: recipientId,
         sender: sender._id,
-        type: mentionedUserIds.includes(recipientId) ? "mention" : "message",
-        text: `${sender.name}: ${plainText.slice(0, 100)}`,
+        type: "mention",
+        text: `${sender.name || "Teammate"} mentioned you: ${plainText.slice(0, 100)}`,
         chat: chat._id,
         message: message._id,
       })
@@ -258,13 +336,15 @@ const sendMessage = asyncHandler(async (req, res) => {
 
   const message = await Message.create({
     chat: chatId,
+    conversationId: chatId,
+    team: chat.team || null,
     sender: req.user._id,
-    content: encryptText(clean),
+    content: clean,
     mentions: validMentions,
   });
 
   chat.lastMessage = {
-    text: encryptText(clean),
+    text: clean,
     sender: req.user._id,
     sentAt: new Date(),
   };
@@ -276,23 +356,114 @@ const sendMessage = asyncHandler(async (req, res) => {
     "sender",
     "name username profilePicture"
   );
-  const populated = populatedDoc.toObject();
-  populated.content = clean;
+  const dto = toMessageDTO(populatedDoc);
 
   try {
     const io = getIO();
-    io.to(chatId).emit("message:new", populated);
+    io.to(chatId).emit("message:new", dto);
     if (Array.isArray(chat.participants)) {
       chat.participants.forEach((p) => {
         const pId = p.toString();
         if (pId !== chatId) {
-          io.to(pId).emit("message:new", populated);
+          io.to(pId).emit("message:new", dto);
         }
       });
     }
   } catch (err) {}
 
-  return res.status(201).json(new ApiResponse(201, "Message sent", populated));
+  return res.status(201).json(new ApiResponse(201, "Message sent", dto));
+});
+
+const editMessage = asyncHandler(async (req, res) => {
+  const { chatId, messageId } = req.params;
+  const { content } = req.body;
+
+  if (!content || !content.trim()) {
+    throw new ApiError(400, "Content cannot be empty");
+  }
+
+  const chat = await Chat.findById(chatId);
+  if (!chat) throw new ApiError(404, "Chat not found");
+
+  const message = await Message.findOne({ _id: messageId, chat: chatId });
+  if (!message) throw new ApiError(404, "Message not found");
+
+  if (message.sender.toString() !== req.user._id.toString()) {
+    throw new ApiError(403, "You can only edit your own messages");
+  }
+
+  if (message.isDeleted || message.deletedForEveryone) {
+    throw new ApiError(400, "Cannot edit a deleted message");
+  }
+
+  const clean = xss(content.trim());
+  message.content = clean;
+  message.edited = true;
+  message.editedAt = new Date();
+  await message.save();
+
+  const populatedDoc = await message.populate("sender", "name username profilePicture");
+  const dto = toMessageDTO(populatedDoc);
+
+  try {
+    const io = getIO();
+    io.to(chatId).emit("message:edited", dto);
+    if (Array.isArray(chat.participants)) {
+      chat.participants.forEach((p) => {
+        const pId = p.toString();
+        if (pId !== chatId) {
+          io.to(pId).emit("message:edited", dto);
+        }
+      });
+    }
+  } catch (err) {}
+
+  return res.status(200).json(new ApiResponse(200, "Message edited", dto));
+});
+
+const deleteMessage = asyncHandler(async (req, res) => {
+  const { chatId, messageId } = req.params;
+
+  const chat = await Chat.findById(chatId);
+  if (!chat) throw new ApiError(404, "Chat not found");
+
+  const message = await Message.findOne({ _id: messageId, chat: chatId });
+  if (!message) throw new ApiError(404, "Message not found");
+
+  const isSender = message.sender.toString() === req.user._id.toString();
+  const isLeader = chat.leader && chat.leader.toString() === req.user._id.toString();
+  const isAdmin = (chat.admins || []).some((a) => a.toString() === req.user._id.toString()) ||
+                  (chat.groupAdmin && chat.groupAdmin.toString() === req.user._id.toString());
+
+  if (!isSender && !isLeader && !isAdmin) {
+    throw new ApiError(403, "Not authorized to delete this message");
+  }
+
+  message.isDeleted = true;
+  message.deletedForEveryone = true;
+  message.content = "";
+  await message.save();
+
+  const payload = {
+    messageId: String(messageId),
+    chatId: String(chatId),
+    isDeleted: true,
+  };
+
+  try {
+    const io = getIO();
+    io.to(chatId).emit("message:deleted", payload);
+    if (Array.isArray(chat.participants)) {
+      chat.participants.forEach((p) => {
+        const pId = p.toString();
+        if (pId !== chatId) {
+          io.to(pId).emit("message:deleted", payload);
+        }
+      });
+    }
+  } catch (err) {}
+
+  return res.status(200).json(new ApiResponse(200, "Message deleted", payload));
 });
 
 export {
@@ -300,6 +471,8 @@ export {
   getOrCreateDirectChat,
   getMessages,
   sendMessage,
+  editMessage,
+  deleteMessage,
   createGroupChat,
   markChatAsRead,
   notifyForNewMessage,

@@ -21,7 +21,18 @@ let toastId = 0;
 
 export default function Explore() {
   const { user } = useAuth() || {};
-  const { teams: contextTeams, projects: contextProjects, joinTeam, isMember } = useTeams();
+  const {
+    teams: contextTeams,
+    projects: contextProjects,
+    joinTeam,
+    isMember,
+    isCreator,
+    isProjectMember,
+    isProjectCreator,
+    joinedTeamIds,
+  } = useTeams();
+  const currentUserId = String(user?._id || user?.id || '');
+  const currentUsername = String(user?.username || '').toLowerCase();
   const { isUserBlocked } = useProfile();
   const [activeTab, setActiveTab] = useState('foryou');
   const [searchTerm, setSearchTerm] = useState('');
@@ -108,7 +119,20 @@ export default function Explore() {
         maxMembers: Number(t?.maxMembers) || 4,
         matchScore: Number(t?.matchScore) || 82,
         postedAgo: t?.postedAgo || 'recently',
-        isJoined: isMember ? isMember(t) : false,
+        isJoined: Boolean(
+          (isMember && isMember(t)) ||
+          (isCreator && isCreator(t)) ||
+          (joinedTeamIds && joinedTeamIds.has(String(t._id || t.id))) ||
+          (Array.isArray(t?.members) && t.members.some((m) => {
+            const u = m?.user || m;
+            const uid = String(u?._id || u?.id || u || '');
+            const uusername = String(u?.username || '').toLowerCase();
+            return (
+              (currentUserId && uid && currentUserId === uid) ||
+              (currentUsername && uusername && currentUsername === uusername)
+            );
+          }))
+        ),
         creator: {
           _id: creatorObj._id || t?.creator,
           name: creatorName,
@@ -118,7 +142,7 @@ export default function Explore() {
         },
       };
     });
-  }, [teams, isMember]);
+  }, [teams, isMember, isCreator, joinedTeamIds, currentUserId, currentUsername]);
 
   const normalizedProjects = useMemo(() => {
     return (projects || []).map((p) => {
@@ -153,7 +177,28 @@ export default function Explore() {
         maxMembers: Number(p?.maxTeamSize || p?.maxMembers) || 5,
         matchScore: Number(p?.matchScore) || 80,
         postedAgo: p?.postedAgo || 'recently',
-        isJoined: false,
+        isJoined: Boolean(
+          (isProjectMember && isProjectMember(p)) ||
+          (isProjectCreator && isProjectCreator(p)) ||
+          (Array.isArray(p?.collaborators) && p.collaborators.some((c) => {
+            const u = c?.user || c;
+            const cid = String(u?._id || u?.id || u || '');
+            const cusername = String(u?.username || '').toLowerCase();
+            return (
+              (currentUserId && cid && currentUserId === cid) ||
+              (currentUsername && cusername && currentUsername === cusername)
+            );
+          })) ||
+          (Array.isArray(p?.members) && p.members.some((m) => {
+            const u = m?.user || m;
+            const mid = String(u?._id || u?.id || u || '');
+            const musername = String(u?.username || '').toLowerCase();
+            return (
+              (currentUserId && mid && currentUserId === mid) ||
+              (currentUsername && musername && currentUsername === musername)
+            );
+          }))
+        ),
         creator: {
           _id: ownerObj._id || p?.owner || p?.creator?._id,
           name: ownerName,
@@ -163,7 +208,7 @@ export default function Explore() {
         },
       };
     });
-  }, [projects]);
+  }, [projects, isProjectMember, isProjectCreator, currentUserId, currentUsername]);
 
   const allItems = useMemo(() => {
     return [...normalizedTeams, ...normalizedProjects];
@@ -210,8 +255,6 @@ export default function Explore() {
   function handleJoin(item) {
     const creatorId = String(item?.creator?._id || item?.creator?.id || item?.creator || item?.owner?._id || item?.owner?.id || item?.owner || '');
     const creatorUsername = String(item?.creator?.username || item?.owner?.username || '').toLowerCase();
-    const currentUserId = String(user?._id || user?.id || '');
-    const currentUsername = String(user?.username || '').toLowerCase();
 
     const isOwner = Boolean(
       (currentUserId && creatorId && currentUserId === creatorId) ||
@@ -223,8 +266,83 @@ export default function Explore() {
       return;
     }
 
+    const isAlreadyMember = Boolean(
+      item?.isJoined ||
+      (Array.isArray(item?.members) && item.members.some((m) => {
+        const u = m?.user || m;
+        const uid = String(u?._id || u?.id || u || '');
+        const uusername = String(u?.username || '').toLowerCase();
+        return (
+          (currentUserId && uid && currentUserId === uid) ||
+          (currentUsername && uusername && currentUsername === uusername)
+        );
+      }))
+    );
+
+    if (isAlreadyMember) {
+      showToast(`You have already joined ${item.name}!`);
+      return;
+    }
+
     const tid = item._id || item.id;
     const isProj = item.kind === 'project';
+
+    const updateLocalJoinedTeam = () => {
+      setLiveTeams((prev) => {
+        if (!prev) return prev;
+        return prev.map((t) => {
+          if (String(t._id || t.id) === String(tid)) {
+            const alreadyIn = (t.members || []).some((m) => {
+              const u = m?.user || m;
+              const uid = String(u?._id || u?.id || u || '');
+              return currentUserId && uid && currentUserId === uid;
+            });
+            if (alreadyIn) return t;
+            const newMembers = [
+              ...(t.members || []),
+              {
+                user: {
+                  _id: currentUserId,
+                  name: user?.name || 'Developer',
+                  username: user?.username || 'builder',
+                  profilePicture: user?.profilePicture || '',
+                },
+                role: 'Member',
+              },
+            ];
+            return {
+              ...t,
+              members: newMembers,
+              membersCount: newMembers.length,
+            };
+          }
+          return t;
+        });
+      });
+
+      setModalItem((prev) => {
+        if (!prev || String(prev._id || prev.id) !== String(tid)) return prev;
+        const newMembers = [
+          ...(prev.members || []),
+          {
+            user: {
+              _id: currentUserId,
+              name: user?.name || 'Developer',
+              username: user?.username || 'builder',
+              profilePicture: user?.profilePicture || '',
+            },
+            role: 'Member',
+          },
+        ];
+        return {
+          ...prev,
+          isJoined: true,
+          members: newMembers,
+          membersCount: newMembers.length,
+        };
+      });
+    };
+
     if (!isProj) {
       if (tid && String(tid).length === 24) {
         joinRequestApi
@@ -232,12 +350,14 @@ export default function Explore() {
           .then(() => {
             showToast(`Join request sent to ${item.name}!`);
             joinTeam(tid);
+            updateLocalJoinedTeam();
           })
           .catch((err) => {
             showToast(err?.message || `Could not join ${item.name}`);
           });
       } else {
         joinTeam(tid);
+        updateLocalJoinedTeam();
         showToast(`Joined ${item.name}!`);
       }
     } else {

@@ -26,6 +26,28 @@ export default function Card({ item, saved, onToggleSave, onJoin, onOpen }) {
     (currentUsername && creatorUsername && currentUsername === creatorUsername)
   );
 
+  const isMember = Boolean(
+    item?.isJoined ||
+    (Array.isArray(item?.members) && item.members.some((m) => {
+      const u = m?.user || m;
+      const mId = String(u?._id || u?.id || u || '');
+      const mUsername = String(u?.username || '').toLowerCase();
+      return (
+        (currentUserId && mId && currentUserId === mId) ||
+        (currentUsername && mUsername && currentUsername === mUsername)
+      );
+    })) ||
+    (Array.isArray(item?.collaborators) && item.collaborators.some((c) => {
+      const u = c?.user || c;
+      const cId = String(u?._id || u?.id || u || '');
+      const cUsername = String(u?.username || '').toLowerCase();
+      return (
+        (currentUserId && cId && currentUserId === cId) ||
+        (currentUsername && cUsername && currentUsername === cUsername)
+      );
+    }))
+  );
+
   const maxMembers = Math.max(1, Math.min(Number(item?.maxMembers) || 4, 12));
   const membersCount = Number(item?.membersCount) || 1;
   const full = membersCount >= maxMembers;
@@ -115,7 +137,7 @@ export default function Card({ item, saved, onToggleSave, onJoin, onOpen }) {
 
   function handleJoinClick(e) {
     e.stopPropagation();
-    if (isOwner) return;
+    if (isOwner || isMember || full) return;
     setJoinPop(true);
     setTimeout(() => setJoinPop(false), 450);
     spawnParticles(10);
@@ -208,6 +230,20 @@ export default function Card({ item, saved, onToggleSave, onJoin, onOpen }) {
             onClick={(e) => e.stopPropagation()}
           >
             <span className="btn-label">Owner</span>
+          </button>
+        ) : isMember ? (
+          <button
+            className="join-btn is-joined"
+            disabled
+            title="You have already joined this team"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span className="btn-label" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              Joined
+            </span>
           </button>
         ) : (
           <button

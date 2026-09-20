@@ -39,7 +39,13 @@ const toSafeUser = (user) => ({
 
 
 const sendAuthResponse = (res, statusCode, user, message) => {
-  const accessToken = generateAccessToken(user._id, { isProfileComplete: Boolean(user.isProfileComplete) });
+  const isProfileComplete = Boolean(user.isProfileComplete);
+  const accessToken = generateAccessToken(user._id, {
+    userId: user._id,
+    isProfileComplete,
+    email: user.email,
+    username: user.username,
+  });
   const refreshToken = generateRefreshToken(user._id);
 
   res.cookie(REFRESH_COOKIE_NAME, refreshToken, refreshCookieOptions());
@@ -52,22 +58,50 @@ const sendAuthResponse = (res, statusCode, user, message) => {
   );
 };
 
-
-const generateUniqueUsername = async (seed) => {
-  const base = seed
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "")
-    .slice(0, 20) || "user";
-
-  let candidate = base;
-  let suffix = 0;
-  while (await User.exists({ username: candidate })) {
-    suffix += 1;
-    candidate = `${base}${suffix}`;
+const deriveUniqueUsernameFromEmail = async (email) => {
+  if (!email || typeof email !== "string" || !email.includes("@")) {
+    email = "user@devconnect.local";
   }
-  return candidate;
+  const rawPrefix = email.split("@")[0].toLowerCase().trim();
+
+  // Sanitize: lowercase, strip +, convert spaces, keep letters, numbers, dots, underscores, hyphens
+  let sanitized = rawPrefix
+    .replace(/\+/g, "")
+    .replace(/\s+/g, "_")
+    .replace(/[^a-z0-9_.-]/g, "")
+    .replace(/^[._-]+|[._-]+$/g, "")
+    .slice(0, 24);
+
+  if (!sanitized || sanitized.length < 2) {
+    sanitized = "dev";
+  }
+
+  // Check if base candidate is free
+  if (!(await User.exists({ username: sanitized }))) {
+    return sanitized;
+  }
+
+  // Handle collisions: append -2, -3, -4, etc.
+  let suffixNum = 2;
+  while (suffixNum <= 50) {
+    const candidate = `${sanitized}-${suffixNum}`;
+    if (!(await User.exists({ username: candidate }))) {
+      return candidate;
+    }
+    suffixNum += 1;
+  }
+
+  // Random fallback for extreme collisions
+  while (true) {
+    const randomSuffix = Math.random().toString(36).substring(2, 6);
+    const candidate = `${sanitized.slice(0, 18)}-${randomSuffix}`;
+    if (!(await User.exists({ username: candidate }))) {
+      return candidate;
+    }
+  }
 };
 
+const generateUniqueUsername = deriveUniqueUsernameFromEmail;
 
 const register = asyncHandler(async (req, res) => {
   const { name, username, email, password, phoneNumber } = req.body;
@@ -82,12 +116,12 @@ const register = asyncHandler(async (req, res) => {
   if (!username || !username.trim()) {
     throw new ApiError(400, "Username is required");
   }
-  const cleanUsername = username.trim();
+  const cleanUsername = username.trim().toLowerCase();
   if (cleanUsername.length < 3 || cleanUsername.length > 30) {
     throw new ApiError(400, "Username must be between 3 and 30 characters");
   }
-  if (!/^[a-zA-Z0-9_]+$/.test(cleanUsername)) {
-    throw new ApiError(400, "Invalid username! Username can only contain letters, numbers, and underscores");
+  if (!/^[a-zA-Z0-9_.-]+$/.test(cleanUsername)) {
+    throw new ApiError(400, "Invalid username! Username can only contain letters, numbers, underscores, dots, and hyphens");
   }
 
   if (!email || !email.trim()) {
@@ -173,7 +207,7 @@ const login = asyncHandler(async (req, res) => {
 
 
 const googleAuth = asyncHandler(async (req, res) => {
-  const { idToken, accessToken, mode = "login" } = req.body;
+  const { idToken, accessToken } = req.body;
   if (!idToken && !accessToken) {
     throw new ApiError(400, "idToken or accessToken is required");
   }
@@ -207,38 +241,48 @@ const googleAuth = asyncHandler(async (req, res) => {
     throw new ApiError(401, "Google account has no verified email");
   }
 
+  const normalizedEmail = payload.email.toLowerCase().trim();
   const googleId = payload.sub || payload.id;
-  let user = await User.findOne({
-    $or: [{ googleId }, { email: payload.email.toLowerCase() }],
-  });
+
+  // Match on email first for linking, fallback to googleId
+  let user = await User.findOne({ email: normalizedEmail });
+  if (!user && googleId) {
+    user = await User.findOne({ googleId });
+  }
 
   if (!user) {
-    if (mode === "login") {
-      throw new ApiError(404, "Account does not exist. Please register first.");
-    }
-    const username = await generateUniqueUsername(payload.email.split("@")[0]);
+    // Auto-create account on the spot without separate registration step
+    const username = await deriveUniqueUsernameFromEmail(normalizedEmail);
     user = await User.create({
-      name: payload.name || username,
+      name: (payload.name && payload.name.trim()) || username,
       username,
-      email: payload.email.toLowerCase(),
+      email: normalizedEmail,
       googleId,
       authProvider: "google",
       profilePicture: payload.picture || "",
       isProfileComplete: false,
     });
-  } else if (!user.googleId) {
-    user.googleId = googleId;
+  } else {
+    // Existing user -> Link OAuth details
+    let needsSave = false;
+    if (!user.googleId && googleId) {
+      user.googleId = googleId;
+      needsSave = true;
+    }
     if (payload.picture && !user.profilePicture) {
       user.profilePicture = payload.picture;
+      needsSave = true;
     }
-    await user.save({ validateModifiedOnly: true });
+    if (needsSave) {
+      await user.save({ validateModifiedOnly: true });
+    }
   }
 
   return sendAuthResponse(res, 200, user, "Logged in with Google successfully");
 });
 
 const githubAuth = asyncHandler(async (req, res) => {
-  const { code, mode = "login" } = req.body;
+  const { code } = req.body;
   if (!code) {
     throw new ApiError(400, "code is required");
   }
@@ -279,41 +323,57 @@ const githubAuth = asyncHandler(async (req, res) => {
   }
 
   const profile = githubProfile.data;
+  const emailsList = Array.isArray(githubEmails.data) ? githubEmails.data : [];
   const primaryEmail =
-    githubEmails.data.find((e) => e.primary && e.verified)?.email ||
-    githubEmails.data.find((e) => e.verified)?.email ||
+    emailsList.find((e) => e.primary && e.verified)?.email ||
+    emailsList.find((e) => e.verified)?.email ||
+    emailsList[0]?.email ||
     profile.email;
 
   if (!primaryEmail) {
     throw new ApiError(401, "GitHub account has no accessible verified email");
   }
 
-  let user = await User.findOne({
-    $or: [{ githubId: String(profile.id) }, { email: primaryEmail.toLowerCase() }],
-  });
+  const normalizedEmail = primaryEmail.toLowerCase().trim();
+  const githubId = String(profile.id);
+
+  // Match on email first for linking, fallback to githubId
+  let user = await User.findOne({ email: normalizedEmail });
+  if (!user && githubId) {
+    user = await User.findOne({ githubId });
+  }
 
   if (!user) {
-    if (mode === "login") {
-      throw new ApiError(404, "Account does not exist. Please register first.");
-    }
-    const username = await generateUniqueUsername(profile.login || primaryEmail.split("@")[0]);
+    // Auto-create account on the spot without separate registration step
+    const username = await deriveUniqueUsernameFromEmail(normalizedEmail);
     user = await User.create({
-      name: profile.name || profile.login,
+      name: (profile.name && profile.name.trim()) || profile.login || username,
       username,
-      email: primaryEmail.toLowerCase(),
-      githubId: String(profile.id),
+      email: normalizedEmail,
+      githubId,
       githubUsername: (profile.login || "").toLowerCase() || null,
       authProvider: "github",
       profilePicture: profile.avatar_url || "",
       isProfileComplete: false,
     });
-  } else if (!user.githubId) {
-    user.githubId = String(profile.id);
-    if (profile.login) user.githubUsername = profile.login.toLowerCase();
-    await user.save({ validateModifiedOnly: true });
-  } else if (profile.login && !user.githubUsername) {
-    user.githubUsername = profile.login.toLowerCase();
-    await user.save({ validateModifiedOnly: true });
+  } else {
+    // Existing user -> Link OAuth details
+    let needsSave = false;
+    if (!user.githubId) {
+      user.githubId = githubId;
+      needsSave = true;
+    }
+    if (profile.login && !user.githubUsername) {
+      user.githubUsername = profile.login.toLowerCase();
+      needsSave = true;
+    }
+    if (profile.avatar_url && !user.profilePicture) {
+      user.profilePicture = profile.avatar_url;
+      needsSave = true;
+    }
+    if (needsSave) {
+      await user.save({ validateModifiedOnly: true });
+    }
   }
 
   return sendAuthResponse(res, 200, user, "Logged in with GitHub successfully");
@@ -369,4 +429,14 @@ const changePassword = asyncHandler(async (req, res) => {
   return res.status(200).json(new ApiResponse(200, "Password updated successfully"));
 });
 
-export { register, login, googleAuth, githubAuth, refreshAccessToken, logout, toSafeUser ,changePassword};
+export {
+  register,
+  login,
+  googleAuth,
+  githubAuth,
+  refreshAccessToken,
+  logout,
+  toSafeUser,
+  changePassword,
+  deriveUniqueUsernameFromEmail,
+};
