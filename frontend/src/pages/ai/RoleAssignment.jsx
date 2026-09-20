@@ -1,58 +1,53 @@
 import { useState } from 'react';
 import { useTeams } from '../../context/TeamsContext.jsx';
-
-function assignRole(person, teamSkills = []) {
-  const pSkills = person.skills || [];
-  const match = teamSkills.find((s) => pSkills.some((ps) => ps.toLowerCase() === s.toLowerCase()));
-  if (match) return `${match} lead`;
-  if (pSkills.some((s) => /figma|tailwind|design|ui/i.test(s))) return 'Design support';
-  if (pSkills.some((s) => /node|express|mongo|sql|backend/i.test(s))) return 'Backend Architect';
-  return 'Core Contributor';
-}
+import { aiApi } from '../../lib/api.js';
 
 export default function RoleAssignment() {
   const { teams = [] } = useTeams() || {};
   const [teamId, setTeamId] = useState(teams[0]?._id || teams[0]?.id || '');
   const [loading, setLoading] = useState(false);
   const [assignments, setAssignments] = useState(null);
+  const [error, setError] = useState('');
 
   const team = teams.find((t) => t._id === teamId || t.id === teamId) || teams[0];
 
-  function assign() {
+  async function assign() {
     if (!team) return;
     setLoading(true);
     setAssignments(null);
-    setTimeout(() => {
-      const skillsNeeded = team.skillsNeeded?.length ? team.skillsNeeded : team.skills || [];
-      const rawMembers = team.members?.length
-        ? team.members
-        : team.creator
-        ? [{ user: team.creator, role: 'Creator' }]
-        : [];
+    setError('');
 
-      const members = rawMembers.map((m, idx) => {
-        const u = m.user || m || {};
-        const name = u.name || u.username || `Member ${idx + 1}`;
-        const initials =
-          u.initials ||
-          name
-            .split(' ')
-            .map((w) => w[0])
-            .slice(0, 2)
-            .join('')
-            .toUpperCase();
-        const skills = u.skills?.length ? u.skills : skillsNeeded.slice(idx, idx + 2);
-        return {
-          id: u._id || u.id || `m_${idx}`,
-          name,
-          initials,
-          skills: skills.length ? skills : ['Generalist'],
-          role: assignRole({ name, skills }, skillsNeeded),
-        };
-      });
-      setAssignments(members);
+    const realTeamId = team._id || team.id;
+
+    try {
+      const result = await aiApi.assignRoles({ targetType: 'team', targetId: realTeamId });
+      if (result?.assignments?.length) {
+        setAssignments(
+          result.assignments.map((a) => ({
+            id: a.userId,
+            name: a.name,
+            initials: a.name
+              ? a.name
+                  .split(' ')
+                  .map((w) => w[0])
+                  .slice(0, 2)
+                  .join('')
+                  .toUpperCase()
+              : 'TM',
+            role: a.role,
+            reason: a.reason || '',
+            skills: [],
+          }))
+        );
+      } else {
+        setError('AI returned no role assignments.');
+      }
+    } catch (err) {
+      console.error('AI role assignment failed:', err.message);
+      setError(err.message || 'AI role assignment failed. Please try again.');
+    } finally {
       setLoading(false);
-    }, 600);
+    }
   }
 
   return (
@@ -79,6 +74,7 @@ export default function RoleAssignment() {
             onChange={(e) => {
               setTeamId(e.target.value);
               setAssignments(null);
+              setError('');
             }}
           >
             {teams.map((t) => (
@@ -95,6 +91,12 @@ export default function RoleAssignment() {
 
       {loading && <div className="ai-loading"><span className="ai-spinner" /> matching skills to roles...</div>}
 
+      {error && (
+        <div style={{ padding: '12px 16px', borderRadius: '10px', background: 'rgba(248,113,113,0.12)', border: '1px solid rgba(248,113,113,0.3)', color: '#f87171', fontSize: '13px', marginTop: '12px' }}>
+          {error}
+        </div>
+      )}
+
       {assignments && (
         <div className="ai-role-list">
           {assignments.map((p) => (
@@ -102,11 +104,11 @@ export default function RoleAssignment() {
               <div className="avatar-sm" style={{ width: '36px', height: '36px', fontSize: '11px' }}>{p.initials}</div>
               <div className="ai-role-info">
                 <span className="ai-role-name">{p.name}</span>
-                <div className="chip-row" style={{ marginTop: '4px' }}>
-                  {p.skills.map((s) => (
-                    <span className="skill-chip" key={s} style={{ fontSize: '10px', padding: '2px 8px' }}>{s}</span>
-                  ))}
-                </div>
+                {p.reason && (
+                  <p style={{ fontSize: '11px', color: 'var(--text-muted, #888)', margin: '4px 0 0', lineHeight: 1.3 }}>
+                    {p.reason}
+                  </p>
+                )}
               </div>
               <span className="type-badge" style={{ fontSize: '10.5px', padding: '5px 12px' }}>{p.role}</span>
             </div>

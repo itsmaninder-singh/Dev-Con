@@ -1,28 +1,33 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-
-const TEMPLATES = [
-  { title: 'Peer review queue', stack: ['React', 'Node.js', 'PostgreSQL'], difficulty: 'Medium', blurb: 'A lightweight tool that routes {domain} submissions to the right reviewer automatically, with SLA tracking.' },
-  { title: 'Live status tracker', stack: ['React', 'WebSockets', 'Redis'], difficulty: 'Easy', blurb: 'Real-time dashboard showing the current state of every active {domain} job, with alerts on stalls.' },
-  { title: 'Smart matcher', stack: ['Node.js', 'Vector search', 'Postgres'], difficulty: 'Hard', blurb: 'Matches people or resources in {domain} using embeddings instead of manual tagging.' },
-  { title: 'Weekly digest bot', stack: ['Node.js', 'Cron', 'Email API'], difficulty: 'Easy', blurb: 'Summarizes the week\u2019s {domain} activity into a short digest, sent automatically every Monday.' },
-];
+import { aiApi } from '../../lib/api.js';
 
 export default function IdeaGenerator() {
   const navigate = useNavigate();
   const [domain, setDomain] = useState('');
   const [loading, setLoading] = useState(false);
   const [ideas, setIdeas] = useState(null);
+  const [error, setError] = useState('');
 
-  function generate() {
+  async function generate() {
     if (!domain.trim()) return;
     setLoading(true);
     setIdeas(null);
-    setTimeout(() => {
-      const d = domain.trim().toLowerCase();
-      setIdeas(TEMPLATES.map((t) => ({ ...t, blurb: t.blurb.replaceAll('{domain}', d) })));
+    setError('');
+    try {
+      const result = await aiApi.generateIdeas(domain.trim());
+      // Backend returns { domain, allIdeas, topFeasible }
+      if (result?.topFeasible?.length) {
+        setIdeas(result.topFeasible);
+      } else {
+        setError('AI returned no ideas. Try a different domain.');
+      }
+    } catch (err) {
+      console.error('AI idea generation failed:', err.message);
+      setError(err.message || 'AI idea generation failed. Please try again.');
+    } finally {
       setLoading(false);
-    }, 900);
+    }
   }
 
   function handleUseIdea(idea) {
@@ -30,9 +35,9 @@ export default function IdeaGenerator() {
       state: {
         idea: {
           title: idea.title,
-          desc: idea.blurb,
-          stack: idea.stack,
-          tags: [idea.difficulty.toLowerCase(), 'ai-generated']
+          desc: idea.description || idea.pitch || '',
+          stack: idea.techStack || [],
+          tags: ['ai-generated']
         }
       }
     });
@@ -64,19 +69,32 @@ export default function IdeaGenerator() {
         </div>
       )}
 
+      {error && (
+        <div style={{ padding: '12px 16px', borderRadius: '10px', background: 'rgba(248,113,113,0.12)', border: '1px solid rgba(248,113,113,0.3)', color: '#f87171', fontSize: '13px', marginTop: '12px' }}>
+          {error}
+        </div>
+      )}
+
       {ideas && (
         <div className="ai-idea-grid">
           {ideas.map((idea, i) => (
             <div className="card in-view" key={i}>
               <div className="card-top">
-                <span className="type-badge">{idea.difficulty}</span>
-                <span className="seats-label">AI Blueprint</span>
+                <span className="type-badge">AI Blueprint</span>
+                {idea.timeline && <span className="seats-label">{idea.timeline}</span>}
               </div>
               <h3>{idea.title}</h3>
-              <p className="desc">{idea.blurb}</p>
-              <div className="chip-row">
-                {idea.stack.map((s) => <span className="skill-chip" key={s}>{s}</span>)}
-              </div>
+              <p className="desc">{idea.description || idea.pitch}</p>
+              {idea.techStack?.length > 0 && (
+                <div className="chip-row">
+                  {idea.techStack.map((s) => <span className="skill-chip" key={s}>{s}</span>)}
+                </div>
+              )}
+              {idea.monetization && (
+                <p className="desc" style={{ fontSize: '11px', marginTop: '8px', opacity: 0.7 }}>
+                  💰 {idea.monetization}
+                </p>
+              )}
               <div className="card-footer">
                 <div className="card-owner">
                   <div className="avatar-sm">AI</div>

@@ -51,8 +51,12 @@ export default function Login() {
 
     setLoading(true);
     try {
-      await login(form);
-      navigate(redirectTo, { replace: true });
+      const loggedUser = await login(form);
+      if (loggedUser && !loggedUser.isProfileComplete) {
+        navigate("/onboarding", { replace: true });
+      } else {
+        navigate(redirectTo, { replace: true });
+      }
     } catch (err) {
       setError(err.message || "Invalid credentials. Please try again.");
     } finally {

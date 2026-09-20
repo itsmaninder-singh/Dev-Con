@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useProfile } from '../../context/ProfileContext.jsx';
 import { useTeams } from '../../context/TeamsContext.jsx';
+import { aiApi } from '../../lib/api.js';
 import { overlap, scorePair } from './scoring.js';
 
 export default function CompatibilityCheck() {
@@ -10,6 +11,7 @@ export default function CompatibilityCheck() {
   const you = useMemo(
     () => ({
       id: 'you',
+      _id: profile?._id,
       name: profile?.name || 'You',
       initials: 'YO',
       skills: profile?.skills || [],
@@ -29,6 +31,7 @@ export default function CompatibilityCheck() {
           if (!map.has(uid)) {
             map.set(uid, {
               id: uid,
+              _id: u._id,
               name: u.name || u.username || 'Teammate',
               initials: u.initials || 'TM',
               skills: u.skills || t.skillsNeeded || [],
@@ -48,20 +51,44 @@ export default function CompatibilityCheck() {
   const [bId, setBId] = useState(() => teamMembers[0]?.id || 'you');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [error, setError] = useState('');
 
   const a = people.find((p) => p.id === aId);
   const b = people.find((p) => p.id === bId);
 
-  function runCheck() {
+  async function runCheck() {
     if (!a || !b || a.id === b.id) return;
     setLoading(true);
     setResult(null);
-    setTimeout(() => {
-      const score = scorePair(a.skills, b.skills);
-      const shared = overlap(a.skills, b.skills);
-      setResult({ score, shared });
-      setLoading(false);
-    }, 600);
+    setError('');
+
+    // Try real AI API first if both users have real MongoDB IDs
+    const aRealId = a._id && /^[0-9a-fA-F]{24}$/.test(a._id) ? a._id : null;
+    const bRealId = b._id && /^[0-9a-fA-F]{24}$/.test(b._id) ? b._id : null;
+
+    if (aRealId && bRealId) {
+      try {
+        const aiData = await aiApi.analyzeCompatibility({ targetUserId: bRealId });
+        if (aiData) {
+          setResult({
+            score: aiData.compatibilityScore ?? 75,
+            reasons: aiData.reasons || [],
+            shared: overlap(a.skills, b.skills),
+            source: 'ai',
+          });
+          setLoading(false);
+          return;
+        }
+      } catch (err) {
+        console.warn('Backend AI compatibility unavailable, falling back to local scoring:', err.message);
+      }
+    }
+
+    // Local fallback
+    const score = scorePair(a.skills, b.skills);
+    const shared = overlap(a.skills, b.skills);
+    setResult({ score, shared, reasons: [], source: 'local' });
+    setLoading(false);
   }
 
   return (
@@ -100,6 +127,12 @@ export default function CompatibilityCheck() {
 
       {loading && <div className="ai-loading"><span className="ai-spinner" /> comparing skills and availability...</div>}
 
+      {error && (
+        <div style={{ padding: '12px 16px', borderRadius: '10px', background: 'rgba(248,113,113,0.12)', border: '1px solid rgba(248,113,113,0.3)', color: '#f87171', fontSize: '13px', marginTop: '12px' }}>
+          {error}
+        </div>
+      )}
+
       {result && (
         <div className="ai-compat-result">
           <div className="ai-score-ring-wrap">
@@ -114,7 +147,27 @@ export default function CompatibilityCheck() {
           </div>
 
           <div className="ai-compat-breakdown">
-            <div className="ai-compat-line"><b>{a.name}</b> &amp; <b>{b.name}</b></div>
+            <div className="ai-compat-line">
+              <b>{a.name}</b> &amp; <b>{b.name}</b>
+              {result.source === 'ai' && (
+                <span style={{ fontSize: '10px', color: 'var(--coral, #ff98a2)', marginLeft: '8px', opacity: 0.8 }}>✦ AI-powered</span>
+              )}
+            </div>
+
+            {result.reasons?.length > 0 && (
+              <div className="ai-compat-row" style={{ alignItems: 'flex-start' }}>
+                <span className="ai-compat-label">AI Insights</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: 'var(--text-muted)' }}>
+                  {result.reasons.map((r, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ color: 'var(--coral, #ff98a2)' }}>•</span>
+                      <span>{r}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="ai-compat-row">
               <span className="ai-compat-label">Shared skills</span>
               <div className="chip-row">

@@ -43,15 +43,20 @@ export function AuthProvider({ children }) {
       try {
         const parsed = JSON.parse(saved);
         if (parsed?.accessToken && parsed?.user) {
+          // Apply cached session for immediate UI rendering,
+          // but keep initializing=true until refresh gives us fresh isProfileComplete
           applySession(parsed);
-          setInitializing(false);
-          // Verify/refresh in background
           authApi
             .refresh()
             .then((fresh) => {
               if (active && fresh?.accessToken) applySession(fresh);
             })
-            .catch(() => {});
+            .catch(() => {
+              // Refresh failed — fall back to cached session (already applied)
+            })
+            .finally(() => {
+              if (active) setInitializing(false);
+            });
           return;
         }
       } catch {
