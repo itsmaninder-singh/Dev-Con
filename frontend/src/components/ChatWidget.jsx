@@ -1,25 +1,59 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { chatApi } from "../lib/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useChatUI, AVATAR_COLORS } from "../context/ChatUIContext.jsx";
 import { connectSocket } from "../lib/socket.js";
-
-const INITIAL_CONVERSATIONS = [];
-
-const REPLIES = [
-  "Got it, I\u2019ll add it to the PR.",
-  "Good question, can you share more detail?",
-  "Cool, noted 👍",
-  "Yep, I\u2019ll get it done today.",
-  "Ok noted! Let\u2019s discuss it in standup.",
-];
+import {
+  Check,
+  CheckCheck,
+  Clock,
+  AlertCircle,
+  Trash2,
+  Edit2,
+  ArrowDown,
+  RefreshCw,
+} from "lucide-react";
 
 function timeNow() {
   return new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 }
 
+function formatMessageTime(dateInput) {
+  if (!dateInput) return timeNow();
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return timeNow();
+  return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+}
+
+function getDateLabel(dateInput) {
+  if (!dateInput) return 'Today';
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return 'Today';
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+
+  if (d.toDateString() === today.toDateString()) return 'Today';
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+
+  return d.toLocaleDateString('en-US', {
+    day: 'numeric',
+    month: 'short',
+    year: d.getFullYear() !== today.getFullYear() ? 'numeric' : undefined,
+  });
+}
+
+function formatMessageText(text) {
+  if (!text) return "";
+  const s = String(text).trim();
+  if (/^[0-9a-f]{32}:[0-9a-f]{32,}$/i.test(s)) {
+    return "💬 Message";
+  }
+  return text;
+}
+
 /* ============================================================
-   GLOBAL STYLES — plain CSS animations only, no GSAP needed.
+   GLOBAL STYLES — plain CSS animations only
    ============================================================ */
 const GlobalStyle = () => (
   <style>{`
@@ -59,7 +93,7 @@ const GlobalStyle = () => (
 
     .cw-root .panel{
       position:fixed; right:32px; bottom:32px; z-index:9999;
-      width:376px; max-width:calc(100vw - 40px); height:580px; max-height:calc(100vh - 64px);
+      width:380px; max-width:calc(100vw - 40px); height:600px; max-height:calc(100vh - 64px);
       border-radius:24px; background:rgba(14,14,16,0.88); border:1px solid var(--glass-border);
       backdrop-filter:blur(28px) saturate(160%); -webkit-backdrop-filter:blur(28px) saturate(160%);
       box-shadow:var(--shadow-deep), 0 0 40px rgba(255,152,162,0.18), inset 0 1px 0 rgba(255,255,255,.08); overflow:hidden;
@@ -89,7 +123,7 @@ const GlobalStyle = () => (
 
     .views{ position:relative; width:200%; height:100%; display:flex; transition:transform .4s cubic-bezier(.16,1,.3,1); }
     .views.show-chat{ transform:translateX(-50%); }
-    .view{ width:50%; height:100%; display:flex; flex-direction:column; }
+    .view{ width:50%; height:100%; display:flex; flex-direction:column; position:relative; }
 
     .inbox-header{
       padding:18px 18px 14px; border-bottom:1px solid var(--glass-border);
@@ -130,9 +164,6 @@ const GlobalStyle = () => (
       width:46px; height:46px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center;
       font-family:'Fraunces',serif; font-style:italic; font-weight:450; color:var(--ink); font-size:17px; position:relative;
     }
-    .avatar.online::after{
-      display: none;
-    }
     .chat-item .info{ flex:1; min-width:0; }
     .chat-item .row1{ display:flex; justify-content:space-between; align-items:baseline; gap:6px; }
     .chat-item .name{ font-family:'Fraunces',serif; font-style:italic; font-weight:450; font-size:14.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -150,35 +181,109 @@ const GlobalStyle = () => (
       background:linear-gradient(180deg, rgba(255,255,255,.04), transparent);
     }
     .chat-header .avatar{ width:38px; height:38px; font-size:15px; }
-    .chat-header .avatar.online::after{ width:10px; height:10px; }
     .chat-header .who{ flex:1; min-width:0; }
     .chat-header .who .name{ font-family:'Fraunces',serif; font-style:italic; font-weight:450; font-size:15.5px; }
     .chat-header .who .status{ font-size:11.5px; margin-top:1px; }
 
-    .messages{ flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:10px; }
+    .messages{ flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:10px; position:relative; }
     .messages::-webkit-scrollbar{ width:6px; }
     .messages::-webkit-scrollbar-thumb{ background:rgba(255,152,162,.35); border-radius:3px; }
-    .day-divider{
-      align-self:center; font-size:11px; color:var(--text-lo); background:var(--glass-fill); padding:4px 12px;
-      border-radius:20px; border:1px solid var(--glass-border); margin-bottom:2px;
-    }
-    .msg{
-      max-width:78%; padding:10px 14px; border-radius:16px; font-size:13.5px; line-height:1.5; position:relative;
-      animation:pop-in .4s cubic-bezier(.16,1,.3,1) both;
-    }
-    @keyframes pop-in{ from{ opacity:0; transform:translateY(8px); } to{ opacity:1; transform:translateY(0); } }
-    .msg.them{ align-self:flex-start; background:var(--glass-fill-strong); border:1px solid var(--glass-border); border-bottom-left-radius:4px; }
-    .msg.me{ align-self:flex-end; background:linear-gradient(135deg, var(--accent), var(--accent-2)); color:var(--ink); font-weight:500; border-bottom-right-radius:4px; }
-    .msg .time{ display:block; font-size:10px; margin-top:4px; opacity:.6; font-weight:400; }
 
-    .typing{
-      align-self:flex-start; display:flex; gap:4px; padding:12px 14px; border-radius:16px; border-bottom-left-radius:4px;
-      background:var(--glass-fill-strong); border:1px solid var(--glass-border); width:fit-content;
+    .load-earlier-container{ display:flex; justify-content:center; padding:4px 0 10px; }
+    .load-earlier-btn{
+      background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); color:var(--text-lo);
+      font-size:11.5px; padding:5px 14px; border-radius:20px; cursor:pointer; transition:all .2s ease;
+      display:inline-flex; align-items:center; gap:6px;
     }
-    .typing span{ width:6px; height:6px; border-radius:50%; background:var(--text-lo); animation:bounce 1.2s infinite ease-in-out; }
-    .typing span:nth-child(2){ animation-delay:.15s; }
-    .typing span:nth-child(3){ animation-delay:.3s; }
-    @keyframes bounce{ 0%,60%,100%{ transform:translateY(0); opacity:.5; } 30%{ transform:translateY(-4px); opacity:1; } }
+    .load-earlier-btn:hover{ background:rgba(255,255,255,0.12); color:var(--text-hi); border-color:var(--accent); }
+
+    .day-divider{
+      align-self:center; font-size:11px; color:var(--text-lo); background:var(--glass-fill); padding:3px 12px;
+      border-radius:20px; border:1px solid var(--glass-border); margin:4px 0; font-weight:500;
+    }
+
+    .msg-wrapper{ display:flex; flex-direction:column; position:relative; width:100%; }
+    .msg-wrapper.me{ align-items:flex-end; }
+    .msg-wrapper.them{ align-items:flex-start; }
+
+    .msg-row{ display:flex; align-items:center; gap:6px; max-width:82%; position:relative; }
+    .msg-wrapper.me .msg-row{ flex-direction:row-reverse; }
+
+    .msg{
+      padding:9px 13px; border-radius:16px; font-size:13.5px; line-height:1.45; position:relative;
+      animation:pop-in .3s cubic-bezier(.16,1,.3,1) both; word-break:break-word;
+    }
+    @keyframes pop-in{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:translateY(0); } }
+
+    .msg.them{
+      background:var(--glass-fill-strong); border:1px solid var(--glass-border);
+      border-bottom-left-radius:4px; color:var(--text-hi);
+    }
+    .msg.me{
+      background:linear-gradient(135deg, var(--accent), var(--accent-2));
+      color:var(--ink); font-weight:480; border-bottom-right-radius:4px;
+    }
+    .msg.deleted{
+      opacity:0.65; font-style:italic; background:rgba(255,255,255,0.03) !important;
+      border:1px dashed rgba(255,255,255,0.15) !important; color:var(--text-lo) !important;
+    }
+
+    .msg-footer{ display:flex; align-items:center; justify-content:flex-end; gap:4px; margin-top:3px; font-size:10px; opacity:.85; }
+    .msg-footer .time{ opacity:.8; font-weight:400; }
+    .msg-footer .edited-tag{ font-size:9.5px; opacity:0.75; font-style:italic; }
+
+    .msg-actions{
+      display:none; align-items:center; gap:2px; padding:2px; border-radius:8px;
+      background:rgba(20,20,24,0.9); border:1px solid var(--glass-border);
+      box-shadow:0 4px 12px rgba(0,0,0,0.3); z-index:5;
+    }
+    .msg-row:hover .msg-actions{ display:flex; }
+    .msg-action-btn{
+      background:transparent; border:none; color:var(--text-lo); padding:4px; border-radius:6px;
+      cursor:pointer; display:flex; align-items:center; justify-content:center; transition:color .15s ease, background .15s ease;
+    }
+    .msg-action-btn:hover{ color:var(--text-hi); background:rgba(255,255,255,0.1); }
+    .msg-action-btn.delete:hover{ color:#ff7a7a; background:rgba(255,74,74,0.15); }
+
+    .inline-edit-box{ width:100%; display:flex; flex-direction:column; gap:6px; margin:4px 0; }
+    .inline-edit-box textarea{
+      width:100%; min-height:48px; max-height:120px; resize:none; padding:8px 10px;
+      background:rgba(20,20,25,0.95); border:1px solid var(--accent); border-radius:10px;
+      color:var(--text-hi); font-size:13px; outline:none; font-family:'Inter',sans-serif;
+    }
+    .inline-edit-actions{ display:flex; justify-content:flex-end; gap:6px; }
+    .inline-edit-actions button{
+      padding:4px 10px; border-radius:8px; font-size:11.5px; cursor:pointer; font-weight:600; border:none;
+    }
+    .btn-save-edit{ background:var(--accent); color:var(--ink); }
+    .btn-cancel-edit{ background:rgba(255,255,255,0.1); color:var(--text-hi); }
+
+    .msg-retry-banner{
+      font-size:10.5px; color:#ff7a7a; display:flex; align-items:center; gap:4px; margin-top:2px;
+    }
+    .msg-retry-btn{
+      background:none; border:none; color:#ff98a2; text-decoration:underline; cursor:pointer; font-size:10.5px; padding:0;
+    }
+
+    .typing-bar{
+      padding:6px 16px; font-size:11.5px; color:var(--accent); display:flex; align-items:center; gap:8px;
+      background:linear-gradient(90deg, rgba(255,152,162,0.06), transparent); animation:fadeIn .2s ease;
+    }
+    @keyframes fadeIn{ from{ opacity:0; transform:translateY(4px); } to{ opacity:1; transform:translateY(0); } }
+    .typing-dots{ display:flex; gap:3px; }
+    .typing-dots span{ width:4.5px; height:4.5px; border-radius:50%; background:var(--accent); animation:bounce 1.2s infinite ease-in-out; }
+    .typing-dots span:nth-child(2){ animation-delay:.15s; }
+    .typing-dots span:nth-child(3){ animation-delay:.3s; }
+    @keyframes bounce{ 0%,60%,100%{ transform:translateY(0); opacity:.4; } 30%{ transform:translateY(-3.5px); opacity:1; } }
+
+    .jump-btn{
+      position:absolute; bottom:64px; right:20px; z-index:15;
+      background:rgba(20,20,24,0.92); border:1px solid var(--accent); color:var(--accent);
+      padding:6px 12px; border-radius:20px; font-size:11.5px; font-weight:600;
+      display:flex; align-items:center; gap:5px; cursor:pointer; box-shadow:0 8px 24px rgba(0,0,0,0.5);
+      backdrop-filter:blur(8px); transition:all .2s cubic-bezier(.16,1,.3,1); animation:pop-in .25s ease;
+    }
+    .jump-btn:hover{ transform:translateY(-2px); background:var(--accent); color:var(--ink); }
 
     .composer{ display:flex; align-items:flex-end; gap:8px; padding:12px 14px; border-top:1px solid var(--glass-border); background:linear-gradient(0deg, rgba(255,255,255,.05), transparent); }
     .composer textarea{
@@ -194,6 +299,7 @@ const GlobalStyle = () => (
       display:flex; align-items:center; justify-content:center; cursor:pointer; transition:transform .18s ease;
     }
     .send-btn:active{ transform:scale(.88); }
+    .send-btn:disabled{ opacity:0.5; cursor:not-allowed; }
     .send-btn svg{ width:16px; height:16px; fill:var(--ink); }
 
     @media (max-width:480px){
@@ -201,7 +307,7 @@ const GlobalStyle = () => (
       .launcher{ right:20px; bottom:20px; }
     }
     @media (prefers-reduced-motion: reduce){
-      .launcher, .msg, .typing span{ animation:none !important; }
+      .launcher, .msg, .typing-dots span{ animation:none !important; }
       .cw-root .panel, .views{ transition:opacity .2s ease !important; }
     }
   `}</style>
@@ -253,27 +359,29 @@ export default function ChatWidget() {
   } = useChatUI();
 
   const [inputValue, setInputValue] = useState('');
-  const [typing, setTyping] = useState(false);
+  const [editingMessageId, setEditingMessageId] = useState(null);
+  const [editingContent, setEditingContent] = useState('');
+  const [typingState, setTypingState] = useState({}); // { [chatId]: username }
+  const [showJumpButton, setShowJumpButton] = useState(false);
+  const [loadingEarlier, setLoadingEarlier] = useState(false);
+  const [chatPagination, setChatPagination] = useState({}); // { [chatId]: { page, hasMore } }
+
   const messagesRef = useRef(null);
   const panelRef = useRef(null);
   const textareaRef = useRef(null);
+  const editInputRef = useRef(null);
+  const currentChatIdRef = useRef(activeId);
+  const isAutoScrollingRef = useRef(true);
+  const typingTimeoutRef = useRef(null);
 
   const totalUnread = conversations.reduce((sum, c) => sum + (c.unread || 0), 0);
-  const active = conversations.find((c) => c.id === activeId) || null;
+  const active = conversations.find((c) => c.id === activeId || c._id === activeId) || null;
 
   useEffect(() => {
-    if (messagesRef.current) messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
-  }, [active, typing, view]);
+    currentChatIdRef.current = activeId;
+  }, [activeId]);
 
-  useEffect(() => {
-    if (view === 'chat' && open) {
-      const t1 = setTimeout(() => textareaRef.current?.focus(), 50);
-      const t2 = setTimeout(() => textareaRef.current?.focus(), 150);
-      const t3 = setTimeout(() => textareaRef.current?.focus(), 300);
-      return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
-    }
-  }, [view, open, activeId]);
-
+  // Handle outside click & escape
   useEffect(() => {
     function onDocClick(e) {
       if (
@@ -291,125 +399,569 @@ export default function ChatWidget() {
     return () => { document.removeEventListener('click', onDocClick); document.removeEventListener('keydown', onKey); };
   }, [open, setOpen]);
 
-  // Connect socket and listen for live incoming messages
+  // Focus textarea when entering chat view
+  useEffect(() => {
+    if (view === 'chat' && open) {
+      const t1 = setTimeout(() => textareaRef.current?.focus(), 50);
+      const t2 = setTimeout(() => textareaRef.current?.focus(), 200);
+      return () => { clearTimeout(t1); clearTimeout(t2); };
+    }
+  }, [view, open, activeId]);
+
+  // Auto-scroll to bottom if near bottom
+  const scrollToBottom = useCallback((smooth = false) => {
+    if (messagesRef.current) {
+      messagesRef.current.scrollTo({
+        top: messagesRef.current.scrollHeight,
+        behavior: smooth ? 'smooth' : 'auto',
+      });
+      setShowJumpButton(false);
+    }
+  }, []);
+
+  // Monitor scroll for jump button and auto-scroll behavior
+  const handleScroll = useCallback(() => {
+    if (!messagesRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = messagesRef.current;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+    const isNearBottom = distanceFromBottom < 80;
+    isAutoScrollingRef.current = isNearBottom;
+    setShowJumpButton(distanceFromBottom > 140);
+  }, []);
+
+  // Scroll to bottom on opening a chat or when messages change (if was near bottom)
+  useEffect(() => {
+    if (view === 'chat' && active) {
+      if (isAutoScrollingRef.current) {
+        scrollToBottom(false);
+      }
+    }
+  }, [active?.messages?.length, view, scrollToBottom]);
+
+  // Mark chat as read helper
+  const markActiveChatAsRead = useCallback((chatId) => {
+    if (!chatId || !user?._id) return;
+    const socket = connectSocket();
+    socket.emit('chat:read', chatId);
+    chatApi.markChatAsRead(chatId).catch(() => {});
+  }, [user?._id]);
+
+  // Fetch initial messages for a chat
+  const loadChatMessages = useCallback(async (chatId, page = 1) => {
+    if (!chatId || typeof chatId !== 'string' || chatId.length !== 24) return;
+    try {
+      const res = await chatApi.getMessages(chatId, page, 30);
+      const list = Array.isArray(res) ? res : res?.messages || [];
+      const pagination = res?.pagination || { page, hasMore: false };
+
+      setChatPagination((prev) => ({
+        ...prev,
+        [chatId]: { page: pagination.page, hasMore: pagination.hasMore },
+      }));
+
+      const formatted = list.map((m) => {
+        const isFromMe = (m.sender?._id || m.sender) === user?._id;
+        return {
+          _id: m._id || m.id,
+          id: m._id || m.id,
+          from: isFromMe ? 'me' : 'them',
+          sender: m.sender || {},
+          content: m.content || '',
+          text: m.content || '',
+          time: formatMessageTime(m.createdAt),
+          createdAt: m.createdAt || new Date().toISOString(),
+          isDeleted: Boolean(m.isDeleted),
+          edited: Boolean(m.edited),
+          editedAt: m.editedAt,
+          readBy: m.readBy || [],
+          deliveredTo: m.deliveredTo || [],
+          status: 'sent',
+        };
+      });
+
+      setConversations((all) =>
+        all.map((c) => {
+          if (c.id === chatId || c._id === chatId) {
+            if (page === 1) {
+              return { ...c, messages: formatted, unread: 0 };
+            } else {
+              // Prepend older messages while deduplicating
+              const existingIds = new Set((c.messages || []).map((m) => m._id));
+              const newUnique = formatted.filter((m) => !existingIds.has(m._id));
+              return { ...c, messages: [...newUnique, ...(c.messages || [])] };
+            }
+          }
+          return c;
+        })
+      );
+    } catch (err) {
+      console.warn('Failed to load chat messages:', err);
+    }
+  }, [user?._id, setConversations]);
+
+  // Load earlier messages (pagination)
+  const handleLoadEarlier = async () => {
+    if (!active?.id || loadingEarlier) return;
+    const currentPaging = chatPagination[active.id] || { page: 1, hasMore: false };
+    if (!currentPaging.hasMore) return;
+
+    setLoadingEarlier(true);
+    const container = messagesRef.current;
+    const prevScrollHeight = container ? container.scrollHeight : 0;
+
+    await loadChatMessages(active.id, currentPaging.page + 1);
+
+    setLoadingEarlier(false);
+    requestAnimationFrame(() => {
+      if (container) {
+        container.scrollTop = container.scrollHeight - prevScrollHeight;
+      }
+    });
+  };
+
+  // Switch to a chat thread
+  const openChat = (id) => {
+    const prevId = currentChatIdRef.current;
+    const socket = connectSocket();
+
+    if (prevId && prevId !== id && prevId.length === 24) {
+      socket.emit('chat:leave', prevId);
+    }
+
+    setConversations((list) => list.map((c) => (c.id === id ? { ...c, unread: 0 } : c)));
+    setActiveId(id);
+    setView('chat');
+    isAutoScrollingRef.current = true;
+    setTimeout(() => textareaRef.current?.focus(), 150);
+
+    if (id && id.length === 24) {
+      socket.emit('chat:join', id);
+      markActiveChatAsRead(id);
+      loadChatMessages(id, 1).then(() => {
+        setTimeout(() => scrollToBottom(false), 80);
+      });
+    }
+  };
+
+  const backToList = () => {
+    setView('inbox');
+    setEditingMessageId(null);
+  };
+
+  // Socket setup and real-time event listeners
   useEffect(() => {
     if (!user?._id) return;
     const socket = connectSocket();
 
     const handleIncomingMessage = (msg) => {
       if (!msg) return;
+      const chatId = msg.chatId || msg.chat?._id || msg.chat || msg.conversationId;
       const isFromMe = (msg.sender?._id || msg.sender) === user._id;
-      const mText = msg.content || '';
-      const mTime = msg.createdAt
-        ? new Date(msg.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
-        : timeNow();
-      const chatId = msg.chat?._id || msg.chat;
+      const activeCurrentId = currentChatIdRef.current;
+      const isViewingActive = activeCurrentId === chatId;
 
-      setConversations((all) => {
-        return all.map((c) => {
+      const newMsg = {
+        _id: msg._id || msg.id,
+        id: msg._id || msg.id,
+        from: isFromMe ? 'me' : 'them',
+        sender: msg.sender || {},
+        content: msg.content || '',
+        text: msg.content || '',
+        time: formatMessageTime(msg.createdAt),
+        createdAt: msg.createdAt || new Date().toISOString(),
+        isDeleted: Boolean(msg.isDeleted),
+        edited: Boolean(msg.edited),
+        editedAt: msg.editedAt,
+        readBy: msg.readBy || (isFromMe ? [user._id] : []),
+        deliveredTo: msg.deliveredTo || [],
+        status: 'sent',
+      };
+
+      setConversations((all) =>
+        all.map((c) => {
           const matches = c.id === chatId || c._id === chatId;
           if (matches) {
-            const alreadyExists = c.messages?.some(
-              (m) => (m._id && m._id === msg._id) || (m.text === mText && m.from === (isFromMe ? 'me' : 'them'))
-            );
-            if (alreadyExists) return c;
+            const currentList = c.messages || [];
+            let reconciled = false;
+            const updated = currentList.map((m) => {
+              if (m._id === newMsg._id) return { ...m, ...newMsg };
+              if (
+                isFromMe &&
+                m.status === 'sending' &&
+                (m.content === newMsg.content || m.text === newMsg.content)
+              ) {
+                reconciled = true;
+                return { ...newMsg, tempId: m._id };
+              }
+              return m;
+            });
 
-            const updatedMessages = [
-              ...(c.messages || []),
-              {
-                _id: msg._id,
-                from: isFromMe ? 'me' : 'them',
-                text: mText,
-                time: mTime,
-              },
-            ];
+            if (!reconciled && !currentList.some((m) => m._id === newMsg._id)) {
+              updated.push(newMsg);
+            }
 
             return {
               ...c,
-              unread: (activeId === c.id || isFromMe) ? 0 : (c.unread || 0) + 1,
-              messages: updatedMessages,
+              unread: (isViewingActive || isFromMe) ? 0 : (c.unread || 0) + 1,
+              lastMessageText: newMsg.content,
+              lastMessageTime: newMsg.time,
+              lastMessageFrom: isFromMe ? 'me' : 'them',
+              messages: updated,
             };
           }
           return c;
-        });
-      });
+        })
+      );
+
+      if (isViewingActive) {
+        socket.emit('chat:read', chatId);
+        if (isAutoScrollingRef.current) {
+          setTimeout(() => scrollToBottom(true), 60);
+        }
+      }
+    };
+
+    const handleMessageEdited = (updatedMsg) => {
+      if (!updatedMsg) return;
+      const msgId = updatedMsg._id || updatedMsg.id;
+      const chatId = updatedMsg.chatId || updatedMsg.chat?._id || updatedMsg.chat;
+
+      setConversations((all) =>
+        all.map((c) => {
+          if (c.id === chatId || c._id === chatId) {
+            return {
+              ...c,
+              messages: (c.messages || []).map((m) =>
+                m._id === msgId || m.id === msgId
+                  ? {
+                      ...m,
+                      content: updatedMsg.content,
+                      text: updatedMsg.content,
+                      edited: true,
+                      editedAt: updatedMsg.editedAt || new Date().toISOString(),
+                    }
+                  : m
+              ),
+            };
+          }
+          return c;
+        })
+      );
+    };
+
+    const handleMessageDeleted = ({ messageId, chatId }) => {
+      if (!messageId) return;
+      setConversations((all) =>
+        all.map((c) => {
+          if (c.id === chatId || c._id === chatId) {
+            return {
+              ...c,
+              messages: (c.messages || []).map((m) =>
+                m._id === messageId || m.id === messageId
+                  ? { ...m, isDeleted: true, content: '', text: '' }
+                  : m
+              ),
+            };
+          }
+          return c;
+        })
+      );
+    };
+
+    const handleMessageRead = ({ chatId, userId }) => {
+      if (!chatId || !userId) return;
+      setConversations((all) =>
+        all.map((c) => {
+          if (c.id === chatId || c._id === chatId) {
+            return {
+              ...c,
+              messages: (c.messages || []).map((m) => {
+                if (m.from === 'me') {
+                  const currentReadBy = Array.isArray(m.readBy) ? m.readBy : [];
+                  if (!currentReadBy.includes(userId)) {
+                    return { ...m, readBy: [...currentReadBy, userId] };
+                  }
+                }
+                return m;
+              }),
+            };
+          }
+          return c;
+        })
+      );
+    };
+
+    const handleTypingUpdate = ({ chatId, userId, username, typing }) => {
+      if (userId === user._id) return;
+      setTypingState((prev) => ({
+        ...prev,
+        [chatId]: typing ? username || 'Someone' : null,
+      }));
+    };
+
+    const handleReconnect = () => {
+      const activeCurrentId = currentChatIdRef.current;
+      if (activeCurrentId && activeCurrentId.length === 24) {
+        socket.emit('chat:join', activeCurrentId);
+        loadChatMessages(activeCurrentId, 1);
+      }
     };
 
     socket.on('message:new', handleIncomingMessage);
+    socket.on('message:edited', handleMessageEdited);
+    socket.on('message:deleted', handleMessageDeleted);
+    socket.on('message:read', handleMessageRead);
+    socket.on('typing:update', handleTypingUpdate);
+    socket.on('reconnect', handleReconnect);
+    socket.on('connect', handleReconnect);
+
     return () => {
       socket.off('message:new', handleIncomingMessage);
+      socket.off('message:edited', handleMessageEdited);
+      socket.off('message:deleted', handleMessageDeleted);
+      socket.off('message:read', handleMessageRead);
+      socket.off('typing:update', handleTypingUpdate);
+      socket.off('reconnect', handleReconnect);
+      socket.off('connect', handleReconnect);
     };
-  }, [user?._id, activeId, setConversations]);
+  }, [user?._id, setConversations, loadChatMessages, scrollToBottom]);
 
-  function openChat(id) {
-    setConversations((list) => list.map((c) => (c.id === id ? { ...c, unread: 0 } : c)));
-    setActiveId(id);
-    setView('chat');
-    setTimeout(() => textareaRef.current?.focus(), 150);
+  // Composer typing notification emitter
+  const handleComposerChange = (e) => {
+    const val = e.target.value;
+    setInputValue(val);
+    if (!active?.id || !user?._id) return;
+    const socket = connectSocket();
+    socket.emit('typing:start', active.id);
+
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      socket.emit('typing:stop', active.id);
+    }, 1600);
+  };
+
+  // Send message implementation with optimistic temp ID & retry handling
+  const sendMessage = (customContent = null, retryTempId = null) => {
+    const text = (customContent !== null ? customContent : inputValue).trim();
+    if (!text || !active) return;
 
     const socket = connectSocket();
-    if (id && id.length === 24) {
-      socket.emit('chat:join', id);
+    if (active.id && user?._id) {
+      socket.emit('typing:stop', active.id);
+    }
+    if (customContent === null) {
+      setInputValue('');
     }
 
-    // If it's a server chat, fetch message history
-    const target = conversations.find((c) => c.id === id);
-    if (target?.isServerChat && id && id.length === 24) {
-      chatApi
-        .getMessages(id)
-        .then((msgs) => {
-          const list = Array.isArray(msgs) ? msgs : msgs?.messages || [];
-          if (list.length > 0) {
-            const formatted = list.map((m) => ({
-              _id: m._id,
-              from: m.sender?._id === user?._id || m.sender === user?._id ? 'me' : 'them',
-              text: m.content || '',
-              time: m.createdAt
-                ? new Date(m.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
-                : 'Now',
-            }));
-            setConversations((all) =>
-              all.map((c) => (c.id === id ? { ...c, messages: formatted } : c))
-            );
-          }
-        })
-        .catch(() => {});
-    }
-  }
-
-  function backToList() { setView('inbox'); }
-
-  function sendMessage() {
-    const text = inputValue.trim();
-    if (!text || !active) return;
+    const tempId = retryTempId || `temp_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     const time = timeNow();
-    setConversations((list) => list.map((c) => (c.id === active.id ? { ...c, messages: [...c.messages, { from: 'me', text, time }] } : c)));
-    setInputValue('');
-
-    // If server chat, send via socket and fallback to chatApi
     const serverChatId = (active.isServerChat && active.id && active.id.length === 24)
       ? active.id
       : (active._id && typeof active._id === 'string' && active._id.length === 24)
       ? active._id
       : null;
 
+    const optimisticMsg = {
+      _id: tempId,
+      id: tempId,
+      from: 'me',
+      sender: {
+        _id: user?._id,
+        name: user?.name,
+        username: user?.username,
+        profilePicture: user?.profilePicture,
+      },
+      content: text,
+      text,
+      time,
+      createdAt: new Date().toISOString(),
+      status: 'sending',
+      isDeleted: false,
+      edited: false,
+      readBy: [user?._id],
+    };
+
+    setConversations((list) =>
+      list.map((c) => {
+        if (c.id === active.id) {
+          const currentList = c.messages || [];
+          const exists = currentList.some((m) => m._id === tempId);
+          const updated = exists
+            ? currentList.map((m) => (m._id === tempId ? { ...optimisticMsg, status: 'sending' } : m))
+            : [...currentList, optimisticMsg];
+          return {
+            ...c,
+            lastMessageText: text,
+            lastMessageTime: time,
+            lastMessageFrom: 'me',
+            messages: updated,
+          };
+        }
+        return c;
+      })
+    );
+
     if (serverChatId) {
-      const socket = connectSocket();
       socket.emit('message:send', serverChatId, text, [], (res) => {
-        if (!res?.ok) {
-          chatApi.sendMessage(serverChatId, text).catch(() => {});
+        if (res?.ok && res?.message) {
+          const realMsg = res.message;
+          setConversations((list) =>
+            list.map((c) => {
+              if (c.id === active.id) {
+                return {
+                  ...c,
+                  messages: (c.messages || []).map((m) =>
+                    m._id === tempId
+                      ? {
+                          ...m,
+                          _id: realMsg._id,
+                          id: realMsg._id,
+                          createdAt: realMsg.createdAt,
+                          status: 'sent',
+                        }
+                      : m
+                  ),
+                };
+              }
+              return c;
+            })
+          );
+        } else {
+          chatApi
+            .sendMessage(serverChatId, text)
+            .then((resDto) => {
+              const realMsg = resDto?.message || resDto;
+              setConversations((list) =>
+                list.map((c) => {
+                  if (c.id === active.id) {
+                    return {
+                      ...c,
+                      messages: (c.messages || []).map((m) =>
+                        m._id === tempId
+                          ? {
+                              ...m,
+                              _id: realMsg._id || m._id,
+                              status: 'sent',
+                            }
+                          : m
+                      ),
+                    };
+                  }
+                  return c;
+                })
+              );
+            })
+            .catch(() => {
+              setConversations((list) =>
+                list.map((c) => {
+                  if (c.id === active.id) {
+                    return {
+                      ...c,
+                      messages: (c.messages || []).map((m) =>
+                        m._id === tempId ? { ...m, status: 'failed' } : m
+                      ),
+                    };
+                  }
+                  return c;
+                })
+              );
+            });
         }
       });
     } else {
-      setTyping(true);
       setTimeout(() => {
-        const reply = REPLIES[Math.floor(Math.random() * REPLIES.length)];
-        const rtime = timeNow();
-        setConversations((list) => list.map((c) => (c.id === active.id ? { ...c, messages: [...c.messages, { from: 'them', text: reply, time: rtime }] } : c)));
-        setTyping(false);
-      }, 900 + Math.random() * 700);
+        setConversations((list) =>
+          list.map((c) =>
+            c.id === active.id
+              ? {
+                  ...c,
+                  messages: (c.messages || []).map((m) =>
+                    m._id === tempId ? { ...m, status: 'sent' } : m
+                  ),
+                }
+              : c
+          )
+        );
+      }, 400);
     }
-  }
+
+    scrollToBottom(true);
+  };
+
+  // Edit Message
+  const handleStartEdit = (m) => {
+    setEditingMessageId(m._id);
+    setEditingContent(m.content || m.text || '');
+    setTimeout(() => editInputRef.current?.focus(), 80);
+  };
+
+  const handleSaveEdit = async (messageId) => {
+    const trimmed = editingContent.trim();
+    if (!trimmed || !active?.id) return;
+
+    setConversations((list) =>
+      list.map((c) => {
+        if (c.id === active.id) {
+          return {
+            ...c,
+            messages: (c.messages || []).map((m) =>
+              m._id === messageId
+                ? { ...m, content: trimmed, text: trimmed, edited: true, editedAt: new Date().toISOString() }
+                : m
+            ),
+          };
+        }
+        return c;
+      })
+    );
+    setEditingMessageId(null);
+
+    const socket = connectSocket();
+    socket.emit('message:edit', { chatId: active.id, messageId, content: trimmed });
+    chatApi.editMessage(active.id, messageId, trimmed).catch(() => {});
+  };
+
+  // Soft Delete Message
+  const handleDeleteMessage = (m) => {
+    if (!window.confirm("Delete this message for everyone?")) return;
+    const messageId = m._id;
+    if (!messageId || !active?.id) return;
+
+    setConversations((list) =>
+      list.map((c) => {
+        if (c.id === active.id) {
+          return {
+            ...c,
+            messages: (c.messages || []).map((msg) =>
+              msg._id === messageId ? { ...msg, isDeleted: true, content: '', text: '' } : msg
+            ),
+          };
+        }
+        return c;
+      })
+    );
+
+    const socket = connectSocket();
+    socket.emit('message:delete', { chatId: active.id, messageId });
+    chatApi.deleteMessage(active.id, messageId).catch(() => {});
+  };
+
+  const canDeleteMessage = (m) => {
+    if (!user?._id || m.isDeleted) return false;
+    const isSender = m.from === 'me' || (m.sender?._id || m.sender) === user._id;
+    if (isSender) return true;
+    if (active?.leader === user._id || active?.groupAdmin === user._id) return true;
+    if (Array.isArray(active?.admins) && active.admins.some((a) => (a._id || a) === user._id)) return true;
+    return false;
+  };
+
+  const processedMessages = useMemo(() => {
+    if (!active || !Array.isArray(active.messages)) return [];
+    return active.messages.filter((m) => m && (m.content || m.text || m.isDeleted));
+  }, [active]);
+
+  const activeTypingUser = active?.id ? typingState[active.id] : null;
+  const currentPaging = active?.id ? chatPagination[active.id] : null;
 
   return (
     <div className="cw-root">
@@ -443,35 +995,37 @@ export default function ChatWidget() {
             </div>
             <div className="search-box">
               <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke="currentColor"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>
-              <input type="text" placeholder="Search..." />
+              <input type="text" placeholder="Search conversations..." />
             </div>
             <div className="chat-list">
               {conversations.length === 0 ? (
-                <div style={{ padding: '36px 16px', textAlign: 'center', color: 'var(--text-muted, #888)' }}>
-                  <p style={{ margin: '0 0 6px 0', fontSize: '13.5px', fontWeight: 600, color: 'var(--text-main, #fff)' }}>No conversations yet</p>
-                  <p style={{ margin: 0, fontSize: '12px', opacity: 0.8 }}>Start a chat with teammates or connect with developers on Explore.</p>
+                <div style={{ padding: '40px 16px', textAlign: 'center', color: 'var(--text-lo)' }}>
+                  <p style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 600, color: 'var(--text-hi)' }}>No conversations yet</p>
+                  <p style={{ margin: 0, fontSize: '12px', opacity: 0.8 }}>Connect with team members or start a direct message to begin chatting.</p>
                 </div>
               ) : (
                 conversations.map((conv) => {
-                  const realMsgs = (conv.messages || []).filter(
-                    (m) =>
-                      m &&
-                      m.text &&
-                      !m.text.includes("connect on DevConnect") &&
-                      !m.text.includes("Let's connect") &&
-                      !m.text.includes("Let’s connect")
-                  );
-                  const last = realMsgs[realMsgs.length - 1] || { text: 'No messages yet', time: '' };
+                  const msgs = conv.messages || [];
+                  const last = msgs[msgs.length - 1] || {
+                    text: conv.lastMessageText || 'No messages yet',
+                    time: conv.lastMessageTime || '',
+                    from: conv.lastMessageFrom || '',
+                  };
                   return (
                     <div className={`chat-item${conv.unread === 0 ? ' read' : ''}`} key={conv.id} onClick={() => openChat(conv.id)}>
-                      <div className={`avatar${conv.online ? ' online' : ''}`} style={{ background: AVATAR_COLORS[conv.colorIdx] || AVATAR_COLORS[0] }}>{conv.initial}</div>
+                      <div className={`avatar${conv.online ? ' online' : ''}`} style={{ background: AVATAR_COLORS[conv.colorIdx] || AVATAR_COLORS[0] }}>
+                        {conv.initial}
+                      </div>
                       <div className="info">
                         <div className="row1">
                           <span className="name">{conv.name}</span>
-                          <span className="time">{last.time}</span>
+                          <span className="time">{last.time || ''}</span>
                         </div>
                         <div className="row2">
-                          <span className="preview">{last.from === 'me' ? 'You: ' : ''}{last.text}</span>
+                          <span className="preview">
+                            {last.from === 'me' ? 'You: ' : ''}
+                            {formatMessageText(last.content || last.text)}
+                          </span>
                           {conv.unread > 0 && <span className="unread-pill tabular">{conv.unread}</span>}
                         </div>
                       </div>
@@ -490,11 +1044,13 @@ export default function ChatWidget() {
               </button>
               {active && (
                 <>
-                  <div className={`avatar${active.online ? ' online' : ''}`} style={{ background: AVATAR_COLORS[active.colorIdx] }}>{active.initial}</div>
+                  <div className={`avatar${active.online ? ' online' : ''}`} style={{ background: AVATAR_COLORS[active.colorIdx] }}>
+                    {active.initial}
+                  </div>
                   <div className="who">
                     <div className="name">{active.name}</div>
                     <div className="status" style={{ color: active.online ? 'var(--online)' : 'var(--text-lo)' }}>
-                      {active.online ? 'Online now' : 'Last seen recently'}
+                      {active.online ? 'Online now' : 'Active conversation'}
                     </div>
                   </div>
                 </>
@@ -504,34 +1060,162 @@ export default function ChatWidget() {
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
               </button>
             </div>
-            <div className="messages" ref={messagesRef}>
-              <div className="day-divider">Today</div>
-              {active &&
-                active.messages
-                  ?.filter(
-                    (m) =>
-                      m &&
-                      m.text &&
-                      !m.text.includes("connect on DevConnect") &&
-                      !m.text.includes("Let's connect") &&
-                      !m.text.includes("Let’s connect")
-                  )
-                  .map((m, i) => (
-                    <div className={`msg ${m.from}`} key={i}>
-                      {m.text}
-                      <span className="time">{m.time}</span>
+
+            <div className="messages" ref={messagesRef} onScroll={handleScroll}>
+              {currentPaging?.hasMore && (
+                <div className="load-earlier-container">
+                  <button className="load-earlier-btn" onClick={handleLoadEarlier} disabled={loadingEarlier}>
+                    {loadingEarlier ? (
+                      <>
+                        <RefreshCw size={12} className="animate-spin" /> Loading earlier...
+                      </>
+                    ) : (
+                      'Load earlier messages'
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {processedMessages.map((m, index) => {
+                const prev = processedMessages[index - 1];
+                const currentDateLabel = getDateLabel(m.createdAt);
+                const prevDateLabel = prev ? getDateLabel(prev.createdAt) : null;
+                const showDateDivider = currentDateLabel !== prevDateLabel;
+
+                const isMe = m.from === 'me';
+                const isEditing = editingMessageId === m._id;
+                const isDeleted = Boolean(m.isDeleted);
+                const isSeen = Array.isArray(m.readBy) && m.readBy.some((id) => id && id !== user?._id);
+
+                return (
+                  <React.Fragment key={m._id || m.id || index}>
+                    {showDateDivider && <div className="day-divider">{currentDateLabel}</div>}
+
+                    <div className={`msg-wrapper ${isMe ? 'me' : 'them'}`}>
+                      {isEditing ? (
+                        <div className="inline-edit-box">
+                          <textarea
+                            ref={editInputRef}
+                            value={editingContent}
+                            onChange={(e) => setEditingContent(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                handleSaveEdit(m._id);
+                              } else if (e.key === 'Escape') {
+                                setEditingMessageId(null);
+                              }
+                            }}
+                          />
+                          <div className="inline-edit-actions">
+                            <button className="btn-cancel-edit" onClick={() => setEditingMessageId(null)}>
+                              Cancel
+                            </button>
+                            <button className="btn-save-edit" onClick={() => handleSaveEdit(m._id)}>
+                              Save
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="msg-row">
+                          <div className={`msg ${isMe ? 'me' : 'them'}${isDeleted ? ' deleted' : ''}`}>
+                            {isDeleted ? (
+                              <em>This message was deleted</em>
+                            ) : (
+                              formatMessageText(m.content || m.text)
+                            )}
+
+                            <div className="msg-footer">
+                              <span className="time">{m.time || formatMessageTime(m.createdAt)}</span>
+                              {m.edited && !isDeleted && <span className="edited-tag">(edited)</span>}
+                              {isMe && !isDeleted && (
+                                <span title={m.status === 'sending' ? 'Sending' : isSeen ? 'Seen' : 'Delivered'}>
+                                  {m.status === 'sending' ? (
+                                    <Clock size={11} style={{ opacity: 0.6 }} />
+                                  ) : isSeen ? (
+                                    <CheckCheck size={13} style={{ color: '#ff98a2', strokeWidth: 2.4 }} />
+                                  ) : (
+                                    <Check size={13} style={{ opacity: 0.7, strokeWidth: 2 }} />
+                                  )}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {!isDeleted && m.status !== 'sending' && (
+                            <div className="msg-actions">
+                              {isMe && (
+                                <button
+                                  className="msg-action-btn"
+                                  title="Edit message"
+                                  onClick={() => handleStartEdit(m)}
+                                >
+                                  <Edit2 size={12} />
+                                </button>
+                              )}
+                              {canDeleteMessage(m) && (
+                                <button
+                                  className="msg-action-btn delete"
+                                  title="Delete message"
+                                  onClick={() => handleDeleteMessage(m)}
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {m.status === 'failed' && (
+                        <div className="msg-retry-banner">
+                          <AlertCircle size={11} /> Failed to send.
+                          <button className="msg-retry-btn" onClick={() => sendMessage(m.content || m.text, m._id)}>
+                            Retry
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  ))}
-              {typing && <div className="typing"><span /><span /><span /></div>}
+                  </React.Fragment>
+                );
+              })}
             </div>
+
+            {showJumpButton && (
+              <button className="jump-btn" onClick={() => scrollToBottom(true)}>
+                <ArrowDown size={13} /> Jump to latest
+              </button>
+            )}
+
+            {activeTypingUser && (
+              <div className="typing-bar">
+                <div className="typing-dots">
+                  <span /><span /><span />
+                </div>
+                <span>{activeTypingUser} is typing...</span>
+              </div>
+            )}
+
             <div className="composer">
               <textarea
-                ref={textareaRef} rows={1} placeholder="Type a message..."
+                ref={textareaRef}
+                rows={1}
+                placeholder="Type a message..."
                 value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+                onChange={handleComposerChange}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                  }
+                }}
               />
-              <button className="send-btn" aria-label="Send" onClick={sendMessage}>
+              <button
+                className="send-btn"
+                aria-label="Send"
+                disabled={!inputValue.trim()}
+                onClick={() => sendMessage()}
+              >
                 <svg viewBox="0 0 24 24"><path d="M3 20l18-8L3 4v6l12 2-12 2z" /></svg>
               </button>
             </div>

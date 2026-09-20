@@ -257,7 +257,17 @@ export default function Register() {
         </div>
       </form>
 
-      <OAuthButtons mode="register" onError={setError} onSuccess={() => navigate(nextParam || "/workspace", { replace: true })} />
+      <OAuthButtons
+        mode="register"
+        onError={setError}
+        onSuccess={(loggedUser) => {
+          if (loggedUser && !loggedUser.isProfileComplete) {
+            navigate("/onboarding", { replace: true });
+          } else {
+            navigate(nextParam || "/workspace", { replace: true });
+          }
+        }}
+      />
 
       <p style={styles.footerText}>
         Already have an account?{" "}

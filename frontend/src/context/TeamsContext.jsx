@@ -91,7 +91,7 @@ export function TeamsProvider({ children }) {
     const myJoined = new Set();
     teams.forEach((t) => {
       const isMem = t.members?.some((m) => {
-        const u = m.user;
+        const u = m?.user || m;
         const uid = String(u?._id || u?.id || u || '');
         const uusername = String(u?.username || '').toLowerCase();
         return (
@@ -138,14 +138,14 @@ export function TeamsProvider({ children }) {
     const tid = String(team._id || team.id || '');
     if (tid && joinedTeamIds.has(tid)) return true;
     return team.members?.some((m) => {
-      const u = m.user;
+      const u = m?.user || m;
       if (!u) return false;
       const uid = String(u._id || u.id || u || '');
       const uname = String(u.name || '');
       const uusername = String(u.username || '');
       return (
         (uid && (uid === String(currentUserId) || (authUser?._id && uid === String(authUser._id)))) ||
-        (uname && (uname === currentUserName || uname === authUser?.name)) ||
+        (uname && currentUserName && (uname === currentUserName || uname === authUser?.name)) ||
         (uusername && authUser?.username && uusername.toLowerCase() === authUser.username.toLowerCase())
       );
     }) || false;

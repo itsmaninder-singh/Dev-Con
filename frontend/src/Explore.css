@@ -495,6 +495,22 @@
 }
 .explore-root .join-btn:hover{ box-shadow:0 0 24px rgba(255,152,162,0.45); }
 .explore-root .join-btn:disabled{ background:transparent; color:var(--dim); border:1px solid var(--glass-border); cursor:default; box-shadow:none; }
+.explore-root .join-btn.is-joined,
+.explore-root .join-btn.is-joined:disabled {
+  background: rgba(74, 222, 128, 0.12) !important;
+  border: 1px solid rgba(74, 222, 128, 0.35) !important;
+  color: #4ade80 !important;
+  cursor: default;
+  opacity: 1 !important;
+  box-shadow: none !important;
+}
+.explore-root .join-btn.is-joined.clickable {
+  cursor: pointer !important;
+}
+.explore-root .join-btn.is-joined.clickable:hover {
+  background: rgba(74, 222, 128, 0.22) !important;
+  box-shadow: 0 0 20px rgba(74, 222, 128, 0.3) !important;
+}
 .explore-root .join-btn.pop{ transform:scale(0.92); }
 .explore-root .score-text{ font-weight:700; }
 

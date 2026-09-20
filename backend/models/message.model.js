@@ -1,53 +1,92 @@
 import mongoose from "mongoose";
 
 const messageSchema = new mongoose.Schema({
-    chat:{
-        type:mongoose.Schema.Types.ObjectId,
-        ref:"Chat",
-        required:true,
+    chat: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Chat",
+      required: true,
+      index: true,
     },
-    sender:{
-    type: mongoose.Schema.Types.ObjectId,
+    conversationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Chat",
+      index: true,
+    },
+    team: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Team",
+      default: null,
+      index: true,
+    },
+    sender: {
+      type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
-        
+      index: true,
     },
-    content:{
-        type:String,
-        required:true,
-        maxlength: 4200 
+    content: {
+      type: String,
+      default: "",
+      maxlength: 4200,
     },
-     mentions: [{
-         type: mongoose.Schema.Types.ObjectId, 
-         ref: "User" 
-    }],
-     deliveredTo: [{
-         type: mongoose.Schema.Types.ObjectId,
-          ref: "User"
-    }],
-     deletedFor: [{ 
-        type: mongoose.Schema.Types.ObjectId, 
-        ref: "User"
-     }],
-      deletedForEveryone: {
-        type: Boolean,
-        default: false
-         },
-    readBy:[{
+    mentions: [
+      {
         type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-    }],
-    edited: { 
-        type: Boolean,
-         default: false 
-        },
+        ref: "User",
+      },
+    ],
+    deliveredTo: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    deletedFor: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    deletedForEveryone: {
+      type: Boolean,
+      default: false,
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
+    readBy: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    edited: {
+      type: Boolean,
+      default: false,
+    },
     editedAt: {
-         type: Date,
-          default: null
-         },
-},
-{timestamps:true}
+      type: Date,
+      default: null,
+    },
+  },
+  {
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
+  }
 );
+
+messageSchema.pre("save", function (next) {
+  if (!this.conversationId && this.chat) {
+    this.conversationId = this.chat;
+  }
+  if (this.isDeleted || this.deletedForEveryone) {
+    this.isDeleted = true;
+    this.deletedForEveryone = true;
+  }
+  next();
+});
 messageSchema.index({ chat: 1, createdAt: -1 });
 messageSchema.methods.computeStatus = function (participantIds = []) {
   const others = participantIds

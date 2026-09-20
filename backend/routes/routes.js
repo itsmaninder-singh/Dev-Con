@@ -84,6 +84,8 @@ import {
   getOrCreateDirectChat,
   getMessages,
   sendMessage,
+  editMessage,
+  deleteMessage,
   createGroupChat,
   markChatAsRead,
 } from "../controller/chat.controller.js";
@@ -156,6 +158,8 @@ router.get("/chats", protect, requireCompleteProfile, getMyChats);
 router.get("/chats/direct/:userId", protect, requireCompleteProfile, getOrCreateDirectChat);
 router.get("/chats/:chatId/messages", protect, requireCompleteProfile, getMessages);
 router.post("/chats/:chatId/messages", protect, requireCompleteProfile, sendMessage);
+router.patch("/chats/:chatId/messages/:messageId", protect, requireCompleteProfile, editMessage);
+router.delete("/chats/:chatId/messages/:messageId", protect, requireCompleteProfile, deleteMessage);
 router.post("/chats/group", protect, requireCompleteProfile, createGroupChat);
 router.patch("/chats/:chatId/read", protect, requireCompleteProfile, markChatAsRead);
 router.use("/projects", projectFileRouter);

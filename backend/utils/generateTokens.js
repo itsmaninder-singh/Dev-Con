@@ -5,13 +5,18 @@ const REFRESH_TOKEN_EXPIRE = process.env.JWT_EXPIRE || "7d";
 
 export const REFRESH_COOKIE_NAME = "devconnect_refresh_token";
 
-export const generateAccessToken = (userId) => {
-  return jwt.sign({ id: userId 
-
-  },
-   process.env.JWT_SECRET, {
-    expiresIn: ACCESS_TOKEN_EXPIRE,
-  });
+export const generateAccessToken = (userId, extraClaims = {}) => {
+  return jwt.sign(
+    {
+      id: userId,
+      userId,
+      ...extraClaims,
+    },
+    process.env.JWT_SECRET,
+    {
+      expiresIn: ACCESS_TOKEN_EXPIRE,
+    }
+  );
 };
 
 export const generateRefreshToken = (userId) => {

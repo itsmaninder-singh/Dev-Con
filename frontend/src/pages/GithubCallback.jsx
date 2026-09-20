@@ -29,12 +29,17 @@ export default function GithubCallback() {
     const mode = localStorage.getItem("oauth_auth_mode") || "login";
 
     loginWithGithub({ code, mode })
-      .then(() => {
+      .then((loggedUser) => {
         localStorage.removeItem("oauth_auth_mode");
         if (!isMounted) return;
-        setStatus("Success! Redirecting to your workspace...");
+        const destination = loggedUser && !loggedUser.isProfileComplete ? "/onboarding" : "/workspace";
+        setStatus(
+          destination === "/onboarding"
+            ? "Success! Setting up your profile..."
+            : "Success! Redirecting to your workspace..."
+        );
         setTimeout(() => {
-          navigate("/workspace", { replace: true });
+          navigate(destination, { replace: true });
         }, 600);
       })
       .catch((err) => {
