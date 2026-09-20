@@ -42,6 +42,7 @@ export function ChatUIProvider({ children }) {
             const mapped = serverChats.map((c, idx) => {
               const other = c.participants?.find((p) => p._id !== user._id) || c.participants?.[0] || {};
               const name = c.isGroup ? c.name : other.name || 'Chat Member';
+              const initial = name ? name[0].toUpperCase() : '?';
               const hasLastMsg = !!c.lastMessage?.text;
               const lastMsg = c.lastMessage?.text || 'No messages yet';
               const lastTime = c.lastMessage?.timestamp
