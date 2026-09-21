@@ -418,6 +418,7 @@ export default function Explore() {
         item={modalItem}
         onClose={() => setModalItem(null)}
         onJoin={handleJoin}
+        showToast={showToast}
       />
     </div>
   );

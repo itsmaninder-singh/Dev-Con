@@ -3,22 +3,25 @@ import { useNavigate } from 'react-router-dom';
 import AIScoreRing from '../../components/ai/AIScoreRing.jsx';
 import AILoadingShimmer from '../../components/ai/AILoadingShimmer.jsx';
 import { scoreCandidateVsTeam } from '../ai/scoring.js';
-import { Sparkles, Check, AlertCircle, MessageSquare } from 'lucide-react';
+import { Sparkles, Check, AlertCircle, MessageSquare, Loader2 } from 'lucide-react';
 import soundManager from '../../utils/soundManager.js';
 import { aiApi } from '../../lib/api.js';
 import { useProfile } from '../../context/ProfileContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useChatUI } from '../../context/ChatUIContext.jsx';
 
 const CIRC = 75.4;
 
-export default function CardModal({ item, onClose, onJoin }) {
+export default function CardModal({ item, onClose, onJoin, showToast, onToast }) {
   const navigate = useNavigate();
   const { profile } = useProfile() || {};
   const { user } = useAuth() || {};
+  const { openDirectChatWith } = useChatUI() || {};
   const [joined, setJoined] = useState(false);
   const [fitOpen, setFitOpen] = useState(false);
   const [fitLoading, setFitLoading] = useState(false);
   const [fitResult, setFitResult] = useState(null);
+  const [isMessaging, setIsMessaging] = useState(false);
 
   useEffect(() => {
     if (item) {
@@ -28,6 +31,7 @@ export default function CardModal({ item, onClose, onJoin }) {
     setFitOpen(false);
     setFitLoading(false);
     setFitResult(null);
+    setIsMessaging(false);
   }, [item]);
 
   useEffect(() => {
@@ -47,11 +51,19 @@ export default function CardModal({ item, onClose, onJoin }) {
   const full = membersCount >= maxMembers;
   const openSpots = Math.max(0, maxMembers - membersCount);
 
-  const creatorName = item?.creator?.name || 'Developer';
+  const creatorName = item?.creator?.name || (typeof item?.owner === 'object' && item?.owner?.name) || 'Developer';
   const creatorInitials = item?.creator?.initials || (creatorName ? creatorName.slice(0, 2).toUpperCase() : 'DV');
-  const creatorUsername = item?.creator?.username || (creatorName ? creatorName.toLowerCase().replace(/\s+/g, '') : 'builder');
+  const creatorUsername = item?.creator?.username || (typeof item?.owner === 'object' && item?.owner?.username) || (creatorName ? creatorName.toLowerCase().replace(/\s+/g, '') : 'builder');
 
-  const creatorId = String(item?.creator?._id || item?.creator?.id || item?.creator || item?.owner?._id || item?.owner?.id || item?.owner || '');
+  const creatorId = String(
+    item?.creator?._id ||
+    item?.creator?.id ||
+    (typeof item?.creator === 'string' ? item.creator : '') ||
+    item?.owner?._id ||
+    item?.owner?.id ||
+    (typeof item?.owner === 'string' ? item.owner : '') ||
+    ''
+  ).trim();
   const creatorUsernameVal = String(item?.creator?.username || item?.owner?.username || creatorUsername || '').toLowerCase();
   const currentUserId = String(user?._id || user?.id || '');
   const currentUsername = String(user?.username || '').toLowerCase();
@@ -129,12 +141,89 @@ export default function CardModal({ item, onClose, onJoin }) {
     onClose();
   };
 
+  const displayToast = (msg) => {
+    if (showToast) showToast(msg);
+    else if (onToast) onToast(msg);
+    else if (window.devconnectToast) window.devconnectToast(msg);
+  };
+
+  async function handleMessageOwner(e) {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    console.log('[CardModal] Message button clicked for owner:', {
+      item,
+      creatorId,
+      creatorName,
+      creatorInitials,
+      isOwner,
+      currentUserId,
+    });
+
+    if (isOwner) {
+      console.warn('[CardModal] Blocked: Current user is the owner, cannot message self.');
+      displayToast("You cannot message yourself as you are the project owner.");
+      return;
+    }
+
+    if (isMessaging) {
+      console.log('[CardModal] Blocked: Message creation already in flight, ignoring duplicate click.');
+      return;
+    }
+
+    if (!creatorId) {
+      console.error('[CardModal] Error: No valid owner/creator ID found on item:', item);
+      displayToast("Could not find the project owner's contact details.");
+      return;
+    }
+
+    setIsMessaging(true);
+    console.log('[CardModal] Initiating chat with owner ID:', creatorId);
+
+    try {
+      if (openDirectChatWith) {
+        const chat = await openDirectChatWith(creatorId, {
+          name: creatorName,
+          initial: creatorInitials,
+          throwOnError: true,
+        });
+        console.log('[CardModal] Chat opened/created successfully:', chat);
+      } else {
+        console.log('[CardModal] Falling back to devconnect:open-chat custom event');
+        window.dispatchEvent(
+          new CustomEvent('devconnect:open-chat', {
+            detail: {
+              userId: creatorId,
+              name: creatorName,
+              initial: creatorInitials,
+            },
+          })
+        );
+      }
+
+      // Close project card modal so the user transitions into the active chat drawer
+      handleClose();
+    } catch (err) {
+      console.error('[CardModal] Failed to open conversation with owner:', err);
+      displayToast(err?.message || 'Failed to start conversation with owner. Please try again.');
+    } finally {
+      setIsMessaging(false);
+    }
+  }
+
   return (
     <div
       id="modalOverlay"
       className={visible ? 'visible' : ''}
       onClick={(e) => { if (e.target.id === 'modalOverlay') handleClose(); }}
     >
+      <style>{`
+        @keyframes cardModalSpin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
       {item && (
         <div className="modal-card">
           <button className="modal-close" aria-label="Close" onClick={handleClose}>
@@ -205,37 +294,42 @@ export default function CardModal({ item, onClose, onJoin }) {
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                window.dispatchEvent(
-                  new CustomEvent('devconnect:open-chat', {
-                    detail: {
-                      userId: item.creator?._id || item.creator?.id || item.owner,
-                      name: creatorName,
-                      initial: creatorInitials,
-                    },
-                  })
-                );
-              }}
-              style={{
-                background: 'rgba(255, 152, 162, 0.12)',
-                border: '1px solid rgba(255, 152, 162, 0.3)',
-                color: 'var(--coral, #ff98a2)',
-                padding: '6px 14px',
-                borderRadius: '20px',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                transition: 'all 0.18s ease',
-              }}
-              title="Message owner"
-            >
-              <MessageSquare size={13} /> Message
-            </button>
+            {!isOwner && (
+              <button
+                type="button"
+                data-chat-trigger="true"
+                disabled={isMessaging}
+                onClick={handleMessageOwner}
+                style={{
+                  background: isMessaging ? 'rgba(255, 152, 162, 0.2)' : 'rgba(255, 152, 162, 0.12)',
+                  border: '1px solid rgba(255, 152, 162, 0.3)',
+                  color: 'var(--coral, #ff98a2)',
+                  padding: '6px 14px',
+                  borderRadius: '20px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: isMessaging ? 'wait' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'all 0.18s ease',
+                  opacity: isMessaging ? 0.75 : 1,
+                }}
+                title={isMessaging ? 'Opening conversation...' : `Message ${creatorName}`}
+              >
+                {isMessaging ? (
+                  <>
+                    <Loader2 size={13} style={{ animation: 'cardModalSpin 0.9s linear infinite' }} />
+                    <span>Opening...</span>
+                  </>
+                ) : (
+                  <>
+                    <MessageSquare size={13} />
+                    <span>Message</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
 
           {/* AI Tool 4a: Team Fit Check Inline Panel */}

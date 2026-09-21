@@ -107,16 +107,22 @@ export function ChatUIProvider({ children }) {
       setOpen(true);
       setView('chat');
 
+      // Extract 24-character string ID if object was passed
+      const cleanUserId = typeof userId === 'object' && userId !== null
+        ? String(userId._id || userId.id || '')
+        : String(userId || '').trim();
+      const validUserId = cleanUserId.length === 24 ? cleanUserId : null;
+
       // Check if already in conversations by userId / name
       const currentList = conversationsRef.current || [];
       const existing = currentList.find(
         (c) =>
-          (userId && (c.id === userId || c._id === userId)) ||
+          (cleanUserId && (c.id === cleanUserId || c._id === cleanUserId)) ||
           (targetName && c.name?.toLowerCase() === targetName.toLowerCase()) ||
           (targetName && targetName.toLowerCase().includes(c.name?.toLowerCase()))
       );
 
-      const tempId = userId || `dm_${Date.now()}`;
+      const tempId = validUserId || (cleanUserId ? `dm_${cleanUserId}` : `dm_${Date.now()}`);
 
       if (existing) {
         setActiveId(existing.id);
@@ -125,8 +131,8 @@ export function ChatUIProvider({ children }) {
         // Optimistically create and set active conversation immediately
         const optimisticConv = {
           id: tempId,
-          _id: userId && userId.length === 24 ? userId : tempId,
-          isServerChat: !!(userId && userId.length === 24),
+          _id: validUserId || tempId,
+          isServerChat: !!validUserId,
           name: targetName,
           initial: targetInitial,
           online: true,
@@ -139,12 +145,12 @@ export function ChatUIProvider({ children }) {
       }
 
       // If valid MongoDB ObjectId, call GET /chats/direct/:userId via chatApi
-      if (userId && typeof userId === 'string' && userId.length === 24) {
+      if (validUserId) {
         try {
-          const res = await chatApi.getOrCreateDirectChat(userId);
+          const res = await chatApi.getOrCreateDirectChat(validUserId);
           const chat = res?.chat || res;
           if (chat && chat._id) {
-            const other = chat.participants?.find((p) => (p._id || p) !== user?._id) || { name: targetName, _id: userId };
+            const other = chat.participants?.find((p) => (p._id || p) !== user?._id) || { name: targetName, _id: validUserId };
             const chatName = other.name || targetName;
             const chatInitial = other.name ? other.name[0].toUpperCase() : targetInitial;
 
@@ -175,19 +181,30 @@ export function ChatUIProvider({ children }) {
             };
 
             setConversations((prev) => {
-              const matches = (c) => c.id === chat._id || c.id === tempId || c._id === userId;
+              const matches = (c) =>
+                c.id === chat._id ||
+                c.id === tempId ||
+                c._id === validUserId ||
+                (targetName && c.name?.toLowerCase() === targetName.toLowerCase());
               if (prev.some(matches)) {
                 return prev.map((c) => (matches(c) ? { ...c, ...serverConv, id: chat._id } : c));
               }
               return [serverConv, ...prev];
             });
-            setActiveId((curr) => (curr === tempId || curr === userId || !curr ? chat._id : curr));
+            setActiveId((curr) => (curr === tempId || curr === validUserId || !curr ? chat._id : curr));
             return chat;
           }
         } catch (err) {
           console.warn('GET /chats/direct/:userId failed, using fallback thread:', err);
+          if (targetInfo.throwOnError) {
+            throw err;
+          }
         }
+      } else if (targetInfo.throwOnError) {
+        throw new Error('Invalid user ID to message');
       }
+
+      return existing || null;
     },
     [user?._id]
   );
