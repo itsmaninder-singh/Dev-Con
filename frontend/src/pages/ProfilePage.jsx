@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import gsap from 'gsap';
 import { useProfile } from '../context/ProfileContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -17,6 +17,7 @@ export default function ProfilePage() {
   const { teams: userTeams, projects: userProjects } = useTeams() || {};
   const { openDirectChatWith } = useChatUI();
   const navigate = useNavigate();
+  const location = useLocation();
   const { username } = useParams();
 
   const [targetUser, setTargetUser] = useState(null);
@@ -212,6 +213,15 @@ export default function ProfilePage() {
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 2500);
   };
+
+  useEffect(() => {
+    if (location.state?.githubSynced) {
+      showToast(location.state.message || "GitHub profile connected and synced successfully!");
+      try {
+        window.history.replaceState({}, document.title);
+      } catch {}
+    }
+  }, [location.state]);
 
   const handleCopyLink = () => {
     if (navigator.clipboard) {
@@ -524,6 +534,7 @@ export default function ProfilePage() {
           repScoreRef={repScoreRef}
           navigate={navigate}
           isOwnProfile={isOwnProfile}
+          showToast={showToast}
         />
 
         <ProfileTabs

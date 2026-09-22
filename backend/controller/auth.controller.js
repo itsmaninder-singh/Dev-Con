@@ -12,6 +12,8 @@ import {
   refreshCookieOptions,
 } from "../utils/generateTokens.js";
 
+import { syncGithubProfileForUser } from "../utils/githubSync.js";
+
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const toSafeUser = (user) => ({
@@ -19,6 +21,9 @@ const toSafeUser = (user) => ({
   name: user.name,
   username: user.username,
   email: user.email,
+  githubUsername: user.githubUsername,
+  githubProfile: user.githubProfile,
+  badges: user.badges,
   profilePicture: user.profilePicture,
   coverPicture: user.coverPicture,
   bio: user.bio,
@@ -312,14 +317,14 @@ const githubAuth = asyncHandler(async (req, res) => {
   try {
     [githubProfile, githubEmails] = await Promise.all([
       axios.get("https://api.github.com/user", {
-        headers: { Authorization: `Bearer ${accessToken}` },
+        headers: { Authorization: `Bearer ${accessToken}`, "User-Agent": "DevConnect-App" },
       }),
       axios.get("https://api.github.com/user/emails", {
-        headers: { Authorization: `Bearer ${accessToken}` },
+        headers: { Authorization: `Bearer ${accessToken}`, "User-Agent": "DevConnect-App" },
       }),
     ]);
   } catch (err) {
-    throw new ApiError(401, "Failed to fetch GitHub profile");
+    throw new ApiError(401, "Failed to fetch GitHub profile: " + (err.response?.data?.message || err.message));
   }
 
   const profile = githubProfile.data;
@@ -374,6 +379,13 @@ const githubAuth = asyncHandler(async (req, res) => {
     if (needsSave) {
       await user.save({ validateModifiedOnly: true });
     }
+  }
+
+  // Automatically sync GitHub profile stats (repos, streak, badges) in background
+  if (user?.githubUsername) {
+    syncGithubProfileForUser(user._id, user.githubUsername).catch((err) =>
+      console.warn(`[githubAuth] Background sync notice for @${user.githubUsername}:`, err.message)
+    );
   }
 
   return sendAuthResponse(res, 200, user, "Logged in with GitHub successfully");

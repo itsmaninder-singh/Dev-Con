@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import axios from 'axios';
 import { User } from '../models/user.model.js';
 import { ApiError } from '../utils/ApiError.js';
 import {asyncHandler} from "../utils/asyncHandler.js"
@@ -7,6 +8,7 @@ import { toSafeUser } from "./auth.controller.js";
 import { uploadOnCloudinary, deleteFromCloudinary } from "../utils/cloudinary.js";
 import { Notification } from "../models/notification.model.js";
 import { sendNotification } from "../utils/notify.js";
+import { syncGithubProfileForUser } from "../utils/githubSync.js";
 
 const ALLOWED_EXPERIENCE = ["Fresher", "1-2 years", "2-5 years", "5+ years"];
 const ALLOWED_AVAILABLE_FOR = [
@@ -375,6 +377,189 @@ const getUserConnections = asyncHandler(async (req, res) => {
   );
 });
 
+const syncGithubProfile = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+  const usernameParam = req.body?.githubUsername?.trim();
+
+  // If user has not connected their GitHub account via OAuth yet
+  if (!req.user.githubId && !req.user.githubUsername) {
+    throw new ApiError(
+      400,
+      "Please connect your GitHub account using GitHub login first before syncing."
+    );
+  }
+
+  // Prevent users from syncing someone else's GitHub username without authenticating
+  if (req.user.githubUsername && usernameParam) {
+    const cleanParam = usernameParam
+      .replace(/^https?:\/\/(www\.)?github\.com\//i, "")
+      .replace(/\/$/, "")
+      .toLowerCase()
+      .trim();
+
+    if (cleanParam && cleanParam !== req.user.githubUsername.toLowerCase()) {
+      throw new ApiError(
+        400,
+        `Your account is linked to GitHub as @${req.user.githubUsername}. To connect a different GitHub account, please use "Connect GitHub" to log in.`
+      );
+    }
+  }
+
+  let targetGithubUsername = req.user.githubUsername || usernameParam;
+
+  if (!targetGithubUsername) {
+    throw new ApiError(400, "GitHub username is required to sync profile");
+  }
+
+  targetGithubUsername = targetGithubUsername
+    .replace(/^https?:\/\/(www\.)?github\.com\//i, "")
+    .replace(/\/$/, "")
+    .trim();
+
+  if (!targetGithubUsername) {
+    throw new ApiError(400, "Invalid GitHub username provided");
+  }
+
+  try {
+    await syncGithubProfileForUser(userId, targetGithubUsername);
+
+    const updatedUser = await User.findById(userId);
+
+    return res.status(200).json(
+      new ApiResponse(200, "GitHub profile synchronized successfully", {
+        githubProfile: updatedUser.githubProfile,
+        badges: updatedUser.badges,
+        githubUsername: updatedUser.githubUsername,
+        user: toSafeUser(updatedUser),
+      })
+    );
+  } catch (err) {
+    if (err.code === "NOT_FOUND") {
+      throw new ApiError(404, `GitHub user "${targetGithubUsername}" was not found.`);
+    }
+    if (err.code === "RATE_LIMITED") {
+      throw new ApiError(429, "GitHub API rate limit reached. Please wait a moment and try again.");
+    }
+    if (err.code === "INVALID_INPUT") {
+      throw new ApiError(400, err.message);
+    }
+    throw new ApiError(500, err.message || "Failed to synchronize GitHub profile.");
+  }
+});
+
+const connectGithubWithOAuth = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+  const { code, targetUsername } = req.body;
+
+  if (!code) {
+    throw new ApiError(400, "Authorization code is required to connect GitHub");
+  }
+
+  const clientId = process.env.GITHUB_CLIENT_ID;
+  const clientSecret = process.env.GITHUB_CLIENT_SECRET;
+  const redirectUri = process.env.GITHUB_REDIRECT_URI || "http://localhost:5173/auth/github/callback";
+
+  if (!clientId || !clientSecret) {
+    throw new ApiError(500, "GitHub OAuth credentials are not configured on the server");
+  }
+
+  // 1. Exchange code for GitHub access token
+  let accessToken;
+  try {
+    const tokenRes = await axios.post(
+      "https://github.com/login/oauth/access_token",
+      {
+        client_id: clientId,
+        client_secret: clientSecret,
+        code,
+        redirect_uri: redirectUri,
+      },
+      { headers: { Accept: "application/json" } }
+    );
+    accessToken = tokenRes.data?.access_token;
+  } catch (err) {
+    throw new ApiError(401, "Failed to exchange GitHub authorization code: " + err.message);
+  }
+
+  if (!accessToken) {
+    throw new ApiError(401, "GitHub did not return an access token");
+  }
+
+  // 2. Fetch authenticated GitHub user
+  let ghUserRes;
+  try {
+    ghUserRes = await axios.get("https://api.github.com/user", {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "User-Agent": "DevConnect-App",
+      },
+    });
+  } catch (err) {
+    throw new ApiError(401, "Failed to fetch GitHub profile: " + err.message);
+  }
+
+  const profile = ghUserRes.data;
+  const authenticatedLogin = (profile.login || "").toLowerCase().trim();
+  const githubId = String(profile.id);
+
+  if (!authenticatedLogin) {
+    throw new ApiError(400, "Unable to determine username of authenticated GitHub account");
+  }
+
+  // 3. Verify target username matches authenticated account if specified
+  if (targetUsername) {
+    const cleanTarget = targetUsername
+      .replace(/^https?:\/\/(www\.)?github\.com\//i, "")
+      .replace(/\/$/, "")
+      .toLowerCase()
+      .trim();
+
+    if (cleanTarget && cleanTarget !== authenticatedLogin) {
+      throw new ApiError(
+        400,
+        `You signed in on GitHub as @${profile.login}, but entered @${targetUsername}. Please log into the corresponding GitHub account.`
+      );
+    }
+  }
+
+  // 4. Check if another user already linked this GitHub account
+  const existingUser = await User.findOne({
+    githubId,
+    _id: { $ne: userId },
+  });
+
+  if (existingUser) {
+    throw new ApiError(
+      409,
+      `This GitHub account (@${profile.login}) is already linked to another DevConnect user (@${existingUser.username}).`
+    );
+  }
+
+  // 5. Update user
+  req.user.githubId = githubId;
+  req.user.githubUsername = authenticatedLogin;
+  await req.user.save({ validateModifiedOnly: true });
+
+  // 6. Run sync immediately
+  let syncedProfile = null;
+  try {
+    syncedProfile = await syncGithubProfileForUser(userId, authenticatedLogin);
+  } catch (syncErr) {
+    console.warn(`[connectGithubWithOAuth] Initial sync warning for @${authenticatedLogin}:`, syncErr.message);
+  }
+
+  const updatedUser = await User.findById(userId);
+
+  return res.status(200).json(
+    new ApiResponse(200, "GitHub account connected and synchronized successfully", {
+      user: toSafeUser(updatedUser),
+      githubProfile: updatedUser.githubProfile || syncedProfile,
+      badges: updatedUser.badges,
+      githubUsername: updatedUser.githubUsername,
+    })
+  );
+});
+
 export {
   getMe,
   getUserByUsername,
@@ -388,5 +573,7 @@ export {
   sendConnectRequest,
   acceptConnectRequest,
   getUserConnections,
+  syncGithubProfile,
+  connectGithubWithOAuth,
 };
 

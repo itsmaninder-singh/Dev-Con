@@ -29,6 +29,8 @@ import {
   sendConnectRequest,
   acceptConnectRequest,
   getUserConnections,
+  syncGithubProfile,
+  connectGithubWithOAuth,
 } from "../controller/user.controller.js";
 
 import {
@@ -112,6 +114,8 @@ router.post("/users/:userId/unblock", protect, requireCompleteProfile, unblockUs
 router.post("/users/:userId/connect", protect, requireCompleteProfile, sendConnectRequest);
 router.post("/users/connect/:notifId/accept", protect, requireCompleteProfile, acceptConnectRequest);
 router.get("/users/:usernameOrId/connections", protect, requireCompleteProfile, getUserConnections);
+router.post("/users/sync-github", protect, syncGithubProfile);
+router.post("/users/connect-github", protect, connectGithubWithOAuth);
 
 router.post("/teams", protect, requireCompleteProfile, createTeam);
 router.get("/teams", getTeams);

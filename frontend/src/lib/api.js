@@ -268,6 +268,22 @@ export const userApi = {
       throw new Error(extractMessage(err));
     }
   },
+  syncGithub: async ({ githubUsername } = {}) => {
+    try {
+      const { data } = await api.post("/users/sync-github", { githubUsername });
+      return data.data;
+    } catch (err) {
+      throw new Error(extractMessage(err));
+    }
+  },
+  connectGithub: async ({ code, targetUsername } = {}) => {
+    try {
+      const { data } = await api.post("/users/connect-github", { code, targetUsername });
+      return data.data;
+    } catch (err) {
+      throw new Error(extractMessage(err));
+    }
+  },
 };
 
 export const reportApi = {

@@ -153,6 +153,21 @@ export function ProfileProvider({ children }) {
     }, 450);
   }
 
+  function setGithubProfileData({ githubProfile, badges, githubUsername } = {}) {
+    setProfile((prev) => {
+      const updated = {
+        ...prev,
+        ...(githubProfile ? { githubProfile } : {}),
+        badges: { ...(prev?.badges || {}), ...(badges || {}) },
+        ...(githubUsername ? { githubUsername } : {}),
+      };
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  }
+
   function blockUser(userToBlock) {
     if (!userToBlock) return;
     const uid = String(userToBlock._id || userToBlock.id || userToBlock.userId || userToBlock.username || userToBlock.handle || '');
@@ -221,6 +236,7 @@ export function ProfileProvider({ children }) {
       value={{
         profile,
         updateProfile,
+        setGithubProfileData,
         blockedUsers,
         blockUser,
         unblockUser,

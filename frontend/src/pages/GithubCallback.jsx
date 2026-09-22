@@ -1,14 +1,19 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
+import { useProfile } from "../context/ProfileContext.jsx";
+import { userApi } from "../lib/api.js";
 import { Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 
 export default function GithubCallback() {
   const [searchParams] = useSearchParams();
-  const { loginWithGithub } = useAuth();
+  const { loginWithGithub, updateUser } = useAuth();
+  const profileCtx = useProfile?.();
+  const setGithubProfileData = profileCtx?.setGithubProfileData;
   const navigate = useNavigate();
   const [error, setError] = useState("");
   const [status, setStatus] = useState("Authenticating with GitHub...");
+  const [callbackMode, setCallbackMode] = useState("login");
 
   useEffect(() => {
     const code = searchParams.get("code");
@@ -27,7 +32,54 @@ export default function GithubCallback() {
 
     let isMounted = true;
     const mode = localStorage.getItem("oauth_auth_mode") || "login";
+    setCallbackMode(mode);
 
+    // Flow 1: Connecting GitHub from Profile page
+    if (mode === "connect_github") {
+      const targetUsername = localStorage.getItem("target_github_username") || "";
+      setStatus("Verifying GitHub login & syncing profile...");
+
+      userApi
+        .connectGithub({ code, targetUsername })
+        .then((result) => {
+          localStorage.removeItem("oauth_auth_mode");
+          localStorage.removeItem("target_github_username");
+          if (!isMounted) return;
+
+          if (result?.user) {
+            updateUser?.(result.user);
+          }
+          if (result?.githubProfile && setGithubProfileData) {
+            setGithubProfileData(result.githubProfile);
+          }
+
+          setStatus("Success! GitHub account verified and synced!");
+          setTimeout(() => {
+            navigate("/profile", {
+              replace: true,
+              state: {
+                githubSynced: true,
+                message: `Connected GitHub @${result?.githubUsername || targetUsername} and synced profile successfully!`,
+              },
+            });
+          }, 600);
+        })
+        .catch((err) => {
+          localStorage.removeItem("oauth_auth_mode");
+          localStorage.removeItem("target_github_username");
+          if (!isMounted) return;
+          setError(
+            err.message ||
+              "Failed to connect GitHub account. Please ensure you log in with the correct GitHub account."
+          );
+        });
+
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    // Flow 2: General OAuth login / registration
     loginWithGithub({ code, mode })
       .then((loggedUser) => {
         localStorage.removeItem("oauth_auth_mode");
@@ -54,7 +106,7 @@ export default function GithubCallback() {
     return () => {
       isMounted = false;
     };
-  }, [searchParams, loginWithGithub, navigate]);
+  }, [searchParams, loginWithGithub, updateUser, setGithubProfileData, navigate]);
 
   return (
     <div style={styles.container}>
@@ -69,8 +121,8 @@ export default function GithubCallback() {
             <h2 style={styles.title}>Authentication Failed</h2>
             <p style={styles.desc}>{error}</p>
             <div style={{ display: "flex", gap: "10px", justifyContent: "center" }}>
-              <Link to="/login" style={styles.btn}>
-                Return to Login
+              <Link to={callbackMode === "connect_github" ? "/profile" : "/login"} style={styles.btn}>
+                {callbackMode === "connect_github" ? "Return to Profile" : "Return to Login"}
               </Link>
               {error.toLowerCase().includes("account does not exist") && (
                 <Link to="/register" style={{ ...styles.btn, background: "#fff", color: "#0a0a0c" }}>
