@@ -11,6 +11,7 @@ import ProtectedRoute from "./components/ProtectedRoute.jsx";
 const Landing = lazy(() => import("./pages/Landing.jsx"));
 const Login = lazy(() => import("./pages/Login.jsx"));
 const Register = lazy(() => import("./pages/Register.jsx"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword.jsx"));
 const GithubCallback = lazy(() => import("./pages/GithubCallback.jsx"));
 const Hackathons = lazy(() => import("./pages/Hackathons.jsx"));
 const Explore = lazy(() => import("./pages/Explore.jsx"));
@@ -182,6 +183,8 @@ export default function App() {
             {/* Auth Routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/reset-password/:token" element={<ResetPassword />} />
             <Route path="/auth/github/callback" element={<GithubCallback />} />
 
             {/* 404 Catch-All */}

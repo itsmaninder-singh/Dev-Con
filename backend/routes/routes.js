@@ -14,6 +14,9 @@ import {
   refreshAccessToken,
   logout,
   changePassword,
+  forgotPassword,
+  verifyResetToken,
+  resetPassword,
 } from "../controller/auth.controller.js";
 
 import {
@@ -101,6 +104,9 @@ router.post("/auth/github", authLimiter, githubAuth);
 router.post("/auth/refresh", authLimiter, refreshAccessToken);
 router.post("/auth/logout", protect, logout);
 router.post("/auth/change-password", protect, sensitiveActionLimiter, changePassword);
+router.post("/auth/forgot-password", sensitiveActionLimiter, forgotPassword);
+router.get("/auth/verify-reset-token", verifyResetToken);
+router.post("/auth/reset-password", sensitiveActionLimiter, resetPassword);
 
 router.get("/users/me", protect, getMe);
 router.get("/users/:username", getUserByUsername);

@@ -77,6 +77,16 @@ const userSchema = new mongoose.Schema(
         enum:["local","google","github"],
         default:"local",
     },
+    resetPasswordToken:{
+        type:String,
+        default:null,
+        select:false,
+    },
+    resetPasswordExpire:{
+        type:Date,
+        default:null,
+        select:false,
+    },
 
     bio:{
         type:String,

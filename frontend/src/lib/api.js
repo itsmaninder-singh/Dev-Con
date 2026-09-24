@@ -165,6 +165,33 @@ export const authApi = {
       throw new Error(extractMessage(err));
     }
   },
+
+  forgotPassword: async (identifier) => {
+    try {
+      const { data } = await api.post("/auth/forgot-password", { identifier });
+      return data;
+    } catch (err) {
+      throw new Error(extractMessage(err));
+    }
+  },
+
+  verifyResetToken: async (token) => {
+    try {
+      const { data } = await api.get(`/auth/verify-reset-token?token=${encodeURIComponent(token)}`);
+      return data.data;
+    } catch (err) {
+      throw new Error(extractMessage(err));
+    }
+  },
+
+  resetPassword: async ({ token, newPassword, confirmPassword }) => {
+    try {
+      const { data } = await api.post("/auth/reset-password", { token, newPassword, confirmPassword });
+      return data;
+    } catch (err) {
+      throw new Error(extractMessage(err));
+    }
+  },
 };
 
 export const userApi = {

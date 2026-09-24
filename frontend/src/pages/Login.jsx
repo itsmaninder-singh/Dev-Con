@@ -8,6 +8,7 @@ import SpecularButton from "../components/effects/SpecularButton.jsx";
 import Magnet from "../components/effects/Magnet.jsx";
 import ClickSpark from "../components/effects/ClickSpark.jsx";
 import ShinyText from "../components/effects/ShinyText.jsx";
+import ForgotPasswordModal from "../components/ForgotPasswordModal.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 
 export default function Login() {
@@ -21,7 +22,7 @@ export default function Login() {
   const [form, setForm] = useState({ identifier: "", password: "", remember: false });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [resetSent, setResetSent] = useState(false);
+  const [forgotOpen, setForgotOpen] = useState(false);
 
   const update = (key) => (e) =>
     setForm((f) => ({
@@ -31,13 +32,7 @@ export default function Login() {
 
   const handleForgotPassword = (e) => {
     e.preventDefault();
-    if (!form.identifier.trim()) {
-      setError("Please enter your email or username above first to request a password reset.");
-      setResetSent(false);
-      return;
-    }
-    setError("");
-    setResetSent(true);
+    setForgotOpen(true);
   };
 
   const handleSubmit = async (e) => {
@@ -114,25 +109,6 @@ export default function Login() {
             Forgot password?
           </a>
         </div>
-
-        {resetSent && (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '10px 14px',
-              borderRadius: '8px',
-              fontSize: '13px',
-              background: 'rgba(129, 199, 132, 0.12)',
-              border: '1px solid rgba(129, 199, 132, 0.3)',
-              color: '#81c784',
-              marginBottom: '16px',
-            }}
-          >
-            <span>Password reset instructions dispatched to your email.</span>
-          </div>
-        )}
 
         {error && (
           <div style={styles.errorBanner}>
@@ -213,6 +189,12 @@ export default function Login() {
           to { transform: rotate(360deg); }
         }
       `}</style>
+
+      <ForgotPasswordModal
+        isOpen={forgotOpen}
+        onClose={() => setForgotOpen(false)}
+        initialIdentifier={form.identifier}
+      />
     </AuthLayout>
   );
 }

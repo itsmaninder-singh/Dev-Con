@@ -13,6 +13,8 @@ import {
 } from "../utils/generateTokens.js";
 
 import { syncGithubProfileForUser } from "../utils/githubSync.js";
+import crypto from "crypto";
+import { sendEmail } from "../utils/sendEmail.js";
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -441,6 +443,143 @@ const changePassword = asyncHandler(async (req, res) => {
   return res.status(200).json(new ApiResponse(200, "Password updated successfully"));
 });
 
+const forgotPassword = asyncHandler(async (req, res) => {
+  const { identifier } = req.body;
+  if (!identifier || !identifier.trim()) {
+    throw new ApiError(400, "Please provide your email address or username");
+  }
+
+  const cleanId = identifier.trim().toLowerCase();
+  const user = await User.findOne({
+    $or: [{ email: cleanId }, { username: cleanId }],
+  });
+
+  if (!user) {
+    throw new ApiError(404, "No account found with that email or username");
+  }
+
+  // Generate unhashed reset token
+  const resetToken = crypto.randomBytes(32).toString("hex");
+
+  // Hash token and store on user
+  const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex");
+  user.resetPasswordToken = hashedToken;
+  user.resetPasswordExpire = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+
+  await user.save({ validateBeforeSave: false });
+
+  // Compute reset URL
+  const clientOrigins = (process.env.CLIENT_URL || "http://localhost:5173")
+    .split(",")
+    .map((s) => s.trim());
+  const origin = req.headers.origin || clientOrigins[0] || "http://localhost:5173";
+  const resetUrl = `${origin}/reset-password?token=${resetToken}&email=${encodeURIComponent(user.email)}`;
+
+  const subject = "DevConnect — Password Reset Request";
+  const text = `Hi ${user.name},\n\nYou requested to reset your password on DevConnect.\n\nPlease click the link below (or paste it into your browser) to choose a new password:\n${resetUrl}\n\nThis link is valid for 15 minutes.\n\nIf you did not make this request, please safely ignore this email.\n\n— The DevConnect Team`;
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px; background: #0c0d0e; color: #f7f2e8; border-radius: 14px; border: 1px solid rgba(255, 152, 162, 0.2);">
+      <div style="margin-bottom: 24px;">
+        <span style="font-size: 20px; font-weight: 700; color: #ff98a2; letter-spacing: -0.02em;">✦ DevConnect</span>
+      </div>
+      <h2 style="font-size: 22px; font-weight: 700; margin: 0 0 12px; color: #ffffff;">Reset Your Password</h2>
+      <p style="font-size: 14px; line-height: 1.6; color: #a1a1aa; margin: 0 0 24px;">
+        Hi <strong style="color: #ffffff;">${user.name}</strong>, we received a request to reset your password for your DevConnect account (<strong>${user.email}</strong>).
+      </p>
+      <div style="margin: 28px 0;">
+        <a href="${resetUrl}" target="_blank" style="background: #ff98a2; color: #160809; padding: 12px 24px; border-radius: 8px; font-weight: 700; font-size: 14px; text-decoration: none; display: inline-block;">
+          Reset Password →
+        </a>
+      </div>
+      <p style="font-size: 12px; color: #71717a; line-height: 1.5; margin: 24px 0 0;">
+        Or copy and paste this URL into your browser:<br/>
+        <a href="${resetUrl}" style="color: #ff98a2; word-break: break-all;">${resetUrl}</a>
+      </p>
+      <p style="font-size: 12px; color: #71717a; margin-top: 16px;">
+        This link expires in <strong>15 minutes</strong>. If you did not request this, you can safely ignore this message.
+      </p>
+    </div>
+  `;
+
+  await sendEmail({
+    to: user.email,
+    subject,
+    text,
+    html,
+  });
+
+  const isDev = process.env.NODE_ENV !== "production";
+
+  return res.status(200).json(
+    new ApiResponse(200, "Password reset instructions sent to your email", {
+      email: user.email,
+      ...(isDev ? { devResetUrl: resetUrl, token: resetToken } : {}),
+    })
+  );
+});
+
+const verifyResetToken = asyncHandler(async (req, res) => {
+  const { token } = req.query;
+  if (!token) {
+    throw new ApiError(400, "Token is required");
+  }
+
+  const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+  const user = await User.findOne({
+    resetPasswordToken: hashedToken,
+    resetPasswordExpire: { $gt: Date.now() },
+  }).select("email username name");
+
+  if (!user) {
+    throw new ApiError(400, "Password reset link is invalid or has expired");
+  }
+
+  return res.status(200).json(
+    new ApiResponse(200, "Token is valid", {
+      valid: true,
+      email: user.email,
+      name: user.name,
+    })
+  );
+});
+
+const resetPassword = asyncHandler(async (req, res) => {
+  const { token, newPassword, confirmPassword } = req.body;
+
+  if (!token) {
+    throw new ApiError(400, "Reset token is required");
+  }
+
+  if (!newPassword || newPassword.length < 8) {
+    throw new ApiError(400, "New password must be at least 8 characters long");
+  }
+
+  if (confirmPassword && newPassword !== confirmPassword) {
+    throw new ApiError(400, "Passwords do not match");
+  }
+
+  const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+  const user = await User.findOne({
+    resetPasswordToken: hashedToken,
+    resetPasswordExpire: { $gt: Date.now() },
+  }).select("+password");
+
+  if (!user) {
+    throw new ApiError(400, "Password reset link is invalid or has expired. Please request a new one.");
+  }
+
+  user.password = newPassword;
+  user.resetPasswordToken = null;
+  user.resetPasswordExpire = null;
+
+  await user.save();
+
+  return res.status(200).json(
+    new ApiResponse(200, "Password reset successful! You can now log in with your new password.")
+  );
+});
+
 export {
   register,
   login,
@@ -450,5 +589,8 @@ export {
   logout,
   toSafeUser,
   changePassword,
+  forgotPassword,
+  verifyResetToken,
+  resetPassword,
   deriveUniqueUsernameFromEmail,
 };
