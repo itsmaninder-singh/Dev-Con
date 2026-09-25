@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from 'react';
 import { chatApi } from '../lib/api.js';
 import { useAuth } from './AuthContext.jsx';
+import { connectSocket } from '../lib/socket.js';
 
 export const AVATAR_COLORS = [
   'linear-gradient(145deg, #ff98a2, #e17a92)',
@@ -25,11 +26,17 @@ export function ChatUIProvider({ children }) {
   const [view, setView] = useState('inbox'); // 'inbox' | 'chat'
   const [conversations, setConversations] = useState(INITIAL_CONVERSATIONS);
   const [activeId, setActiveId] = useState(null);
+  const [onlineUserIds, setOnlineUserIds] = useState(new Set());
 
   const conversationsRef = useRef(conversations);
   useEffect(() => {
     conversationsRef.current = conversations;
   }, [conversations]);
+
+  const onlineUsersRef = useRef(onlineUserIds);
+  useEffect(() => {
+    onlineUsersRef.current = onlineUserIds;
+  }, [onlineUserIds]);
 
   // Sync chats from backend on login
   useEffect(() => {
@@ -40,8 +47,11 @@ export function ChatUIProvider({ children }) {
           const serverChats = Array.isArray(res) ? res : res?.chats || [];
           if (serverChats.length > 0) {
             const mapped = serverChats.map((c, idx) => {
-              const other = c.participants?.find((p) => p._id !== user._id) || c.participants?.[0] || {};
+              const other = c.participants?.find((p) => String(p._id) !== String(user._id)) || c.participants?.[0] || {};
               const name = c.isGroup ? c.name : other.name || 'Chat Member';
+              const chatInitial = name ? name[0].toUpperCase() : '?';
+              const otherUserId = c.isGroup ? null : (other._id ? String(other._id) : null);
+              const isOnline = otherUserId ? onlineUsersRef.current.has(otherUserId) : false;
               const hasLastMsg = !!c.lastMessage?.text;
               const lastMsg = c.lastMessage?.text || 'No messages yet';
               const lastTime = c.lastMessage?.sentAt || c.lastMessage?.timestamp
@@ -57,9 +67,11 @@ export function ChatUIProvider({ children }) {
                 groupAdmin: c.groupAdmin,
                 admins: c.admins || [],
                 isServerChat: true,
+                otherUserId,
+                lastSeen: other.lastSeen || null,
                 name,
                 initial: chatInitial,
-                online: !!other.lastSeen && Date.now() - new Date(other.lastSeen).getTime() < 300000,
+                online: other.isOnline !== undefined ? Boolean(other.isOnline) : isOnline,
                 colorIdx: idx % AVATAR_COLORS.length,
                 unread: c.unreadCount || 0,
                 lastMessageText: lastMsg,
@@ -90,6 +102,71 @@ export function ChatUIProvider({ children }) {
         })
         .catch(() => {});
     }
+  }, [user?._id]);
+
+  // Real-time Presence Listeners (WhatsApp-style Online/Offline tracking)
+  useEffect(() => {
+    if (!user?._id) return;
+    const socket = connectSocket();
+
+    const handleInitialPresence = ({ onlineUserIds: list }) => {
+      const set = new Set((list || []).map(String));
+      setOnlineUserIds(set);
+      setConversations((prev) =>
+        prev.map((c) => {
+          if (!c.isGroup && c.otherUserId) {
+            return { ...c, online: set.has(String(c.otherUserId)) };
+          }
+          return c;
+        })
+      );
+    };
+
+    const handleUserOnline = ({ userId }) => {
+      if (!userId) return;
+      const uid = String(userId);
+      setOnlineUserIds((prev) => new Set([...prev, uid]));
+      setConversations((prev) =>
+        prev.map((c) => {
+          if (!c.isGroup && c.otherUserId && String(c.otherUserId) === uid) {
+            return { ...c, online: true };
+          }
+          return c;
+        })
+      );
+    };
+
+    const handleUserOffline = ({ userId, lastSeen }) => {
+      if (!userId) return;
+      const uid = String(userId);
+      setOnlineUserIds((prev) => {
+        const next = new Set(prev);
+        next.delete(uid);
+        return next;
+      });
+      setConversations((prev) =>
+        prev.map((c) => {
+          if (!c.isGroup && c.otherUserId && String(c.otherUserId) === uid) {
+            return {
+              ...c,
+              online: false,
+              lastSeen: lastSeen || new Date().toISOString(),
+            };
+          }
+          return c;
+        })
+      );
+    };
+
+    socket.on('presence:initial', handleInitialPresence);
+    socket.on('presence:online', handleUserOnline);
+    socket.on('presence:offline', handleUserOffline);
+
+    return () => {
+      socket.off('presence:initial', handleInitialPresence);
+      socket.off('presence:online', handleUserOnline);
+      socket.off('presence:offline', handleUserOffline);
+    };
   }, [user?._id]);
 
   /**
@@ -129,13 +206,16 @@ export function ChatUIProvider({ children }) {
         setConversations((prev) => prev.map((c) => (c.id === existing.id ? { ...c, unread: 0 } : c)));
       } else {
         // Optimistically create and set active conversation immediately
+        const isOnline = Boolean(validUserId && onlineUsersRef.current.has(validUserId));
         const optimisticConv = {
           id: tempId,
           _id: validUserId || tempId,
           isServerChat: !!validUserId,
+          otherUserId: validUserId,
+          lastSeen: targetInfo.lastSeen || null,
           name: targetName,
           initial: targetInitial,
-          online: true,
+          online: isOnline,
           colorIdx: Math.floor(Math.random() * AVATAR_COLORS.length),
           unread: 0,
           messages: [],
@@ -150,9 +230,13 @@ export function ChatUIProvider({ children }) {
           const res = await chatApi.getOrCreateDirectChat(validUserId);
           const chat = res?.chat || res;
           if (chat && chat._id) {
-            const other = chat.participants?.find((p) => (p._id || p) !== user?._id) || { name: targetName, _id: validUserId };
+            const other = chat.participants?.find((p) => String(p._id || p) !== String(user?._id)) || { name: targetName, _id: validUserId };
             const chatName = other.name || targetName;
             const chatInitial = other.name ? other.name[0].toUpperCase() : targetInitial;
+            const otherId = other._id ? String(other._id) : validUserId;
+            const isOtherOnline = other.isOnline !== undefined
+              ? Boolean(other.isOnline)
+              : (otherId ? onlineUsersRef.current.has(otherId) : false);
 
             // Fetch message history
             let msgsFormatted = [];
@@ -172,13 +256,34 @@ export function ChatUIProvider({ children }) {
               id: chat._id,
               _id: chat._id,
               isServerChat: true,
+              otherUserId: otherId,
+              lastSeen: other.lastSeen || targetInfo.lastSeen || null,
               name: chatName,
               initial: chatInitial,
-              online: true,
+              online: isOtherOnline,
               colorIdx: Math.floor(Math.random() * AVATAR_COLORS.length),
               unread: 0,
               messages: msgsFormatted,
             };
+
+            if (!isOtherOnline && validUserId && !other.lastSeen) {
+              const socket = connectSocket();
+              socket.emit('presence:check', { userId: validUserId }, (checkRes) => {
+                if (checkRes?.ok) {
+                  setConversations((prev) =>
+                    prev.map((c) =>
+                      c.id === chat._id || c.otherUserId === validUserId
+                        ? {
+                            ...c,
+                            online: Boolean(checkRes.isOnline),
+                            lastSeen: checkRes.lastSeen || c.lastSeen,
+                          }
+                        : c
+                    )
+                  );
+                }
+              });
+            }
 
             setConversations((prev) => {
               const matches = (c) =>

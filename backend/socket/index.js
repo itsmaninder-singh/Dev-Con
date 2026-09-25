@@ -64,6 +64,32 @@ const initSocket = (io) => {
     redisClient.sAdd("online_users", userId);
     io.emit("presence:online", { userId });
 
+    // Send initial list of all currently online user IDs to the connected client
+    (async () => {
+      try {
+        const onlineUsers = await redisClient.sMembers("online_users");
+        socket.emit("presence:initial", { onlineUserIds: onlineUsers || [] });
+      } catch (err) {
+        console.warn("[socket] Failed to fetch online users:", err.message);
+      }
+    })();
+
+    socket.on("presence:check", async ({ userId: targetUserId }, callback) => {
+      try {
+        if (!targetUserId) return callback?.({ ok: false, error: "Missing userId" });
+        const cleanId = String(targetUserId);
+        const isOnline = await redisClient.sIsMember("online_users", cleanId);
+        let lastSeen = null;
+        if (!isOnline) {
+          const u = await User.findById(cleanId).select("lastSeen");
+          lastSeen = u?.lastSeen ? new Date(u.lastSeen).toISOString() : null;
+        }
+        callback?.({ ok: true, userId: cleanId, isOnline: Boolean(isOnline), lastSeen });
+      } catch (err) {
+        callback?.({ ok: false, error: err.message });
+      }
+    });
+
     socket.on("chat:join", async (chatId, callback) => {
       try {
         const chat = await Chat.findById(chatId);
@@ -421,12 +447,13 @@ const initSocket = (io) => {
       const remaining = await io.in(userId).fetchSockets();
       if (remaining.length === 0) {
         await redisClient.sRem("online_users", userId);
+        const lastSeenDate = new Date();
         if (!socket.user.isGuest) {
           await User.findByIdAndUpdate(socket.user._id, {
-            lastSeen: new Date(),
+            lastSeen: lastSeenDate,
           });
         }
-        io.emit("presence:offline", { userId, lastSeen: new Date() });
+        io.emit("presence:offline", { userId, lastSeen: lastSeenDate.toISOString() });
       }
     });
   });

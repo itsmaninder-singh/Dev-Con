@@ -113,7 +113,7 @@ export default function ProfilePage() {
       return;
     }
     // Jump straight into DM with this person via ChatUIContext
-    openDirectChatWith(targetUserId, { name, initial: initials });
+    openDirectChatWith(targetUserId, { name, initial: initials, lastSeen: targetUser?.lastSeen });
   };
 
   const [activeTab, setActiveTab] = useState('teams');

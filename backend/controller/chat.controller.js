@@ -9,6 +9,7 @@ import { sendNotification } from "../utils/notify.js";
 import { decryptText, encryptText, isCipherHex } from "../utils/crypto.js";
 import { isBlocked } from "../utils/blockGuard.js";
 import { getIO } from "../utils/SocketManager.js";
+import redisClient from "../config/redis.js";
 import xss from "xss";
 
 const PARTICIPANT_FIELDS = "name username profilePicture lastSeen";
@@ -73,6 +74,12 @@ const getMyChats = asyncHandler(async (req, res) => {
     .populate("lastMessage.sender", "name username")
     .sort({ updatedAt: -1 });
 
+  let onlineSet = new Set();
+  try {
+    const list = await redisClient.sMembers("online_users");
+    onlineSet = new Set(list || []);
+  } catch (_) {}
+
   const decorated = await Promise.all(
     chats.map(async (chat) => {
       const obj = chat.toObject();
@@ -84,6 +91,12 @@ const getMyChats = asyncHandler(async (req, res) => {
           obj.lastMessage.text = "💬 Message";
         }
       }
+
+      // Annotate participants with live isOnline
+      obj.participants = (obj.participants || []).map((p) => ({
+        ...p,
+        isOnline: Boolean(p._id && onlineSet.has(p._id.toString())),
+      }));
 
       const myMeta = chat.participantsMeta.find(
         (pm) => pm.user.toString() === req.user._id.toString()
@@ -133,8 +146,19 @@ const getOrCreateDirectChat = asyncHandler(async (req, res) => {
   }
 
   chat = await chat.populate("participants", PARTICIPANT_FIELDS);
+  const obj = chat.toObject();
 
-  return res.status(200).json(new ApiResponse(200, "Chat ready", chat));
+  let isOtherOnline = false;
+  try {
+    isOtherOnline = Boolean(await redisClient.sIsMember("online_users", userId));
+  } catch (_) {}
+
+  obj.participants = (obj.participants || []).map((p) => ({
+    ...p,
+    isOnline: p._id.toString() === userId ? isOtherOnline : false,
+  }));
+
+  return res.status(200).json(new ApiResponse(200, "Chat ready", obj));
 });
 
 const getMessages = asyncHandler(async (req, res) => {

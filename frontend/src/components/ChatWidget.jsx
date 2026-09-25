@@ -52,6 +52,55 @@ function formatMessageText(text) {
   return text;
 }
 
+function formatWhatsAppStatus(active, isTyping) {
+  if (isTyping) {
+    return 'typing...';
+  }
+  if (!active) return '';
+  if (active.isGroup) {
+    const memberCount = active.participants?.length || active.membersCount;
+    return memberCount ? `${memberCount} members` : 'Group conversation';
+  }
+  if (active.online) {
+    return 'Online';
+  }
+  if (!active.lastSeen) {
+    return 'Offline';
+  }
+
+  const d = new Date(active.lastSeen);
+  if (isNaN(d.getTime())) return 'Offline';
+
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+
+  if (diffMin < 1) {
+    return 'last seen just now';
+  }
+
+  const timeStr = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+  const isToday = d.toDateString() === now.toDateString();
+  if (isToday) {
+    return `last seen today at ${timeStr}`;
+  }
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday = d.toDateString() === yesterday.toDateString();
+  if (isYesterday) {
+    return `last seen yesterday at ${timeStr}`;
+  }
+
+  if (d.getFullYear() === now.getFullYear()) {
+    const dateStr = d.toLocaleDateString([], { day: 'numeric', month: 'short' });
+    return `last seen ${dateStr} at ${timeStr}`;
+  }
+
+  const fullDateStr = d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+  return `last seen ${fullDateStr} at ${timeStr}`;
+}
+
 /* ============================================================
    GLOBAL STYLES — plain CSS animations only
    ============================================================ */
@@ -163,6 +212,11 @@ const GlobalStyle = () => (
     .avatar{
       width:46px; height:46px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center;
       font-family:'Fraunces',serif; font-style:italic; font-weight:450; color:var(--ink); font-size:17px; position:relative;
+    }
+    .avatar.online::after{
+      content:''; position:absolute; bottom:1px; right:1px; width:11px; height:11px;
+      border-radius:50%; background:#22c55e; border:2px solid var(--bg-deep, #050506);
+      box-shadow:0 0 6px rgba(34,197,94,0.6);
     }
     .chat-item .info{ flex:1; min-width:0; }
     .chat-item .row1{ display:flex; justify-content:space-between; align-items:baseline; gap:6px; }
@@ -1049,8 +1103,18 @@ export default function ChatWidget() {
                   </div>
                   <div className="who">
                     <div className="name">{active.name}</div>
-                    <div className="status" style={{ color: active.online ? 'var(--online)' : 'var(--text-lo)' }}>
-                      {active.online ? 'Online now' : 'Active conversation'}
+                    <div
+                      className="status"
+                      style={{
+                        color: activeTypingUser
+                          ? 'var(--accent, #ff98a2)'
+                          : active.online
+                          ? '#22c55e'
+                          : 'var(--text-lo)',
+                        fontWeight: activeTypingUser || active.online ? 500 : 400,
+                      }}
+                    >
+                      {formatWhatsAppStatus(active, Boolean(activeTypingUser))}
                     </div>
                   </div>
                 </>

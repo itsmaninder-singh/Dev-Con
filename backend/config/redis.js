@@ -109,6 +109,11 @@ class InMemoryRedisClient {
     return Array.from(inMemorySets.get(key));
   }
 
+  async sIsMember(key, member) {
+    if (!inMemorySets.has(key)) return false;
+    return inMemorySets.get(key).has(member);
+  }
+
   async hSet(key, field, value) {
     if (!inMemoryHashes.has(key)) {
       inMemoryHashes.set(key, new Map());
