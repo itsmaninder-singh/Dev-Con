@@ -1,5 +1,7 @@
 import mongoose from 'mongoose';
 import axios from 'axios';
+import fs from 'fs';
+import path from 'path';
 import { User } from '../models/user.model.js';
 import { ApiError } from '../utils/ApiError.js';
 import {asyncHandler} from "../utils/asyncHandler.js"
@@ -51,12 +53,22 @@ const updateProfile = asyncHandler(async (req, res) => {
     "skills",
     "experience",
     "gender",
+    "profilePicture",
+    "avatarUrl",
+    "coverPicture",
+    "coverUrl",
   ];
   const ALLOWED_GENDER = ["male", "female", "other", "prefer-not-to-say"];
 
   const updates = {};
   for (const field of editable) {
     if (req.body[field] !== undefined) updates[field] = req.body[field];
+  }
+  if (updates.avatarUrl && !updates.profilePicture) {
+    updates.profilePicture = updates.avatarUrl;
+  }
+  if (updates.coverUrl && !updates.coverPicture) {
+    updates.coverPicture = updates.coverUrl;
   }
   if (updates.experience && !ALLOWED_EXPERIENCE.includes(updates.experience)) {
     throw new ApiError(400, `experience must be one of: ${ALLOWED_EXPERIENCE.join(", ")}`);
@@ -166,9 +178,30 @@ const uploadProfilePicture = asyncHandler(async (req, res) => {
     throw new ApiError(404, "User not found");
   }
 
-  const result = await uploadOnCloudinary(req.file.path, "devconnect/profile-pictures");
+  let result = await uploadOnCloudinary(req.file.path, "devconnect/profile-pictures");
   if (!result) {
-    throw new ApiError(500, "Failed to upload image, please try again");
+    // Cloudinary not configured or failed - store locally in public/uploads/profile-pictures
+    try {
+      const uploadDir = path.resolve("public/uploads/profile-pictures");
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      const ext = path.extname(req.file.originalname || req.file.path) || ".jpg";
+      const filename = `avatar-${user._id}-${Date.now()}${ext}`;
+      const destPath = path.join(uploadDir, filename);
+
+      if (fs.existsSync(req.file.path)) {
+        fs.copyFileSync(req.file.path, destPath);
+        try { fs.unlinkSync(req.file.path); } catch (_) {}
+      }
+      result = {
+        url: `/uploads/profile-pictures/${filename}`,
+        publicId: null,
+      };
+    } catch (localErr) {
+      console.error("[uploadProfilePicture] Local storage fallback failed:", localErr);
+      throw new ApiError(500, "Failed to save uploaded image");
+    }
   }
 
   const oldPublicId = user.profilePicturePublicId;
@@ -182,7 +215,7 @@ const uploadProfilePicture = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .json(new ApiResponse(200, "Profile picture updated", { profilePicture: user.profilePicture }));
+    .json(new ApiResponse(200, "Profile picture updated", { profilePicture: user.profilePicture, avatarUrl: user.profilePicture }));
 });
 
 const uploadCoverPicture = asyncHandler(async (req, res) => {
@@ -194,9 +227,30 @@ const uploadCoverPicture = asyncHandler(async (req, res) => {
     throw new ApiError(404, "User not found");
   }
 
-  const result = await uploadOnCloudinary(req.file.path, "devconnect/cover-pictures");
+  let result = await uploadOnCloudinary(req.file.path, "devconnect/cover-pictures");
   if (!result) {
-    throw new ApiError(500, "Failed to upload image, please try again");
+    // Cloudinary not configured or failed - store locally in public/uploads/cover-pictures
+    try {
+      const uploadDir = path.resolve("public/uploads/cover-pictures");
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      const ext = path.extname(req.file.originalname || req.file.path) || ".jpg";
+      const filename = `cover-${user._id}-${Date.now()}${ext}`;
+      const destPath = path.join(uploadDir, filename);
+
+      if (fs.existsSync(req.file.path)) {
+        fs.copyFileSync(req.file.path, destPath);
+        try { fs.unlinkSync(req.file.path); } catch (_) {}
+      }
+      result = {
+        url: `/uploads/cover-pictures/${filename}`,
+        publicId: null,
+      };
+    } catch (localErr) {
+      console.error("[uploadCoverPicture] Local storage fallback failed:", localErr);
+      throw new ApiError(500, "Failed to save uploaded cover image");
+    }
   }
 
   const oldPublicId = user.coverPicturePublicId;
@@ -210,7 +264,7 @@ const uploadCoverPicture = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .json(new ApiResponse(200, "Cover picture updated", { coverPicture: user.coverPicture }));
+    .json(new ApiResponse(200, "Cover picture updated", { coverPicture: user.coverPicture, coverUrl: user.coverPicture }));
 });
 
 const blockUser = asyncHandler(async (req, res) => {
@@ -347,7 +401,12 @@ const acceptConnectRequest = asyncHandler(async (req, res) => {
 const getUserConnections = asyncHandler(async (req, res) => {
   const { usernameOrId } = req.params;
   let user;
-  if (mongoose.Types.ObjectId.isValid(usernameOrId)) {
+  if (!usernameOrId || usernameOrId === "me" || usernameOrId === req.user?.username) {
+    user = await User.findById(req.user._id).populate(
+      "connections",
+      "name username profilePicture college skills bio experience isAvailable"
+    );
+  } else if (mongoose.Types.ObjectId.isValid(usernameOrId)) {
     user = await User.findById(usernameOrId).populate(
       "connections",
       "name username profilePicture college skills bio experience isAvailable"
@@ -355,12 +414,6 @@ const getUserConnections = asyncHandler(async (req, res) => {
   }
   if (!user) {
     user = await User.findOne({ username: usernameOrId.toLowerCase() }).populate(
-      "connections",
-      "name username profilePicture college skills bio experience isAvailable"
-    );
-  }
-  if (!user && (usernameOrId === "me" || usernameOrId === req.user?.username)) {
-    user = await User.findById(req.user._id).populate(
       "connections",
       "name username profilePicture college skills bio experience isAvailable"
     );

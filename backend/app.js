@@ -11,6 +11,7 @@ app.use(express.urlencoded({extended:true,limit:"5mb"}));
 export default app;*/
 import "dotenv/config";
 import express from "express";
+import path from "path";
 import cors from "cors";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
@@ -20,7 +21,12 @@ import { router } from "./routes/routes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 const app = express();
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
+app.use("/uploads", express.static(path.resolve("public/uploads")));
 
 const defaultOrigins = [
   "http://localhost:5173",

@@ -47,9 +47,10 @@ export function ChatUIProvider({ children }) {
           const serverChats = Array.isArray(res) ? res : res?.chats || [];
           if (serverChats.length > 0) {
             const mapped = serverChats.map((c, idx) => {
-              const other = c.participants?.find((p) => String(p._id) !== String(user._id)) || c.participants?.[0] || {};
-              const name = c.isGroup ? c.name : other.name || 'Chat Member';
-              const chatInitial = name ? name[0].toUpperCase() : '?';
+              const other = c.participants?.find((p) => String(p._id || p.id) !== String(user._id)) || c.participants?.[0] || {};
+              const name = c.isGroup ? (c.name || 'Group Chat') : (other.name || 'Chat Member');
+              const chatInitial = (name || 'C').split(' ').filter(Boolean).map((w) => w[0]).slice(0, 2).join('').toUpperCase() || 'C';
+              const avatarUrl = c.isGroup ? '' : (other.profilePicture || other.avatarUrl || '');
               const otherUserId = c.isGroup ? null : (other._id ? String(other._id) : null);
               const isOnline = otherUserId ? onlineUsersRef.current.has(otherUserId) : false;
               const hasLastMsg = !!c.lastMessage?.text;
@@ -71,6 +72,8 @@ export function ChatUIProvider({ children }) {
                 lastSeen: other.lastSeen || null,
                 name,
                 initial: chatInitial,
+                avatarUrl,
+                profilePicture: avatarUrl,
                 online: other.isOnline !== undefined ? Boolean(other.isOnline) : isOnline,
                 colorIdx: idx % AVATAR_COLORS.length,
                 unread: c.unreadCount || 0,
@@ -176,9 +179,10 @@ export function ChatUIProvider({ children }) {
    */
   const openDirectChatWith = useCallback(
     async (userId, targetInfo = {}) => {
-      const { name = 'Developer', initial = 'D' } = targetInfo;
+      const { name = 'Developer', initial = 'D', avatarUrl = '', profilePicture = '' } = targetInfo;
       const targetName = name;
       const targetInitial = initial || (targetName ? targetName[0].toUpperCase() : 'D');
+      const targetAvatar = avatarUrl || profilePicture || '';
 
       // Instantly open widget into chat thread view
       setOpen(true);
@@ -203,7 +207,18 @@ export function ChatUIProvider({ children }) {
 
       if (existing) {
         setActiveId(existing.id);
-        setConversations((prev) => prev.map((c) => (c.id === existing.id ? { ...c, unread: 0 } : c)));
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.id === existing.id
+              ? {
+                  ...c,
+                  unread: 0,
+                  avatarUrl: c.avatarUrl || targetAvatar || '',
+                  profilePicture: c.profilePicture || targetAvatar || '',
+                }
+              : c
+          )
+        );
       } else {
         // Optimistically create and set active conversation immediately
         const isOnline = Boolean(validUserId && onlineUsersRef.current.has(validUserId));
@@ -215,6 +230,8 @@ export function ChatUIProvider({ children }) {
           lastSeen: targetInfo.lastSeen || null,
           name: targetName,
           initial: targetInitial,
+          avatarUrl: targetAvatar,
+          profilePicture: targetAvatar,
           online: isOnline,
           colorIdx: Math.floor(Math.random() * AVATAR_COLORS.length),
           unread: 0,
@@ -237,6 +254,7 @@ export function ChatUIProvider({ children }) {
             const isOtherOnline = other.isOnline !== undefined
               ? Boolean(other.isOnline)
               : (otherId ? onlineUsersRef.current.has(otherId) : false);
+            const chatAvatar = other.profilePicture || other.avatarUrl || targetAvatar || '';
 
             // Fetch message history
             let msgsFormatted = [];
@@ -260,6 +278,8 @@ export function ChatUIProvider({ children }) {
               lastSeen: other.lastSeen || targetInfo.lastSeen || null,
               name: chatName,
               initial: chatInitial,
+              avatarUrl: chatAvatar,
+              profilePicture: chatAvatar,
               online: isOtherOnline,
               colorIdx: Math.floor(Math.random() * AVATAR_COLORS.length),
               unread: 0,
@@ -419,7 +439,7 @@ export function ChatUIProvider({ children }) {
   // Global event listener for 'devconnect:open-chat'
   useEffect(() => {
     const handleEvent = (e) => {
-      const { userId, name, initial, openOnly, isGroup, teamId, participantIds } = e.detail || {};
+      const { userId, name, initial, avatarUrl, profilePicture, openOnly, isGroup, teamId, participantIds } = e.detail || {};
       if (openOnly) {
         setOpen(true);
         return;
@@ -428,7 +448,7 @@ export function ChatUIProvider({ children }) {
         openGroupChat({ teamId, name, participantIds });
         return;
       }
-      openDirectChatWith(userId, { name, initial });
+      openDirectChatWith(userId, { name, initial, avatarUrl: avatarUrl || profilePicture });
     };
 
     window.addEventListener('devconnect:open-chat', handleEvent);

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MoreHorizontal, Flag, ShieldBan, ShieldCheck, Camera, Users, ArrowUpRight } from 'lucide-react';
+import { MoreHorizontal, Flag, ShieldBan, ShieldCheck, Camera, Users, ArrowUpRight, X, ExternalLink } from 'lucide-react';
 import { useChatUI } from '../../../context/ChatUIContext.jsx';
 
 export function ProfileHeader({
@@ -32,8 +32,23 @@ export function ProfileHeader({
 }) {
   const { openDirectChatWith } = useChatUI();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [imgError, setImgError] = useState(false);
+  const [showPfpModal, setShowPfpModal] = useState(false);
   const menuRef = useRef(null);
   const avatarInputRef = useRef(null);
+
+  useEffect(() => {
+    setImgError(false);
+  }, [avatarUrl]);
+
+  useEffect(() => {
+    if (!showPfpModal) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setShowPfpModal(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showPfpModal]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -73,21 +88,29 @@ export function ProfileHeader({
             onMouseMove={handleAvatarMove}
             onMouseLeave={handleAvatarLeave}
             onClick={() => {
-              if (isOwnProfile) {
+              if (avatarUrl && !imgError) {
+                setShowPfpModal(true);
+              } else if (isOwnProfile) {
                 avatarInputRef.current?.click();
               }
             }}
             style={{
               position: 'relative',
               overflow: 'hidden',
-              cursor: isOwnProfile ? 'pointer' : 'default',
+              cursor: (avatarUrl && !imgError) || isOwnProfile ? 'pointer' : 'default',
             }}
-            title={isOwnProfile ? "Click to change profile picture" : name}
+            title={
+              isOwnProfile
+                ? 'Click to view profile picture or hover camera to change'
+                : 'Click to view profile picture'
+            }
           >
-            {avatarUrl ? (
+            {avatarUrl && !imgError ? (
               <img
                 src={avatarUrl}
                 alt={name}
+                referrerPolicy="no-referrer"
+                onError={() => setImgError(true)}
                 style={{
                   width: '100%',
                   height: '100%',
@@ -105,7 +128,7 @@ export function ProfileHeader({
                 style={{
                   position: 'absolute',
                   inset: 0,
-                  background: 'rgba(0,0,0,0.45)',
+                  background: 'rgba(0,0,0,0.55)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -113,9 +136,15 @@ export function ProfileHeader({
                   opacity: 0,
                   transition: 'opacity 0.2s ease',
                   borderRadius: 'inherit',
+                  zIndex: 3,
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  avatarInputRef.current?.click();
                 }}
                 onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
                 onMouseLeave={(e) => (e.currentTarget.style.opacity = '0')}
+                title="Change profile picture"
               >
                 <Camera size={26} />
               </div>
@@ -211,7 +240,7 @@ export function ProfileHeader({
                       if (onMessage) {
                         onMessage();
                       } else {
-                        openDirectChatWith(targetUserId, { name, initial: initials });
+                        openDirectChatWith(targetUserId, { name, initial: initials, avatarUrl, profilePicture: avatarUrl });
                       }
                     }}
                   >
@@ -362,6 +391,200 @@ export function ProfileHeader({
           </div>
         </div>
       </div>
+
+      {/* Profile Picture Fullscreen Lightbox Modal */}
+      {showPfpModal && (
+        <div
+          className="pfp-lightbox-overlay"
+          onClick={() => setShowPfpModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.88)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px',
+            animation: 'fadeIn 0.2s ease',
+          }}
+        >
+          <div
+            className="pfp-lightbox-content"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'relative',
+              maxWidth: '460px',
+              width: '100%',
+              backgroundColor: '#121215',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              borderRadius: '24px',
+              padding: '28px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.9), 0 0 40px rgba(255, 152, 162, 0.15)',
+              textAlign: 'center',
+            }}
+          >
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={() => setShowPfpModal(false)}
+              aria-label="Close"
+              style={{
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '50%',
+                width: '36px',
+                height: '36px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#fff',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.18)';
+                e.currentTarget.style.transform = 'scale(1.05)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+            >
+              <X size={18} />
+            </button>
+
+            {/* Avatar Display */}
+            <div
+              style={{
+                width: '240px',
+                height: '240px',
+                borderRadius: '50%',
+                overflow: 'hidden',
+                border: '4px solid rgba(255, 152, 162, 0.4)',
+                boxShadow: '0 12px 36px rgba(0, 0, 0, 0.6), 0 0 30px rgba(255, 152, 162, 0.2)',
+                marginBottom: '20px',
+                backgroundColor: '#1b1b1f',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              {avatarUrl && !imgError ? (
+                <img
+                  src={avatarUrl}
+                  alt={name}
+                  referrerPolicy="no-referrer"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    display: 'block',
+                  }}
+                />
+              ) : (
+                <span
+                  style={{
+                    fontSize: '64px',
+                    fontWeight: 700,
+                    color: 'var(--accent, #ff98a2)',
+                    fontFamily: 'Inter, sans-serif',
+                  }}
+                >
+                  {initials}
+                </span>
+              )}
+            </div>
+
+            {/* User Details */}
+            <h3
+              style={{
+                margin: '0 0 6px 0',
+                fontSize: '22px',
+                fontWeight: 700,
+                color: '#fff',
+                letterSpacing: '-0.02em',
+              }}
+            >
+              {name}
+            </h3>
+            <p
+              style={{
+                margin: '0 0 16px 0',
+                fontSize: '14px',
+                color: 'rgba(255, 255, 255, 0.6)',
+              }}
+            >
+              @{handle}{college ? ` · ${college}` : ''}
+            </p>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
+              {avatarUrl && !imgError && (
+                <a
+                  href={avatarUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 16px',
+                    background: 'rgba(255, 255, 255, 0.08)',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    borderRadius: '100px',
+                    color: '#fff',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    textDecoration: 'none',
+                    transition: 'background 0.2s ease',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)')}
+                >
+                  <ExternalLink size={14} /> Open full size
+                </a>
+              )}
+              {isOwnProfile && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPfpModal(false);
+                    avatarInputRef.current?.click();
+                  }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 16px',
+                    background: 'var(--accent, #ff98a2)',
+                    border: 'none',
+                    borderRadius: '100px',
+                    color: '#0a0a0c',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'opacity 0.2s ease',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
+                  onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+                >
+                  <Camera size={14} /> Change photo
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

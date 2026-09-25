@@ -54,6 +54,7 @@ export default function CardModal({ item, onClose, onJoin, showToast, onToast })
   const creatorName = item?.creator?.name || (typeof item?.owner === 'object' && item?.owner?.name) || 'Developer';
   const creatorInitials = item?.creator?.initials || (creatorName ? creatorName.slice(0, 2).toUpperCase() : 'DV');
   const creatorUsername = item?.creator?.username || (typeof item?.owner === 'object' && item?.owner?.username) || (creatorName ? creatorName.toLowerCase().replace(/\s+/g, '') : 'builder');
+  const creatorAvatar = item?.creator?.profilePicture || item?.creator?.avatarUrl || (typeof item?.owner === 'object' && (item?.owner?.profilePicture || item?.owner?.avatarUrl)) || '';
 
   const creatorId = String(
     item?.creator?._id ||
@@ -186,6 +187,8 @@ export default function CardModal({ item, onClose, onJoin, showToast, onToast })
         const chat = await openDirectChatWith(creatorId, {
           name: creatorName,
           initial: creatorInitials,
+          avatarUrl: creatorAvatar,
+          profilePicture: creatorAvatar,
           throwOnError: true,
         });
         console.log('[CardModal] Chat opened/created successfully:', chat);
@@ -197,6 +200,8 @@ export default function CardModal({ item, onClose, onJoin, showToast, onToast })
               userId: creatorId,
               name: creatorName,
               initial: creatorInitials,
+              avatarUrl: creatorAvatar,
+              profilePicture: creatorAvatar,
             },
           })
         );

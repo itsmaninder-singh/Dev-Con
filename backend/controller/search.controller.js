@@ -1,4 +1,5 @@
 import { User } from "../models/user.model.js";
+import { Notification } from "../models/notification.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
@@ -15,6 +16,7 @@ const searchUsers = asyncHandler(async (req, res) => {
     experience,
     availableFor,
     onlyAvailable,
+    excludeConnected,
     page = 1,
     limit = 20,
   } = req.query;
@@ -62,7 +64,18 @@ const searchUsers = asyncHandler(async (req, res) => {
   }
 
   if (req.user) {
-    filter._id = { $ne: req.user._id };
+    if (excludeConnected === "true") {
+      const freshUser = await User.findById(req.user._id).select("connections");
+      const myConns = (freshUser?.connections || req.user.connections || []).map((id) => (id?._id || id).toString());
+      const pendingSent = await Notification.find({
+        sender: req.user._id,
+        type: "connect_request",
+      }).select("recipient");
+      const pendingRecipientIds = (pendingSent || []).map((n) => n.recipient?.toString()).filter(Boolean);
+      filter._id = { $nin: [req.user._id.toString(), ...myConns, ...pendingRecipientIds] };
+    } else {
+      filter._id = { $ne: req.user._id };
+    }
   }
 
   const pageNum = Math.max(parseInt(page, 10) || 1, 1);
@@ -78,8 +91,9 @@ const searchUsers = asyncHandler(async (req, res) => {
     User.countDocuments(filter),
   ]);
 
+  const freshMe = req.user ? await User.findById(req.user._id).select("connections") : null;
   const myConnections = new Set(
-    (req.user?.connections || []).map((id) => id.toString())
+    (freshMe?.connections || req.user?.connections || []).map((id) => (id?._id || id || "").toString()).filter(Boolean)
   );
 
   const formattedResults = results.map((u) => {

@@ -12,7 +12,7 @@ import { ProfileTabs } from './profile/components/ProfileTabs';
 import ReportUserModal from '../components/ReportUserModal.jsx';
 
 export default function ProfilePage() {
-  const { profile, blockUser, unblockUser, isUserBlocked } = useProfile();
+  const { profile, updateProfile, blockUser, unblockUser, isUserBlocked } = useProfile();
   const { user } = useAuth() || {};
   const { teams: userTeams, projects: userProjects } = useTeams() || {};
   const { openDirectChatWith } = useChatUI();
@@ -113,7 +113,7 @@ export default function ProfilePage() {
       return;
     }
     // Jump straight into DM with this person via ChatUIContext
-    openDirectChatWith(targetUserId, { name, initial: initials, lastSeen: targetUser?.lastSeen });
+    openDirectChatWith(targetUserId, { name, initial: initials, avatarUrl, profilePicture: avatarUrl, lastSeen: targetUser?.lastSeen });
   };
 
   const [activeTab, setActiveTab] = useState('teams');
@@ -386,7 +386,7 @@ export default function ProfilePage() {
     return () => {
       window.removeEventListener('scroll', handleScroll);
     };
-  }, []);
+  }, [username, targetUser?._id, activeUser?._id]);
 
   // Avatar hover 3D tilt
   const handleAvatarMove = (e) => {
@@ -552,7 +552,8 @@ export default function ProfilePage() {
             const cid = conn._id || conn.id;
             const cname = conn.name || 'Developer';
             const cinit = (cname || 'D')[0].toUpperCase();
-            openDirectChatWith(cid, { name: cname, initial: cinit });
+            const cavatar = conn.profilePicture || conn.avatarUrl || '';
+            openDirectChatWith(cid, { name: cname, initial: cinit, avatarUrl: cavatar, profilePicture: cavatar });
           }}
           navigate={navigate}
           isOwnProfile={isOwnProfile}
@@ -656,10 +657,10 @@ export default function ProfilePage() {
           font-family: 'Inter', sans-serif; font-weight: 700; font-size: 40px; color: var(--accent);
           flex-shrink: 0;
           box-shadow: 0 0 0 1px rgba(255, 152, 162, 0.25), 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 30px 60px -20px rgba(0, 0, 0, 0.7);
-          opacity: 0; transform: scale(0.9); transform-style: preserve-3d; cursor: pointer;
+          opacity: 1; transform: scale(1); transform-style: preserve-3d; cursor: pointer;
           transition: border-color 0.3s ease;
         }
-        .identity-text { padding-bottom: 10px; opacity: 0; transform: translateY(16px); }
+        .identity-text { padding-bottom: 10px; opacity: 1; transform: none; }
         .identity-text h1 {
           font-family: 'Fraunces', serif; font-weight: 450; font-style: italic;
           font-size: clamp(28px, 4.2vw, 40px); letter-spacing: -0.01em;

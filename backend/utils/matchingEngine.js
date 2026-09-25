@@ -1,5 +1,5 @@
 const normalizeSkills = (skills = []) =>
-    skills.map((s)=> s.toLowerCase().trim()).filter(Boolean);
+    (Array.isArray(skills) ? skills : []).map((s)=> s.toLowerCase().trim()).filter(Boolean);
 
 const calculateSkillScore = (skillsA = [], skillsB = [])=>{
     const a = new Set(normalizeSkills(skillsA));

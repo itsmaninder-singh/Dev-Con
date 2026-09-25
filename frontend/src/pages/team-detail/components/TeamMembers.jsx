@@ -238,7 +238,8 @@ export function TeamMembers({
                         e.preventDefault();
                         e.stopPropagation();
                         playClick();
-                        openDirectChatWith(mUserId, { name: mName, initial: mInitials });
+                        const mAvatar = m.profilePicture || m.user?.profilePicture || m.avatarUrl || m.user?.avatarUrl || '';
+                        openDirectChatWith(mUserId, { name: mName, initial: mInitials, avatarUrl: mAvatar, profilePicture: mAvatar });
                       }}
                       style={{
                         background: 'rgba(255, 152, 162, 0.1)',
@@ -390,9 +391,12 @@ export function TeamMembers({
                           e.stopPropagation();
                           playClick();
                           setActiveMenuMemberId(null);
+                          const mAvatar = m.profilePicture || m.user?.profilePicture || m.avatarUrl || m.user?.avatarUrl || '';
                           openDirectChatWith(mUserId, {
                             name: mName,
                             initial: mInitials,
+                            avatarUrl: mAvatar,
+                            profilePicture: mAvatar,
                           });
                         }}
                         style={{

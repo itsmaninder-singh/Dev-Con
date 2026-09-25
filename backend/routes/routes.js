@@ -119,7 +119,7 @@ router.post("/users/:userId/block", protect, requireCompleteProfile, blockUser);
 router.post("/users/:userId/unblock", protect, requireCompleteProfile, unblockUser);
 router.post("/users/:userId/connect", protect, requireCompleteProfile, sendConnectRequest);
 router.post("/users/connect/:notifId/accept", protect, requireCompleteProfile, acceptConnectRequest);
-router.get("/users/:usernameOrId/connections", protect, requireCompleteProfile, getUserConnections);
+router.get("/users/:usernameOrId/connections", protect, getUserConnections);
 router.post("/users/sync-github", protect, syncGithubProfile);
 router.post("/users/connect-github", protect, connectGithubWithOAuth);
 
@@ -142,7 +142,7 @@ router.get("/join-requests/sent", protect, requireCompleteProfile, getSentReqs);
 router.post("/join-requests/:id/accept", protect, requireCompleteProfile, acceptJoinReq);
 router.post("/join-requests/:id/ignore", protect, requireCompleteProfile, ignoreJoinRequest);
 
-router.get("/matchup/users", protect, requireCompleteProfile, getRecommendedUsers);
+router.get("/matchup/users", protect, getRecommendedUsers);
 router.get("/matchup/teams", protect, requireCompleteProfile, getRecommendedTeams);
 router.get("/matchup/projects", protect, requireCompleteProfile, getRecommendedProjects);
 

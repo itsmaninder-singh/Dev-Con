@@ -389,10 +389,10 @@ function FullscreenButton({ fullscreen, onClick }) {
   );
 }
 
-export function openDirectMessage({ userId, name, initial }) {
+export function openDirectMessage({ userId, name, initial, avatarUrl, profilePicture }) {
   window.dispatchEvent(
     new CustomEvent('devconnect:open-chat', {
-      detail: { userId, name, initial },
+      detail: { userId, name, initial, avatarUrl: avatarUrl || profilePicture },
     })
   );
 }
@@ -1067,8 +1067,39 @@ export default function ChatWidget() {
                   };
                   return (
                     <div className={`chat-item${conv.unread === 0 ? ' read' : ''}`} key={conv.id} onClick={() => openChat(conv.id)}>
-                      <div className={`avatar${conv.online ? ' online' : ''}`} style={{ background: AVATAR_COLORS[conv.colorIdx] || AVATAR_COLORS[0] }}>
-                        {conv.initial}
+                      <div
+                        className={`avatar${conv.online ? ' online' : ''}`}
+                        style={{
+                          background: AVATAR_COLORS[conv.colorIdx] || AVATAR_COLORS[0],
+                          overflow: 'hidden',
+                          position: 'relative',
+                        }}
+                      >
+                        {conv.avatarUrl || conv.profilePicture ? (
+                          <img
+                            src={conv.avatarUrl || conv.profilePicture}
+                            alt={conv.name}
+                            referrerPolicy="no-referrer"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              if (e.currentTarget.nextSibling) {
+                                e.currentTarget.nextSibling.style.display = 'flex';
+                              }
+                            }}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                          />
+                        ) : null}
+                        <span
+                          style={{
+                            display: conv.avatarUrl || conv.profilePicture ? 'none' : 'flex',
+                            width: '100%',
+                            height: '100%',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          {conv.initial}
+                        </span>
                       </div>
                       <div className="info">
                         <div className="row1">
@@ -1098,8 +1129,39 @@ export default function ChatWidget() {
               </button>
               {active && (
                 <>
-                  <div className={`avatar${active.online ? ' online' : ''}`} style={{ background: AVATAR_COLORS[active.colorIdx] }}>
-                    {active.initial}
+                  <div
+                    className={`avatar${active.online ? ' online' : ''}`}
+                    style={{
+                      background: AVATAR_COLORS[active.colorIdx],
+                      overflow: 'hidden',
+                      position: 'relative',
+                    }}
+                  >
+                    {active.avatarUrl || active.profilePicture ? (
+                      <img
+                        src={active.avatarUrl || active.profilePicture}
+                        alt={active.name}
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          if (e.currentTarget.nextSibling) {
+                            e.currentTarget.nextSibling.style.display = 'flex';
+                          }
+                        }}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                      />
+                    ) : null}
+                    <span
+                      style={{
+                        display: active.avatarUrl || active.profilePicture ? 'none' : 'flex',
+                        width: '100%',
+                        height: '100%',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {active.initial}
+                    </span>
                   </div>
                   <div className="who">
                     <div className="name">{active.name}</div>
@@ -1182,6 +1244,55 @@ export default function ChatWidget() {
                         </div>
                       ) : (
                         <div className="msg-row">
+                          {!isMe && (
+                            <div
+                              className="msg-avatar"
+                              style={{
+                                width: '28px',
+                                height: '28px',
+                                borderRadius: '50%',
+                                overflow: 'hidden',
+                                flexShrink: 0,
+                                alignSelf: 'flex-end',
+                                marginBottom: '2px',
+                                background: AVATAR_COLORS[active?.colorIdx || 0],
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                color: '#0a0a0a',
+                                position: 'relative',
+                              }}
+                              title={active?.name || 'Developer'}
+                            >
+                              {m.sender?.profilePicture || active?.avatarUrl || active?.profilePicture ? (
+                                <img
+                                  src={m.sender?.profilePicture || active?.avatarUrl || active?.profilePicture}
+                                  alt=""
+                                  referrerPolicy="no-referrer"
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                    if (e.currentTarget.nextSibling) {
+                                      e.currentTarget.nextSibling.style.display = 'flex';
+                                    }
+                                  }}
+                                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                                />
+                              ) : null}
+                              <span
+                                style={{
+                                  display: m.sender?.profilePicture || active?.avatarUrl || active?.profilePicture ? 'none' : 'flex',
+                                  width: '100%',
+                                  height: '100%',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                }}
+                              >
+                                {m.sender?.name ? m.sender.name[0].toUpperCase() : (active?.initial || 'D')}
+                              </span>
+                            </div>
+                          )}
                           <div className={`msg ${isMe ? 'me' : 'them'}${isDeleted ? ' deleted' : ''}`}>
                             {isDeleted ? (
                               <em>This message was deleted</em>

@@ -12,6 +12,12 @@ export function Avatar({
   size = 'md',
   className = ''
 }) {
+  const [hasError, setHasError] = React.useState(false);
+
+  React.useEffect(() => {
+    setHasError(false);
+  }, [src]);
+
   const getInitials = (n) => {
     if (!n) return '?';
     const parts = n.trim().split(/\s+/);
@@ -21,8 +27,13 @@ export function Avatar({
 
   return (
     <div className={`ui-avatar ui-avatar-${size} ${className}`} aria-label={alt || name || 'Avatar'}>
-      {src ? (
-        <img src={src} alt={alt || name} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+      {src && !hasError ? (
+        <img
+          src={src}
+          alt={alt || name}
+          referrerPolicy="no-referrer"
+          onError={() => setHasError(true)}
+        />
       ) : (
         <span>{getInitials(name)}</span>
       )}

@@ -230,6 +230,8 @@ export default function SiteNav() {
           openDirectChatWith(senderId, {
             name: targetNotif.sender?.name || 'Developer',
             initial: targetNotif.sender?.initials || 'DV',
+            avatarUrl: targetNotif.sender?.profilePicture || targetNotif.sender?.avatarUrl || '',
+            profilePicture: targetNotif.sender?.profilePicture || targetNotif.sender?.avatarUrl || '',
           });
         }
       } else {
@@ -257,6 +259,11 @@ export default function SiteNav() {
   const initials = user?.name
     ? user.name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
     : '??';
+
+  const [navImgError, setNavImgError] = useState(false);
+  useEffect(() => {
+    setNavImgError(false);
+  }, [avatarUrl]);
 
   const handleEditProfile = () => {
     setMenuOpen(false);
@@ -564,10 +571,12 @@ export default function SiteNav() {
           }}
           style={{ overflow: 'hidden' }}
         >
-          {avatarUrl ? (
+          {avatarUrl && !navImgError ? (
             <img
               src={avatarUrl}
               alt=""
+              referrerPolicy="no-referrer"
+              onError={() => setNavImgError(true)}
               style={{
                 width: '100%',
                 height: '100%',

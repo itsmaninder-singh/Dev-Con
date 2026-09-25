@@ -28,6 +28,8 @@ const toSafeUser = (user) => ({
   badges: user.badges,
   profilePicture: user.profilePicture,
   coverPicture: user.coverPicture,
+  avatarUrl: user.profilePicture || "",
+  coverUrl: user.coverPicture || "",
   bio: user.bio,
   college: user.college,
   skills: user.skills,

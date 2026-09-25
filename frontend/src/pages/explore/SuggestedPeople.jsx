@@ -21,13 +21,32 @@ export default function SuggestedPeople({ searchTerm: externalSearch = '' }) {
     (authUser?.connections || []).forEach((c) => {
       const cid = String(c?._id || c?.id || c || '');
       const cUser = String(c?.username || '').toLowerCase();
+      const cName = String(c?.name || '').toLowerCase();
       if (cid) s.add(cid);
       if (cUser) s.add(cUser);
+      if (cName) s.add(cName);
     });
     return s;
   });
   const { playClick } = useUISound();
   const { isUserBlocked, blockUser } = useProfile();
+
+  // Sync connections when authUser object changes
+  useEffect(() => {
+    if (!authUser?.connections?.length) return;
+    setConnectionsSet((prev) => {
+      const next = new Set(prev);
+      authUser.connections.forEach((c) => {
+        const cid = String(c?._id || c?.id || c || "");
+        const cUser = String(c?.username || "").toLowerCase();
+        const cName = String(c?.name || "").toLowerCase();
+        if (cid) next.add(cid);
+        if (cUser) next.add(cUser);
+        if (cName) next.add(cName);
+      });
+      return next;
+    });
+  }, [authUser?.connections]);
 
   // Load current user's mutual connections from server
   useEffect(() => {
@@ -43,8 +62,10 @@ export default function SuggestedPeople({ searchTerm: externalSearch = '' }) {
           list.forEach((c) => {
             const cid = String(c._id || c.id || c || '');
             const cUsername = String(c.username || '').toLowerCase();
+            const cName = String(c.name || '').toLowerCase();
             if (cid) next.add(cid);
             if (cUsername) next.add(cUsername);
+            if (cName) next.add(cName);
           });
           return next;
         });
@@ -74,11 +95,14 @@ export default function SuggestedPeople({ searchTerm: externalSearch = '' }) {
               name: uName,
               username: u.username || (u.name ? u.name.toLowerCase().replace(/\s+/g, '') : `user_${idx}`),
               initials,
+              profilePicture: u.profilePicture || u.avatarUrl || '',
+              avatarUrl: u.profilePicture || u.avatarUrl || '',
               role: u.skills?.[0] ? `${u.skills[0]} Developer` : (u.college ? `Student @ ${u.college}` : 'Builder'),
               reason: m.matchPercentage ? `${m.matchPercentage}% match on skills` : (u.skills?.length ? `Skills: ${u.skills.slice(0, 3).join(', ')}` : 'DevConnect Builder'),
               matchScore: m.matchPercentage || Math.max(70, Math.min(98, Math.round(m.matchScore || m.score || 85))),
               skills: Array.isArray(u.skills) ? u.skills : [],
               highlight: u.bio || (u.college ? `Studying at ${u.college}` : 'Active builder on DevConnect'),
+              isConnected: Boolean(u.isConnected || m.isConnected),
             };
           });
           setDynamicPeople(mapped);
@@ -89,7 +113,7 @@ export default function SuggestedPeople({ searchTerm: externalSearch = '' }) {
       }
 
       try {
-        const searchRes = await searchApi.searchUsers({ limit: 12 });
+        const searchRes = await searchApi.searchUsers({ limit: 12, excludeConnected: 'true' });
         const realUsers = searchRes?.results || (Array.isArray(searchRes) ? searchRes : []);
         if (realUsers.length > 0 && !isCancelled) {
           const mapped = realUsers.map((u, idx) => {
@@ -101,11 +125,14 @@ export default function SuggestedPeople({ searchTerm: externalSearch = '' }) {
               name: uName,
               username: u.username || (u.name ? u.name.toLowerCase().replace(/\s+/g, '') : `user_${idx}`),
               initials,
+              profilePicture: u.profilePicture || u.avatarUrl || '',
+              avatarUrl: u.profilePicture || u.avatarUrl || '',
               role: u.skills?.[0] ? `${u.skills[0]} Developer` : (u.college ? `Student @ ${u.college}` : 'Builder'),
               reason: u.skills?.length ? `Stack: ${u.skills.slice(0, 3).join(', ')}` : (u.college || 'Verified Developer'),
               matchScore: Math.max(68, Math.min(96, Math.round((u.reputation?.score || 10) * 1.5 + 72))),
               skills: Array.isArray(u.skills) ? u.skills : [],
               highlight: u.bio || (u.college ? `From ${u.college}` : `Active developer on DevConnect`),
+              isConnected: Boolean(u.isConnected),
             };
           });
           setDynamicPeople(mapped);
@@ -145,6 +172,8 @@ export default function SuggestedPeople({ searchTerm: externalSearch = '' }) {
               name: uName,
               username: u.username || '',
               initials,
+              profilePicture: u.profilePicture || u.avatarUrl || '',
+              avatarUrl: u.profilePicture || u.avatarUrl || '',
               role: u.skills?.[0] ? `${u.skills[0]} Developer` : (u.college ? `Student @ ${u.college}` : 'Builder'),
               reason: u.skills?.length ? `Stack: ${u.skills.slice(0, 3).join(', ')}` : (u.college || 'Verified Developer'),
               matchScore: Math.max(68, Math.min(96, Math.round((u.reputation?.score || 10) * 1.5 + 72))),
@@ -167,11 +196,18 @@ export default function SuggestedPeople({ searchTerm: externalSearch = '' }) {
   const isPersonConnected = (p) => {
     const pid = String(p.id || p._id || '');
     const pUsername = String(p.username || '').toLowerCase();
+    const pName = String(p.name || '').toLowerCase();
     return Boolean(
+      p.isConnected ||
       (pid && connectionsSet.has(pid)) ||
       (pUsername && connectionsSet.has(pUsername)) ||
+      (pName && connectionsSet.has(pName)) ||
       (pid && followed.has(pid)) ||
-      p.isConnected
+      (authUser?.connections || []).some((c) => {
+        const cid = String(c?._id || c?.id || c || '');
+        const cUser = String(c?.username || '').toLowerCase();
+        return (pid && cid === pid) || (pUsername && cUser && cUser === pUsername);
+      })
     );
   };
 
@@ -199,9 +235,9 @@ export default function SuggestedPeople({ searchTerm: externalSearch = '' }) {
       return dynamicPeople.filter((p) => !isMe(p) && !isBlocked(p) && !isPersonConnected(p));
     }
 
-    // SEARCH MODE: Show matching users, and indicate connection status
+    // SEARCH MODE: Show matching users, excluding self, blocked, and already connected users
     return allCandidates.filter((p) => {
-      if (isMe(p) || isBlocked(p)) return false;
+      if (isMe(p) || isBlocked(p) || isPersonConnected(p)) return false;
       const q = activeQuery;
       const nameMatch = String(p.name || '').toLowerCase().includes(q);
       const userMatch = String(p.username || '').toLowerCase().includes(q);
@@ -210,22 +246,28 @@ export default function SuggestedPeople({ searchTerm: externalSearch = '' }) {
     });
   }, [activeQuery, dynamicPeople, allCandidates, authUser, connectionsSet, followed, isUserBlocked]);
 
-  const toggleFollow = (id, e) => {
+  const toggleFollow = (person, e) => {
     e.stopPropagation();
     playClick();
-    const sid = String(id);
+    const sid = String(person.id || person._id || person || '');
+    const sUsername = String(person.username || '').toLowerCase();
+    const sName = String(person.name || '').toLowerCase();
     setFollowed((prev) => {
       const next = new Set(prev);
-      next.add(sid);
+      if (sid) next.add(sid);
+      if (sUsername) next.add(sUsername);
+      if (sName) next.add(sName);
       return next;
     });
     setConnectionsSet((prev) => {
       const next = new Set(prev);
-      next.add(sid);
+      if (sid) next.add(sid);
+      if (sUsername) next.add(sUsername);
+      if (sName) next.add(sName);
       return next;
     });
-    if (id && sid.length === 24) {
-      userApi.sendConnectRequest(id).catch((err) => {
+    if (sid && sid.length === 24) {
+      userApi.sendConnectRequest(sid).catch((err) => {
         console.warn('Connect request deferred:', err?.message || err);
       });
     }
@@ -325,7 +367,33 @@ export default function SuggestedPeople({ searchTerm: externalSearch = '' }) {
               >
                 <div className="suggested-item-top">
                   <div className="suggested-avatar-wrap">
-                    <div className="suggested-avatar">{item.initials || 'DV'}</div>
+                    <div className="suggested-avatar" style={{ overflow: 'hidden', padding: 0 }}>
+                      {item.profilePicture || item.avatarUrl ? (
+                        <img
+                          src={item.profilePicture || item.avatarUrl}
+                          alt={item.name}
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            if (e.currentTarget.nextSibling) {
+                              e.currentTarget.nextSibling.style.display = 'flex';
+                            }
+                          }}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        />
+                      ) : null}
+                      <span
+                        style={{
+                          display: item.profilePicture || item.avatarUrl ? 'none' : 'flex',
+                          width: '100%',
+                          height: '100%',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        {item.initials || 'DV'}
+                      </span>
+                    </div>
                     {item.matchScore && (
                       <span className="suggested-score-badge" title={`${item.matchScore}% match`}>
                         {item.matchScore}%
@@ -358,13 +426,13 @@ export default function SuggestedPeople({ searchTerm: externalSearch = '' }) {
                       <span>Connected</span>
                     </button>
                   ) : (
-                    <button
-                      type="button"
-                      className="suggested-action-btn"
-                      onClick={(e) => toggleFollow(item.id, e)}
-                      title="Connect"
-                      aria-label={`Connect with ${item.name}`}
-                    >
+                      <button
+                        type="button"
+                        className="suggested-action-btn"
+                        onClick={(e) => toggleFollow(item, e)}
+                        title="Connect"
+                        aria-label={`Connect with ${item.name}`}
+                      >
                       <UserPlus size={12} style={{ verticalAlign: '-1px' }} />
                       <span>Connect</span>
                     </button>
