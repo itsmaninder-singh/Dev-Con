@@ -409,6 +409,7 @@ class App {
     this.createCamera();
     this.createScene();
     this.onResize();
+    this.createGeometry();
     this.createMedias(items, bend, textColor, borderRadius, font);
     this.isVisible = true;
     this.update();
@@ -421,9 +422,10 @@ class App {
         const wasVisible = this.isVisible;
         this.isVisible = entry.isIntersecting;
         if (!wasVisible && this.isVisible) {
+          window.cancelAnimationFrame(this.raf);
           this.raf = window.requestAnimationFrame(this.update.bind(this));
         }
-      }, { rootMargin: '120px' });
+      }, { rootMargin: '300px' });
       this.observer.observe(this.container);
     }
   }
