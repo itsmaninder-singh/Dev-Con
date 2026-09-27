@@ -64,11 +64,20 @@ const initSocket = (io) => {
     redisClient.sAdd("online_users", userId);
     io.emit("presence:online", { userId });
 
-    // Send initial list of all currently online user IDs to the connected client
+    // Send initial list of all currently online user IDs to the connected client (verified live)
     (async () => {
       try {
-        const onlineUsers = await redisClient.sMembers("online_users");
-        socket.emit("presence:initial", { onlineUserIds: onlineUsers || [] });
+        const rawList = await redisClient.sMembers("online_users");
+        const trulyOnline = [];
+        for (const uid of (rawList || [])) {
+          const live = await io.in(uid).fetchSockets();
+          if (live.length > 0) {
+            trulyOnline.push(uid);
+          } else {
+            await redisClient.sRem("online_users", uid);
+          }
+        }
+        socket.emit("presence:initial", { onlineUserIds: trulyOnline });
       } catch (err) {
         console.warn("[socket] Failed to fetch online users:", err.message);
       }
@@ -78,13 +87,23 @@ const initSocket = (io) => {
       try {
         if (!targetUserId) return callback?.({ ok: false, error: "Missing userId" });
         const cleanId = String(targetUserId);
-        const isOnline = await redisClient.sIsMember("online_users", cleanId);
+
+        // Verify with live sockets in room
+        const liveSockets = await io.in(cleanId).fetchSockets();
+        const isOnline = liveSockets.length > 0;
+
+        if (!isOnline) {
+          await redisClient.sRem("online_users", cleanId);
+        } else {
+          await redisClient.sAdd("online_users", cleanId);
+        }
+
         let lastSeen = null;
         if (!isOnline) {
           const u = await User.findById(cleanId).select("lastSeen");
           lastSeen = u?.lastSeen ? new Date(u.lastSeen).toISOString() : null;
         }
-        callback?.({ ok: true, userId: cleanId, isOnline: Boolean(isOnline), lastSeen });
+        callback?.({ ok: true, userId: cleanId, isOnline, lastSeen });
       } catch (err) {
         callback?.({ ok: false, error: err.message });
       }

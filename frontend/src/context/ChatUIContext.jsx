@@ -80,6 +80,8 @@ export function ChatUIProvider({ children }) {
                 lastMessageText: lastMsg,
                 lastMessageTime: lastTime,
                 lastMessageFrom: isFromMe ? 'me' : 'them',
+                lastActivity: c.lastMessage?.sentAt || c.updatedAt || c.createdAt || new Date().toISOString(),
+                updatedAt: c.lastMessage?.sentAt || c.updatedAt || c.createdAt || new Date().toISOString(),
                 messages: hasLastMsg
                   ? [
                       {
@@ -98,6 +100,11 @@ export function ChatUIProvider({ children }) {
               const combined = [...mapped];
               prev.forEach((p) => {
                 if (!combined.some((item) => item.id === p.id)) combined.push(p);
+              });
+              combined.sort((a, b) => {
+                const ta = new Date(a.lastActivity || a.updatedAt || 0).getTime() || 0;
+                const tb = new Date(b.lastActivity || b.updatedAt || 0).getTime() || 0;
+                return tb - ta;
               });
               return combined;
             });
@@ -370,7 +377,7 @@ export function ChatUIProvider({ children }) {
           isGroup: true,
           name: targetName,
           initial: targetInitial,
-          online: true,
+          online: false,
           colorIdx: Math.floor(Math.random() * AVATAR_COLORS.length),
           unread: 0,
           messages: [],
@@ -410,7 +417,7 @@ export function ChatUIProvider({ children }) {
             isServerChat: true,
             name: chat.name || targetName,
             initial: targetInitial,
-            online: true,
+            online: false,
             colorIdx: Math.floor(Math.random() * AVATAR_COLORS.length),
             unread: 0,
             messages: msgsFormatted,

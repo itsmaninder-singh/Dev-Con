@@ -430,6 +430,41 @@ export default function ChatWidget() {
 
   const totalUnread = conversations.reduce((sum, c) => sum + (c.unread || 0), 0);
   const active = conversations.find((c) => c.id === activeId || c._id === activeId) || null;
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Sorted by most recent message / activity timestamp (WhatsApp-style)
+  const sortedConversations = useMemo(() => {
+    const getTimestamp = (c) => {
+      if (c.lastActivity) {
+        const t = new Date(c.lastActivity).getTime();
+        if (!isNaN(t) && t > 0) return t;
+      }
+      if (c.updatedAt) {
+        const t = new Date(c.updatedAt).getTime();
+        if (!isNaN(t) && t > 0) return t;
+      }
+      const msgs = c.messages || [];
+      const last = msgs[msgs.length - 1];
+      if (last?.createdAt) {
+        const t = new Date(last.createdAt).getTime();
+        if (!isNaN(t) && t > 0) return t;
+      }
+      if (c.createdAt) {
+        const t = new Date(c.createdAt).getTime();
+        if (!isNaN(t) && t > 0) return t;
+      }
+      return 0;
+    };
+
+    const list = [...conversations].sort((a, b) => getTimestamp(b) - getTimestamp(a));
+
+    if (!searchQuery.trim()) return list;
+    const q = searchQuery.toLowerCase().trim();
+    return list.filter((c) =>
+      c.name?.toLowerCase().includes(q) ||
+      c.lastMessageText?.toLowerCase().includes(q)
+    );
+  }, [conversations, searchQuery]);
 
   useEffect(() => {
     currentChatIdRef.current = activeId;
@@ -588,6 +623,21 @@ export default function ChatWidget() {
     isAutoScrollingRef.current = true;
     setTimeout(() => textareaRef.current?.focus(), 150);
 
+    const targetConv = conversations.find((c) => c.id === id || c._id === id);
+    if (targetConv && !targetConv.isGroup && targetConv.otherUserId) {
+      socket.emit('presence:check', { userId: targetConv.otherUserId }, (res) => {
+        if (res?.ok) {
+          setConversations((prev) =>
+            prev.map((c) =>
+              c.id === id || c.otherUserId === targetConv.otherUserId
+                ? { ...c, online: Boolean(res.isOnline), lastSeen: res.lastSeen || c.lastSeen }
+                : c
+            )
+          );
+        }
+      });
+    }
+
     if (id && id.length === 24) {
       socket.emit('chat:join', id);
       markActiveChatAsRead(id);
@@ -631,8 +681,11 @@ export default function ChatWidget() {
         status: 'sent',
       };
 
-      setConversations((all) =>
-        all.map((c) => {
+      setConversations((all) => {
+        let updatedTarget = null;
+        const rest = [];
+
+        for (const c of all) {
           const matches = c.id === chatId || c._id === chatId;
           if (matches) {
             const currentList = c.messages || [];
@@ -654,18 +707,26 @@ export default function ChatWidget() {
               updated.push(newMsg);
             }
 
-            return {
+            updatedTarget = {
               ...c,
               unread: (isViewingActive || isFromMe) ? 0 : (c.unread || 0) + 1,
               lastMessageText: newMsg.content,
               lastMessageTime: newMsg.time,
               lastMessageFrom: isFromMe ? 'me' : 'them',
+              lastActivity: newMsg.createdAt,
+              updatedAt: newMsg.createdAt,
               messages: updated,
             };
+          } else {
+            rest.push(c);
           }
-          return c;
-        })
-      );
+        }
+
+        if (updatedTarget) {
+          return [updatedTarget, ...rest];
+        }
+        return all;
+      });
 
       if (isViewingActive) {
         socket.emit('chat:read', chatId);
@@ -835,25 +896,33 @@ export default function ChatWidget() {
       readBy: [user?._id],
     };
 
-    setConversations((list) =>
-      list.map((c) => {
+    setConversations((list) => {
+      let updatedTarget = null;
+      const rest = [];
+
+      for (const c of list) {
         if (c.id === active.id) {
           const currentList = c.messages || [];
           const exists = currentList.some((m) => m._id === tempId);
           const updated = exists
             ? currentList.map((m) => (m._id === tempId ? { ...optimisticMsg, status: 'sending' } : m))
             : [...currentList, optimisticMsg];
-          return {
+          updatedTarget = {
             ...c,
             lastMessageText: text,
             lastMessageTime: time,
             lastMessageFrom: 'me',
+            lastActivity: optimisticMsg.createdAt,
+            updatedAt: optimisticMsg.createdAt,
             messages: updated,
           };
+        } else {
+          rest.push(c);
         }
-        return c;
-      })
-    );
+      }
+
+      return updatedTarget ? [updatedTarget, ...rest] : list;
+    });
 
     if (serverChatId) {
       socket.emit('message:send', serverChatId, text, [], (res) => {
@@ -1049,16 +1118,27 @@ export default function ChatWidget() {
             </div>
             <div className="search-box">
               <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke="currentColor"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>
-              <input type="text" placeholder="Search conversations..." />
+              <input
+                type="text"
+                placeholder="Search conversations..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
             <div className="chat-list">
-              {conversations.length === 0 ? (
+              {sortedConversations.length === 0 ? (
                 <div style={{ padding: '40px 16px', textAlign: 'center', color: 'var(--text-lo)' }}>
-                  <p style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 600, color: 'var(--text-hi)' }}>No conversations yet</p>
-                  <p style={{ margin: 0, fontSize: '12px', opacity: 0.8 }}>Connect with team members or start a direct message to begin chatting.</p>
+                  <p style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 600, color: 'var(--text-hi)' }}>
+                    {conversations.length === 0 ? 'No conversations yet' : 'No results found'}
+                  </p>
+                  <p style={{ margin: 0, fontSize: '12px', opacity: 0.8 }}>
+                    {conversations.length === 0
+                      ? 'Connect with team members or start a direct message to begin chatting.'
+                      : 'Try searching with a different name or message.'}
+                  </p>
                 </div>
               ) : (
-                conversations.map((conv) => {
+                sortedConversations.map((conv) => {
                   const msgs = conv.messages || [];
                   const last = msgs[msgs.length - 1] || {
                     text: conv.lastMessageText || 'No messages yet',

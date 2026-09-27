@@ -76,8 +76,16 @@ const getMyChats = asyncHandler(async (req, res) => {
 
   let onlineSet = new Set();
   try {
+    const io = getIO();
     const list = await redisClient.sMembers("online_users");
-    onlineSet = new Set(list || []);
+    for (const uid of (list || [])) {
+      const live = await io.in(uid).fetchSockets();
+      if (live.length > 0) {
+        onlineSet.add(uid);
+      } else {
+        await redisClient.sRem("online_users", uid);
+      }
+    }
   } catch (_) {}
 
   const decorated = await Promise.all(
@@ -150,8 +158,17 @@ const getOrCreateDirectChat = asyncHandler(async (req, res) => {
 
   let isOtherOnline = false;
   try {
-    isOtherOnline = Boolean(await redisClient.sIsMember("online_users", userId));
-  } catch (_) {}
+    const io = getIO();
+    const live = await io.in(userId).fetchSockets();
+    isOtherOnline = live.length > 0;
+    if (!isOtherOnline) {
+      await redisClient.sRem("online_users", userId);
+    }
+  } catch (_) {
+    try {
+      isOtherOnline = Boolean(await redisClient.sIsMember("online_users", userId));
+    } catch (_) {}
+  }
 
   obj.participants = (obj.participants || []).map((p) => ({
     ...p,

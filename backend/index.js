@@ -25,6 +25,10 @@ const startServer = async () => {
   await connectDB();
   await connectRedis();
 
+  try {
+    await redisClient.del("online_users");
+  } catch (_) {}
+
   let socketAdapter;
   if (isRedisAvailable()) {
     try {
