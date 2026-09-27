@@ -35,7 +35,7 @@
   transition: none;
 }
 #dc-globalVantaBirds canvas {
-  filter: drop-shadow(0 0 5px rgba(255,152,162,0.55)) drop-shadow(0 0 12px rgba(255,152,162,0.25)) brightness(1.12) saturate(1.2);
+  will-change: transform;
 }
 
 /* ================= Three.js DevConnect logo ================= */
@@ -45,6 +45,7 @@
   width: 100%; height: 100vh;
   z-index: 1;
   pointer-events: none;
+  will-change: opacity;
 }
 
 /* ================= GLASS NAVBAR ================= */
@@ -251,8 +252,7 @@
   width: 560px;
   height: 300px;
   max-width: 90vw;
-  background: radial-gradient(circle, rgba(255, 152, 162, 0.32) 0%, rgba(255, 152, 162, 0.1) 45%, rgba(255, 152, 162, 0) 72%);
-  filter: blur(40px);
+  background: radial-gradient(ellipse at center, rgba(255, 152, 162, 0.28) 0%, rgba(255, 152, 162, 0.08) 45%, transparent 72%);
   pointer-events: none;
 }
 
@@ -291,6 +291,7 @@
   justify-content: center;
   padding: 0 8%;
   pointer-events: none;
+  will-change: transform, opacity;
 }
 .dc-story-beat .dc-num {
   font-family: var(--dc-font-mono, 'JetBrains Mono', monospace);
@@ -307,12 +308,13 @@
   max-width: 640px;
   line-height: 0.98;
   color: #f2f1ed;
-  text-shadow: 0 6px 40px rgba(0,0,0,0.85);
-  transition: text-shadow 0.4s ease, color 0.4s ease;
+  text-shadow: 0 4px 20px rgba(0,0,0,0.85);
+  transition: color 0.3s ease, text-shadow 0.3s ease;
+  will-change: transform, opacity;
 }
 .dc-story-beat h2.dc-line-glow {
   color: #ffe3e6;
-  text-shadow: 0 0 20px rgba(255,152,162,0.9), 0 0 50px rgba(255,152,162,0.5), 0 6px 40px rgba(0,0,0,0.85);
+  text-shadow: 0 0 24px rgba(255,152,162,0.7), 0 4px 20px rgba(0,0,0,0.85);
 }
 .dc-story-beat p {
   margin-top: 14px;
@@ -387,35 +389,34 @@
   opacity: 0; pointer-events: none;
 }
 
-/* ================= FULL-HEIGHT CENTER BLUR PANEL ================= */
+/* ================= FULL-HEIGHT CENTER VIGNETTE PANEL ================= */
 #dc-bgBlurPanel {
-  position: absolute;
-  top: 0; left: 10%; width: 80%;
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100vh;
   z-index: 2;
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  background: rgba(5,5,6,0.18);
+  background: radial-gradient(circle at 50% 50%, rgba(5,5,6,0.35) 0%, rgba(5,5,6,0.85) 100%);
   pointer-events: none;
   opacity: 0;
+  will-change: opacity;
 }
 
 /* ================= CUSTOM CURSOR ================= */
-.dc-cursor-dot, .dc-cursor-ring { position: fixed; top: 0; left: 0; border-radius: 50%; pointer-events: none; z-index: 150; }
+.dc-cursor-dot, .dc-cursor-ring {
+  position: fixed;
+  top: 0; left: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 150;
+  will-change: transform;
+  backface-visibility: hidden;
+}
 .dc-cursor-dot { width: 6px; height: 6px; background: #ff98a2; }
 .dc-cursor-ring { width: 34px; height: 34px; border: 1px solid rgba(255,152,162,0.5); }
 @media (hover: none) { .dc-cursor-dot, .dc-cursor-ring { display: none; } }
 
-/* ================= FILM GRAIN OVERLAY ================= */
+/* ================= FILM GRAIN OVERLAY (DISABLED FOR PERFORMANCE) ================= */
 #dc-filmGrain {
-  position: fixed; top: -50%; left: -50%; width: 200%; height: 200%; z-index: 120;
-  pointer-events: none; opacity: 0.05; mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
-  animation: dc-grainShift 0.4s steps(2) infinite;
-}
-@keyframes dc-grainShift {
-  0% { transform: translate(0,0); }
-  50% { transform: translate(-1%,1%); }
-  100% { transform: translate(1%,-1%); }
+  display: none;
 }
 
 /* ================= LAZY-LOAD PLACEHOLDER =================

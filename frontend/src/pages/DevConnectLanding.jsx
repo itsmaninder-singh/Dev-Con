@@ -214,7 +214,7 @@ export default function DevConnectLanding() {
 
       const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
       renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
       renderer.setClearColor(0x000000, 0);
       holder.appendChild(renderer.domElement);
 
@@ -391,6 +391,9 @@ export default function DevConnectLanding() {
       function renderLoop() {
         if (!mainLoopActive) return;
         rafIds.push(requestAnimationFrame(renderLoop));
+        // Skip rendering when hero has fully exited to save GPU/CPU cycles
+        if (heroScrollProgress >= 1) return;
+
         const exiting = updateLetterScrollExit();
         if (!exiting) updateLetterCursorReact();
 
@@ -432,13 +435,13 @@ export default function DevConnectLanding() {
             color1: 0xff98a2,
             color2: 0x6b6bd6,
             colorMode: 'lerpGradient',
-            birdSize: 1.4,
-            wingSpan: 17,
-            speedLimit: 5,
-            separation: 51,
-            alignment: 55,
+            birdSize: 1.2,
+            wingSpan: 16,
+            speedLimit: 4.5,
+            separation: 50,
+            alignment: 50,
             cohesion: 24,
-            quantity: 3.5,
+            quantity: 2.2,
           });
         } catch (vantaErr) {
           console.warn('[DevConnectLanding] Vanta birds background skipped due to Three.js compatibility:', vantaErr);
@@ -500,16 +503,23 @@ export default function DevConnectLanding() {
       const magneticCleanups = [];
       if (!reducedMotion) {
         qsa('.dc-btn').forEach((btn) => {
+          let rect = null;
+          const onEnter = () => { rect = btn.getBoundingClientRect(); };
           const onMove = (e) => {
-            const rect = btn.getBoundingClientRect();
+            if (!rect) rect = btn.getBoundingClientRect();
             const relX = e.clientX - rect.left - rect.width / 2;
             const relY = e.clientY - rect.top - rect.height / 2;
-            gsap.to(btn, { x: relX * 0.35, y: relY * 0.35, duration: 0.3, ease: 'power2.out' });
+            gsap.to(btn, { x: relX * 0.35, y: relY * 0.35, duration: 0.25, ease: 'power2.out', overwrite: 'auto' });
           };
-          const onLeave = () => gsap.to(btn, { x: 0, y: 0, duration: 0.5, ease: 'elastic.out(1, 0.4)' });
+          const onLeave = () => {
+            rect = null;
+            gsap.to(btn, { x: 0, y: 0, duration: 0.5, ease: 'elastic.out(1, 0.4)', overwrite: 'auto' });
+          };
+          btn.addEventListener('mouseenter', onEnter);
           btn.addEventListener('mousemove', onMove);
           btn.addEventListener('mouseleave', onLeave);
           magneticCleanups.push(() => {
+            btn.removeEventListener('mouseenter', onEnter);
             btn.removeEventListener('mousemove', onMove);
             btn.removeEventListener('mouseleave', onLeave);
           });
@@ -550,88 +560,32 @@ export default function DevConnectLanding() {
       }
 
       /* =========================================================
-         5. 3D SCROLL STORYTELLING
+         5. STORYTELLING SCROLL PROGRESS & GLOW
          ========================================================= */
-      const storyHolder = storyCanvasHolderRef.current;
-      const storyScene = new THREE.Scene();
-      const storyCamera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
-      storyCamera.position.set(0, 0, 16);
-
-      const storyRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
-      storyRenderer.setSize(window.innerWidth, window.innerHeight);
-      storyRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
-      storyRenderer.setClearColor(0x000000, 0);
-      storyHolder.appendChild(storyRenderer.domElement);
-
-      storyScene.add(new THREE.AmbientLight(0x404040, 1.0));
-      const storyKey = new THREE.DirectionalLight(0xffffff, 1.1);
-      storyKey.position.set(4, 6, 8);
-      storyScene.add(storyKey);
-
       const storyProgressBar = storyProgressRef.current;
       const storyHeadings = qsa('.dc-story-beat h2');
 
       function updateStory(progress) {
-        const angle = progress * Math.PI * 1.4;
-        const dist = lerp(16, 9, progress);
-        storyCamera.position.x = Math.sin(angle) * dist;
-        storyCamera.position.z = Math.cos(angle) * dist;
-        storyCamera.position.y = lerp(1, -1.5, progress);
-        storyCamera.lookAt(0, 0, 0);
-
-        storyProgressBar.style.width = progress * 100 + '%';
-
+        if (storyProgressBar) {
+          storyProgressBar.style.width = progress * 100 + '%';
+        }
         if (storyHeadings.length) {
           const activeIdx = Math.min(storyHeadings.length - 1, Math.floor(progress * storyHeadings.length));
           storyHeadings.forEach((h2, i) => h2.classList.toggle('dc-line-glow', i === activeIdx));
         }
       }
 
-      if (!reducedMotion) {
-        gsap.fromTo(storyCanvasHolderRef.current, { opacity: 0 }, {
-          opacity: 1, duration: 0.6, ease: 'none',
-          scrollTrigger: { trigger: '.dc-story-stage', start: 'top 90%', end: 'top 40%', scrub: true },
-        });
-        gsap.to(storyCanvasHolderRef.current, {
-          opacity: 0, duration: 0.6, ease: 'none',
-          scrollTrigger: { trigger: '.dc-next-section', start: 'top 90%', end: 'top 40%', scrub: true },
-        });
-      } else {
-        gsap.set(storyCanvasHolderRef.current, { opacity: 1 });
-      }
-
-      let storyLoopActive = true;
-      function storyRenderLoop() {
-        if (!storyLoopActive) return;
-        rafIds.push(requestAnimationFrame(storyRenderLoop));
-        storyRenderer.render(storyScene, storyCamera);
-      }
-      storyRenderLoop();
-
-      const onResizeStory = () => {
-        storyCamera.aspect = window.innerWidth / window.innerHeight;
-        storyCamera.updateProjectionMatrix();
-        storyRenderer.setSize(window.innerWidth, window.innerHeight);
-      };
-      window.addEventListener('resize', onResizeStory);
-      cleanupFns.push(() => {
-        window.removeEventListener('resize', onResizeStory);
-        storyLoopActive = false;
-        storyRenderer.dispose();
-        storyHolder.removeChild(storyRenderer.domElement);
-      });
-
-      /* 5b. Cinematic blur + scale settle for content below the story */
+      /* 5b. Smooth fade + scale settle for content below the story (transform + opacity for 60fps) */
       if (!reducedMotion) {
         qsa('.dc-next-section h2, .dc-story-beat').forEach((el) => {
-          gsap.fromTo(el, { scale: 0.94, filter: 'blur(10px)' }, {
-            scale: 1, filter: 'blur(0px)', ease: 'none',
-            scrollTrigger: { trigger: el, start: 'top 95%', end: 'top 45%', scrub: true },
+          gsap.fromTo(el, { scale: 0.96, opacity: 0.35, y: 24 }, {
+            scale: 1, opacity: 1, y: 0, ease: 'none',
+            scrollTrigger: { trigger: el, start: 'top 95%', end: 'top 55%', scrub: true },
           });
         });
       }
 
-      /* 5c. Story scroll trigger — drives camera + progress bar */
+      /* 5c. Story scroll trigger — drives progress bar & beat highlights */
       if (!reducedMotion) {
         ScrollTrigger.create({
           trigger: '.dc-story-track',
@@ -645,18 +599,28 @@ export default function DevConnectLanding() {
       }
 
       /* =========================================================
-         6. LENIS — smooth scroll synced into GSAP's ticker
+         6. LENIS — ultra-smooth momentum scroll
          ========================================================= */
       let lenis = null;
-      let lenisRaf;
+      let lenisRafId = null;
       if (!reducedMotion) {
-        lenis = new Lenis({ duration: 1.15, easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)), smoothWheel: true });
+        lenis = new Lenis({
+          lerp: 0.085,
+          smoothWheel: true,
+          wheelMultiplier: 0.95,
+          touchMultiplier: 1.5,
+          infinite: false,
+        });
         lenis.on('scroll', ScrollTrigger.update);
-        lenisRaf = (time) => lenis.raf(time * 1000);
-        gsap.ticker.add(lenisRaf);
-        gsap.ticker.lagSmoothing(0);
+
+        function lenisLoop(time) {
+          lenis.raf(time);
+          lenisRafId = requestAnimationFrame(lenisLoop);
+        }
+        lenisRafId = requestAnimationFrame(lenisLoop);
+
         cleanupFns.push(() => {
-          gsap.ticker.remove(lenisRaf);
+          if (lenisRafId) cancelAnimationFrame(lenisRafId);
           lenis.destroy();
         });
       }
@@ -686,24 +650,6 @@ export default function DevConnectLanding() {
         });
         cleanupFns.push(() => cursorEnterCleanups.forEach((fn) => fn()));
       }
-
-      /* =========================================================
-         8. BLUR PANEL HEIGHT SYNC
-         ========================================================= */
-      function syncBlurPanelHeight() {
-        bgBlurPanel.style.height = document.documentElement.scrollHeight + 'px';
-      }
-      window.addEventListener('load', syncBlurPanelHeight);
-      window.addEventListener('resize', syncBlurPanelHeight);
-      ScrollTrigger.addEventListener('refresh', syncBlurPanelHeight);
-      syncBlurPanelHeight();
-      const lateSyncTimeout = setTimeout(syncBlurPanelHeight, 1200);
-      cleanupFns.push(() => {
-        window.removeEventListener('load', syncBlurPanelHeight);
-        window.removeEventListener('resize', syncBlurPanelHeight);
-        ScrollTrigger.removeEventListener('refresh', syncBlurPanelHeight);
-        clearTimeout(lateSyncTimeout);
-      });
 
       /* =========================================================
          9. KICK OFF

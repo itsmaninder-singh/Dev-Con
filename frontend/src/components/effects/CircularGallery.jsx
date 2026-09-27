@@ -227,7 +227,9 @@ class Media {
     this.font = font;
     this.createShader();
     this.createMesh();
-    this.createTitle();
+    if (this.text && typeof this.text === 'string' && this.text.trim()) {
+      this.createTitle();
+    }
     this.onResize();
   }
   createShader() {
@@ -407,16 +409,29 @@ class App {
     this.createCamera();
     this.createScene();
     this.onResize();
-    this.createGeometry();
     this.createMedias(items, bend, textColor, borderRadius, font);
+    this.isVisible = true;
     this.update();
     this.addEventListeners();
+    this.setupObserver();
+  }
+  setupObserver() {
+    if (typeof IntersectionObserver !== 'undefined' && this.container) {
+      this.observer = new IntersectionObserver(([entry]) => {
+        const wasVisible = this.isVisible;
+        this.isVisible = entry.isIntersecting;
+        if (!wasVisible && this.isVisible) {
+          this.raf = window.requestAnimationFrame(this.update.bind(this));
+        }
+      }, { rootMargin: '120px' });
+      this.observer.observe(this.container);
+    }
   }
   createRenderer() {
     this.renderer = new Renderer({
       alpha: true,
       antialias: true,
-      dpr: Math.min(window.devicePixelRatio || 1, 2)
+      dpr: Math.min(window.devicePixelRatio || 1, 1.5)
     });
     this.gl = this.renderer.gl;
     this.gl.clearColor(0, 0, 0, 0);
@@ -432,8 +447,8 @@ class App {
   }
   createGeometry() {
     this.planeGeometry = new Plane(this.gl, {
-      heightSegments: 50,
-      widthSegments: 100
+      heightSegments: 12,
+      widthSegments: 24
     });
   }
   createMedias(items, bend = 1, textColor, borderRadius, font) {
@@ -448,7 +463,7 @@ class App {
       { image: `https://picsum.photos/seed/8/800/600?grayscale`, text: 'Blurry Lights' },
       { image: `https://picsum.photos/seed/9/800/600?grayscale`, text: 'New York' },
       { image: `https://picsum.photos/seed/10/800/600?grayscale`, text: 'Good Boy' },
-      { image: `https://picsum.photos/seed/21/800/600?grayscale`, text: 'Coastline' },
+      { image: `https://picsum.photos/seed/11/800/600?grayscale`, text: 'Coastline' },
       { image: `https://picsum.photos/seed/12/800/600?grayscale`, text: 'Palm Trees' }
     ];
     const galleryItems = items && items.length ? items : defaultItems;
@@ -542,6 +557,7 @@ class App {
     }
   }
   update() {
+    if (!this.isVisible) return;
     // Continuous slow drift, independent of user interaction — paused while
     // the user is actively dragging so it never fights their input.
     if (this.autoScroll && !this.isDown) {
@@ -565,34 +581,33 @@ class App {
     this.boundOnKeyDown = this.onKeyDown.bind(this);
 
     window.addEventListener('resize', this.boundOnResize);
-    window.addEventListener('mousewheel', this.boundOnWheel);
-    window.addEventListener('wheel', this.boundOnWheel);
-    window.addEventListener('mousedown', this.boundOnTouchDown);
+    if (this.container) {
+      this.container.addEventListener('wheel', this.boundOnWheel, { passive: true });
+      this.container.addEventListener('mousedown', this.boundOnTouchDown);
+      this.container.addEventListener('touchstart', this.boundOnTouchDown, { passive: true });
+      this.container.addEventListener('keydown', this.boundOnKeyDown);
+    }
     window.addEventListener('mousemove', this.boundOnTouchMove);
     window.addEventListener('mouseup', this.boundOnTouchUp);
-    window.addEventListener('touchstart', this.boundOnTouchDown);
     window.addEventListener('touchmove', this.boundOnTouchMove);
     window.addEventListener('touchend', this.boundOnTouchUp);
-
-    this.container?.addEventListener('keydown', this.boundOnKeyDown);
   }
   destroy() {
+    this.observer?.disconnect?.();
     window.cancelAnimationFrame(this.raf);
     window.removeEventListener('resize', this.boundOnResize);
-    window.removeEventListener('mousewheel', this.boundOnWheel);
-    window.removeEventListener('wheel', this.boundOnWheel);
-    window.removeEventListener('mousedown', this.boundOnTouchDown);
+    if (this.container) {
+      this.container.removeEventListener('wheel', this.boundOnWheel);
+      this.container.removeEventListener('mousedown', this.boundOnTouchDown);
+      this.container.removeEventListener('touchstart', this.boundOnTouchDown);
+      this.container.removeEventListener('keydown', this.boundOnKeyDown);
+    }
     window.removeEventListener('mousemove', this.boundOnTouchMove);
     window.removeEventListener('mouseup', this.boundOnTouchUp);
-    window.removeEventListener('touchstart', this.boundOnTouchDown);
     window.removeEventListener('touchmove', this.boundOnTouchMove);
     window.removeEventListener('touchend', this.boundOnTouchUp);
     if (this.renderer && this.renderer.gl && this.renderer.gl.canvas.parentNode) {
       this.renderer.gl.canvas.parentNode.removeChild(this.renderer.gl.canvas);
-    }
-
-    if (this.container) {
-      this.container.removeEventListener('keydown', this.boundOnKeyDown);
     }
   }
 }

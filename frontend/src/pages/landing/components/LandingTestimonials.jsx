@@ -16,7 +16,7 @@ export function LandingTestimonials({
             bend={3}
             textColor="#ffffff"
             borderRadius={0.08}
-            scrollEase={0.02}
+            scrollEase={0.05}
             font="bold 24px 'Segoe UI', sans-serif"
             autoScroll
             autoScrollSpeed={0.012}
