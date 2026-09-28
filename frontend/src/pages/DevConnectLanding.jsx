@@ -435,13 +435,13 @@ export default function DevConnectLanding() {
             color1: 0xff98a2,
             color2: 0x6b6bd6,
             colorMode: 'lerpGradient',
-            birdSize: 1.2,
-            wingSpan: 16,
+            birdSize: 1.25,
+            wingSpan: 18,
             speedLimit: 4.5,
-            separation: 50,
-            alignment: 50,
-            cohesion: 24,
-            quantity: 2.2,
+            separation: 40,
+            alignment: 45,
+            cohesion: 25,
+            quantity: 4.0,
           });
         } catch (vantaErr) {
           console.warn('[DevConnectLanding] Vanta birds background skipped due to Three.js compatibility:', vantaErr);
@@ -476,13 +476,21 @@ export default function DevConnectLanding() {
       /* =========================================================
          2. GSAP INTRO TIMELINE
          ========================================================= */
-      const splitSub = new SplitType(subheadRef.current, { types: 'chars' });
+      const splitSub = new SplitType(subheadRef.current, { types: 'words,chars', tagName: 'span' });
+
+      // Initially hide characters in 3D perspective with soft blur
+      gsap.set(splitSub.chars, {
+        opacity: 0,
+        y: 28,
+        rotateX: -65,
+        filter: 'blur(6px)',
+      });
 
       const tl = gsap.timeline({ defaults: { ease: 'power3.out' }, paused: true });
 
       if (reducedMotion) {
         gsap.set(introVeilRef.current, { opacity: 0 });
-        gsap.set(splitSub.chars, { opacity: 1, y: 0 });
+        gsap.set(splitSub.chars, { opacity: 1, y: 0, rotateX: 0, filter: 'blur(0px)' });
         gsap.set([ctaPrimaryRef.current, ctaSecondaryRef.current], { opacity: 1, y: 0, scale: 1 });
         gsap.set(scrollIndicatorRef.current, { opacity: 1 });
         animateLettersIn();
@@ -490,10 +498,25 @@ export default function DevConnectLanding() {
       } else {
         tl.to(introVeilRef.current, { opacity: 0, duration: 1.1, ease: 'power2.out' }, 0)
           .to(camera.position, { z: 14, duration: 2.2, ease: 'power2.out' }, 0)
-          .call(() => animateLettersIn(), undefined, 0.6)
-          .to(splitSub.chars, { opacity: 1, y: 0, duration: 0.6, stagger: 0.02 }, 2.3)
-          .to([ctaPrimaryRef.current, ctaSecondaryRef.current], { opacity: 1, y: 0, scale: 1, duration: 0.6, stagger: 0.15 }, 2.8)
-          .to(scrollIndicatorRef.current, { opacity: 1, duration: 0.6 }, 3.3)
+          .call(() => animateLettersIn(), undefined, 0.5)
+          .to(splitSub.chars, {
+            opacity: 1,
+            y: 0,
+            rotateX: 0,
+            filter: 'blur(0px)',
+            duration: 0.75,
+            stagger: 0.016,
+            ease: 'back.out(1.5)',
+          }, 1.2)
+          .to([ctaPrimaryRef.current, ctaSecondaryRef.current], {
+            opacity: 1,
+            y: 0,
+            scale: 1,
+            duration: 0.6,
+            stagger: 0.12,
+            ease: 'back.out(1.6)',
+          }, 2.1)
+          .to(scrollIndicatorRef.current, { opacity: 1, duration: 0.6 }, 2.5)
           .call(() => setupHeroExitFade());
       }
 

@@ -9,7 +9,11 @@ export function LandingTestimonials({
     <section className="dc-next-section" ref={nextSectionRef}>
       <div className="dc-end-glow" aria-hidden="true" />
       <div className="dc-testimonials">
-        <h2>What developers are saying</h2>
+        <div className="dc-testimonials-eyebrow">
+          <span className="dc-testimonials-dot" />
+          <span>COMMUNITY VOICES</span>
+        </div>
+        <h2 className="dc-testimonials-heading">What developers are saying</h2>
         <div className="dc-gallery-wrap">
           <CircularGallery
             items={testimonialItems}
@@ -17,7 +21,7 @@ export function LandingTestimonials({
             textColor="#ffffff"
             borderRadius={0.08}
             scrollEase={0.05}
-            font="bold 24px 'Segoe UI', sans-serif"
+            font="bold 28px 'Segoe UI', sans-serif"
             autoScroll
             autoScrollSpeed={0.012}
           />

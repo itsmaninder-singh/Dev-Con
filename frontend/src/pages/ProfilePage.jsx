@@ -644,7 +644,7 @@ export default function ProfilePage() {
           will-change: transform;
         }
 
-        .identity-wrap { position: relative; z-index: 2; padding: 0 6%; }
+        .identity-wrap { position: relative; z-index: 30; padding: 0 6%; }
         .avatar-block {
           display: flex; align-items: flex-end; gap: 22px;
           margin-top: -64px; perspective: 700px;
@@ -745,6 +745,7 @@ export default function ProfilePage() {
         }
         .identity-actions {
           margin-left: auto; padding-bottom: 14px; display: flex; gap: 10px;
+          position: relative; z-index: 35;
           opacity: 0; transform: translateY(16px);
         }
         .btn {

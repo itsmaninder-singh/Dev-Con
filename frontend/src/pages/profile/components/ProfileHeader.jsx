@@ -57,11 +57,16 @@ export function ProfileHeader({
         setMenuOpen(false);
       }
     }
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('click', handleClickOutside);
+    const timer = setTimeout(() => {
+      document.addEventListener('pointerdown', handleClickOutside);
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
+    }, 20);
     return () => {
+      clearTimeout(timer);
+      document.removeEventListener('pointerdown', handleClickOutside);
       document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('click', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
     };
   }, [menuOpen]);
 
@@ -279,10 +284,11 @@ export function ProfileHeader({
             {!isOwnProfile && (
               /* More Options Dropdown */
               <div
-                style={{ position: 'relative' }}
+                style={{ position: 'relative', zIndex: 70 }}
                 ref={menuRef}
                 onClick={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
               >
                 <button
                   type="button"
@@ -294,9 +300,9 @@ export function ProfileHeader({
                   }}
                   aria-label="More options"
                   title="More options"
-                  style={{ width: '42px', height: '42px' }}
+                  style={{ width: '42px', height: '42px', position: 'relative', zIndex: 71 }}
                 >
-                  <MoreHorizontal size={18} />
+                  <MoreHorizontal size={18} style={{ pointerEvents: 'none' }} />
                 </button>
 
                 {menuOpen && (
@@ -305,33 +311,45 @@ export function ProfileHeader({
                       position: 'absolute',
                       top: 'calc(100% + 8px)',
                       right: 0,
-                      minWidth: '175px',
+                      minWidth: '185px',
                       background: 'rgba(20, 20, 24, 0.98)',
-                      border: '1px solid rgba(255, 255, 255, 0.12)',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
                       borderRadius: '14px',
-                      boxShadow: '0 12px 30px rgba(0,0,0,0.6)',
-                      backdropFilter: 'blur(16px)',
-                      zIndex: 50,
+                      boxShadow: '0 16px 40px rgba(0,0,0,0.85), 0 0 25px rgba(0,0,0,0.5)',
+                      backdropFilter: 'blur(20px)',
+                      WebkitBackdropFilter: 'blur(20px)',
+                      zIndex: 100,
                       padding: '6px',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '4px',
                       animation: 'fadeIn 0.15s ease',
                     }}
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onPointerDown={(e) => e.stopPropagation()}
                   >
                     <button
                       type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                      onPointerDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        setMenuOpen(false);
                         if (onOpenReport) onOpenReport();
+                        setMenuOpen(false);
                       }}
                       style={{
                         background: 'none',
                         border: 'none',
                         color: 'var(--text, #fff)',
-                        padding: '9px 12px',
+                        padding: '10px 14px',
                         borderRadius: '8px',
                         fontSize: '13px',
                         fontWeight: 500,
@@ -341,26 +359,36 @@ export function ProfileHeader({
                         gap: '8px',
                         textAlign: 'left',
                         transition: 'background 0.15s ease',
+                        width: '100%',
                       }}
                       onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)')}
                       onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
                     >
-                      <Flag size={14} color="var(--coral, #ff98a2)" /> Report User
+                      <Flag size={14} color="var(--coral, #ff98a2)" style={{ pointerEvents: 'none', flexShrink: 0 }} />
+                      <span style={{ pointerEvents: 'none' }}>Report User</span>
                     </button>
 
                     <button
                       type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                      onPointerDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        setMenuOpen(false);
                         if (onBlockToggle) onBlockToggle();
+                        setMenuOpen(false);
                       }}
                       style={{
                         background: 'none',
                         border: 'none',
                         color: isBlocked ? 'var(--coral, #ff98a2)' : 'var(--text, #fff)',
-                        padding: '9px 12px',
+                        padding: '10px 14px',
                         borderRadius: '8px',
                         fontSize: '13px',
                         fontWeight: 500,
@@ -370,17 +398,20 @@ export function ProfileHeader({
                         gap: '8px',
                         textAlign: 'left',
                         transition: 'background 0.15s ease',
+                        width: '100%',
                       }}
                       onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)')}
                       onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
                     >
                       {isBlocked ? (
                         <>
-                          <ShieldCheck size={14} color="var(--coral, #ff98a2)" /> Unblock User
+                          <ShieldCheck size={14} color="var(--coral, #ff98a2)" style={{ pointerEvents: 'none', flexShrink: 0 }} />
+                          <span style={{ pointerEvents: 'none' }}>Unblock User</span>
                         </>
                       ) : (
                         <>
-                          <ShieldBan size={14} color="#ff7b7b" /> Block User
+                          <ShieldBan size={14} color="#ff7b7b" style={{ pointerEvents: 'none', flexShrink: 0 }} />
+                          <span style={{ pointerEvents: 'none' }}>Block User</span>
                         </>
                       )}
                     </button>
