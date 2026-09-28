@@ -7,8 +7,9 @@ import { ChatUIProvider } from "./context/ChatUIContext.jsx";
 import Layout from "./components/Layout.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
-// Code-splitting routes with React.lazy
-const Landing = lazy(() => import("./pages/Landing.jsx"));
+import Landing from "./pages/Landing.jsx";
+
+// Code-splitting secondary routes with React.lazy
 const Login = lazy(() => import("./pages/Login.jsx"));
 const Register = lazy(() => import("./pages/Register.jsx"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword.jsx"));
@@ -31,25 +32,31 @@ function RouteFallback() {
   return (
     <div
       style={{
-        minHeight: "70vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        height: "3px",
+        zIndex: 999999,
+        overflow: "hidden",
+        background: "rgba(255, 255, 255, 0.05)",
       }}
     >
       <div
         style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "12px",
-          fontFamily: "Inter, sans-serif",
-          fontSize: "13px",
-          color: "var(--muted, #c7c8ca)",
+          width: "100%",
+          height: "100%",
+          background: "linear-gradient(90deg, #ff98a2, #e17a92, #b39ad6)",
+          animation: "routeProgress 1.2s ease-in-out infinite",
         }}
-      >
-        <span className="ai-spinner" />
-        <span>Loading...</span>
-      </div>
+      />
+      <style>{`
+        @keyframes routeProgress {
+          0% { transform: translateX(-100%); }
+          50% { transform: translateX(0%); }
+          100% { transform: translateX(100%); }
+        }
+      `}</style>
     </div>
   );
 }
