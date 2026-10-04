@@ -31,6 +31,7 @@ import {
   unblockUser,
   sendConnectRequest,
   acceptConnectRequest,
+  rejectConnectRequest,
   getUserConnections,
   syncGithubProfile,
   connectGithubWithOAuth,
@@ -119,6 +120,7 @@ router.post("/users/:userId/block", protect, requireCompleteProfile, blockUser);
 router.post("/users/:userId/unblock", protect, requireCompleteProfile, unblockUser);
 router.post("/users/:userId/connect", protect, requireCompleteProfile, sendConnectRequest);
 router.post("/users/connect/:notifId/accept", protect, requireCompleteProfile, acceptConnectRequest);
+router.post("/users/connect/:notifId/reject", protect, requireCompleteProfile, rejectConnectRequest);
 router.get("/users/:usernameOrId/connections", protect, getUserConnections);
 router.post("/users/sync-github", protect, syncGithubProfile);
 router.post("/users/connect-github", protect, connectGithubWithOAuth);

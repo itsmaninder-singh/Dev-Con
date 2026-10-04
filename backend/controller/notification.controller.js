@@ -11,6 +11,12 @@ const getNotifications = asyncHandler(async (req, res) => {
   const filter = { recipient: req.user._id };
   if (read !== undefined) filter.read = read === "true";
 
+  // Only show pending action notifications (hide already accepted/rejected/ignored ones)
+  filter.$or = [
+    { type: { $nin: ["connect_request", "join_request"] } },
+    { type: { $in: ["connect_request", "join_request"] }, status: "pending" },
+  ];
+
   const pageNum = Math.max(Number(page) || 1, 1);
   const limitNum = Math.min(Math.max(Number(limit) || 30, 1), 100);
 

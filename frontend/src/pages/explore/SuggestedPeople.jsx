@@ -366,7 +366,17 @@ export default function SuggestedPeople({ searchTerm: externalSearch = '' }) {
                 }}
               >
                 <div className="suggested-item-top">
-                  <div className="suggested-avatar-wrap">
+                  <div
+                    className="suggested-avatar-wrap"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      playClick();
+                      const target = item.username || item._id || item.id || (item.name ? item.name.toLowerCase().replace(/\s+/g, '') : '');
+                      if (target) navigate(`/profile/${target}`);
+                    }}
+                    style={{ cursor: 'pointer' }}
+                    title={`View ${item.name}'s profile`}
+                  >
                     <div className="suggested-avatar" style={{ overflow: 'hidden', padding: 0 }}>
                       {item.profilePicture || item.avatarUrl ? (
                         <img
@@ -403,7 +413,21 @@ export default function SuggestedPeople({ searchTerm: externalSearch = '' }) {
 
                   <div className="suggested-info">
                     <div className="suggested-name-row">
-                      <span className="suggested-name">{item.name || 'Developer'}</span>
+                      <span
+                        className="suggested-name"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          playClick();
+                          const target = item.username || item._id || item.id || (item.name ? item.name.toLowerCase().replace(/\s+/g, '') : '');
+                          if (target) navigate(`/profile/${target}`);
+                        }}
+                        style={{ cursor: 'pointer', textDecoration: 'none' }}
+                        onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
+                        onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
+                        title={`View ${item.name}'s profile`}
+                      >
+                        {item.name || 'Developer'}
+                      </span>
                       {connected && (
                         <span className="suggested-connected-badge" title="Already connected">
                           Connected

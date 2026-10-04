@@ -373,6 +373,7 @@ const acceptConnectRequest = asyncHandler(async (req, res) => {
   }
 
   notif.read = true;
+  notif.status = "accepted";
   await notif.save();
 
   if (notif.sender) {
@@ -395,6 +396,26 @@ const acceptConnectRequest = asyncHandler(async (req, res) => {
 
   return res.status(200).json(
     new ApiResponse(200, "Connection request accepted successfully", notif)
+  );
+});
+
+const rejectConnectRequest = asyncHandler(async (req, res) => {
+  const { notifId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(notifId)) {
+    throw new ApiError(400, "Invalid notification ID");
+  }
+
+  const notif = await Notification.findOne({ _id: notifId, recipient: req.user._id });
+  if (!notif) {
+    throw new ApiError(404, "Notification not found");
+  }
+
+  notif.read = true;
+  notif.status = "rejected";
+  await notif.save();
+
+  return res.status(200).json(
+    new ApiResponse(200, "Connection request ignored", notif)
   );
 });
 
@@ -625,6 +646,7 @@ export {
   unblockUser,
   sendConnectRequest,
   acceptConnectRequest,
+  rejectConnectRequest,
   getUserConnections,
   syncGithubProfile,
   connectGithubWithOAuth,

@@ -1,4 +1,5 @@
 import {JoinRequest} from "../models/joinRequest.model.js";
+import { Notification } from "../models/notification.model.js";
 import { Team } from "../models/team.model.js";
 import { Project } from "../models/project.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -140,6 +141,11 @@ const acceptJoinReq= asyncHandler(async(req,res)=>{
     joinReq.respondedAt = new Date();
     await joinReq.save();
 
+    await Notification.updateMany(
+      { joinRequest: joinReq._id },
+      { status: "accepted", read: true }
+    );
+
     await sendNotification({
       recipient: joinReq.sender,
       sender: req.user._id,
@@ -171,6 +177,11 @@ const ignoreJoinRequest = asyncHandler(async (req, res) => {
   joinRequest.status = "ignored";
   joinRequest.respondedAt = new Date();
   await joinRequest.save();
+
+  await Notification.updateMany(
+    { joinRequest: joinRequest._id },
+    { status: "ignored", read: true }
+  );
 
   return res
     .status(200)

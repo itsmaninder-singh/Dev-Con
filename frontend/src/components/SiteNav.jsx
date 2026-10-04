@@ -12,6 +12,24 @@ import { useChatUI } from '../context/ChatUIContext.jsx';
 import { connectSocket } from '../lib/socket.js';
 import '../SiteNav.css';
 
+// Formats ISO timestamp to human-readable relative time like WhatsApp
+function formatTimeAgo(isoString) {
+  if (!isoString) return '';
+  const now = new Date();
+  const then = new Date(isoString);
+  const diffMs = now - then;
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHr = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHr / 24);
+  if (diffSec < 60) return 'just now';
+  if (diffMin < 60) return `${diffMin}m`;
+  if (diffHr < 24) return `${diffHr}h`;
+  if (diffDay === 1) return 'yesterday';
+  if (diffDay < 7) return `${diffDay}d`;
+  return then.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+}
+
 const NAV_LINKS = [
   { to: '/explore', label: 'Explore' },
   { to: '/workspace', label: 'Workspace' },
@@ -83,7 +101,8 @@ export default function SiteNav() {
                   sender: { id: sId, _id: sId, name: sName, username: sUsername, initials: sInitials },
                   text: sn.text || '',
                   target: sn.target || '',
-                  time: 'just now',
+                  time: formatTimeAgo(sn.createdAt),
+                  createdAt: sn.createdAt,
                   message: sn.message || '',
                   joinRequestId: sn.joinRequest?._id || sn.joinRequest || null,
                 };
@@ -121,6 +140,7 @@ export default function SiteNav() {
         .join('')
         .toUpperCase() || 'DV';
 
+      const nowIso = sn.createdAt || new Date().toISOString();
       const mapped = {
         id: sn._id || `notif_${Date.now()}`,
         _id: sn._id || `notif_${Date.now()}`,
@@ -130,7 +150,8 @@ export default function SiteNav() {
         sender: { id: sId, _id: sId, name: sName, username: sUsername, initials: sInitials },
         text: sn.text || '',
         target: sn.target || '',
-        time: 'just now',
+        time: formatTimeAgo(nowIso),
+        createdAt: nowIso,
         message: sn.message || '',
         joinRequestId: sn.joinRequest?._id || sn.joinRequest || null,
       };
@@ -213,6 +234,7 @@ export default function SiteNav() {
 
   const handleResolveNotif = (id, action) => {
     const targetNotif = notifications.find((n) => n.id === id);
+    // Immediately remove from UI
     setNotifications((prev) => prev.filter((n) => n.id !== id));
     if (activePreviewId === id) {
       const remaining = notifications.filter((n) => n.id !== id && n.message);
@@ -235,14 +257,15 @@ export default function SiteNav() {
           });
         }
       } else {
+        // Reject/ignore connect request — persist to backend so it never shows again
         if (id && id.length === 24) {
-          notificationApi.markAsRead(id).catch(() => {});
+          userApi.rejectConnectRequest(id).catch(() => {});
         }
       }
       return;
     }
 
-    // Backend sync
+    // Backend sync for join requests
     if (targetNotif?.joinRequestId || (id && id.length === 24)) {
       const reqId = targetNotif?.joinRequestId || id;
       if (action === 'accept') {
@@ -525,7 +548,9 @@ export default function SiteNav() {
                             <strong>{n.sender.name}</strong> {n.text}{' '}
                             {n.target ? <strong>{n.target}</strong> : null}
                           </div>
-                          <div className="sn-notif-time">{n.time} ago</div>
+                          <div className="sn-notif-time">
+                            {n.time === 'just now' ? 'just now' : n.time ? `${n.time} ago` : ''}
+                          </div>
 
                           {/* Action Buttons for join requests and connect requests */}
                           {(n.type === 'join_request' || n.type === 'connect_request') && (

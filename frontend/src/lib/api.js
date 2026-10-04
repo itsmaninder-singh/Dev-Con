@@ -287,6 +287,14 @@ export const userApi = {
       throw new Error(extractMessage(err));
     }
   },
+  rejectConnectRequest: async (notifId) => {
+    try {
+      const { data } = await api.post(`/users/connect/${notifId}/reject`);
+      return data.data;
+    } catch (err) {
+      throw new Error(extractMessage(err));
+    }
+  },
   getUserConnections: async (usernameOrId) => {
     try {
       const { data } = await api.get(`/users/${usernameOrId}/connections`);

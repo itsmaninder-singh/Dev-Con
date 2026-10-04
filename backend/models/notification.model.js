@@ -51,6 +51,11 @@ const notificationSchema = new mongoose.Schema({
         type: Boolean,
         default: false },
 
+    status: {
+        type: String,
+        enum: ["pending", "accepted", "rejected", "ignored"],
+        default: "pending",
+    },
 },
 {timestamps:true});
 notificationSchema.index({recipient:1,read:1,createdAt: -1})
