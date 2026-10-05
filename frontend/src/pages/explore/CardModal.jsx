@@ -299,7 +299,7 @@ export default function CardModal({ item, onClose, onJoin, showToast, onToast })
               </div>
             </div>
 
-            {!isOwner && (
+            {!isOwner && isMember && (
               <button
                 type="button"
                 data-chat-trigger="true"
