@@ -215,6 +215,12 @@ export default function ProfilePage() {
   };
 
   useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, [username, location.pathname]);
+
+  useEffect(() => {
     if (location.state?.githubSynced) {
       showToast(location.state.message || "GitHub profile connected and synced successfully!");
       try {
