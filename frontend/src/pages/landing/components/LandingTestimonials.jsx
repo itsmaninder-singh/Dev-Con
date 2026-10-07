@@ -9,11 +9,14 @@ export function LandingTestimonials({
     <section className="dc-next-section" ref={nextSectionRef}>
       <div className="dc-end-glow" aria-hidden="true" />
       <div className="dc-testimonials">
-        <div className="dc-testimonials-eyebrow">
-          <span className="dc-testimonials-dot" />
-          <span>COMMUNITY VOICES</span>
-        </div>
-        <h2 className="dc-testimonials-heading">What developers are saying</h2>
+        <h2 className="dc-testimonials-heading">
+          What developers are saying
+          <span className="dc-heading-dots" aria-hidden="true">
+            <span className="dc-dot dc-dot-1">.</span>
+            <span className="dc-dot dc-dot-2">.</span>
+            <span className="dc-dot dc-dot-3">.</span>
+          </span>
+        </h2>
         <div className="dc-gallery-wrap">
           <CircularGallery
             items={testimonialItems}

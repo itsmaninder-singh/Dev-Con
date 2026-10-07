@@ -4,7 +4,7 @@ const THEME_KEY = "dc_theme";
 const ThemeContext = createContext(null);
 
 export function ThemeProvider({ children }) {
-  const [theme, setTheme] = useState(() => {
+  const [theme, setThemeState] = useState(() => {
     try {
       const saved = localStorage.getItem(THEME_KEY);
       if (saved === "light" || saved === "dark") return saved;
@@ -13,6 +13,33 @@ export function ThemeProvider({ children }) {
       return "dark";
     }
   });
+
+  const setTheme = (newTheme) => {
+    if (!newTheme || newTheme === theme) return;
+
+    const commitTheme = () => {
+      setThemeState(newTheme);
+      try {
+        localStorage.setItem(THEME_KEY, newTheme);
+      } catch {}
+      document.documentElement.setAttribute("data-theme", newTheme);
+    };
+
+    // Modern View Transitions API (ultra-clean minimalist transition)
+    if (document.startViewTransition && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      document.startViewTransition(() => {
+        commitTheme();
+      });
+      return;
+    }
+
+    // Fallback: smooth minimalist class transition across all elements
+    document.documentElement.classList.add("theme-transitioning");
+    commitTheme();
+    setTimeout(() => {
+      document.documentElement.classList.remove("theme-transitioning");
+    }, 450);
+  };
 
   useEffect(() => {
     try {
@@ -24,7 +51,7 @@ export function ThemeProvider({ children }) {
   }, [theme]);
 
   const toggleTheme = () => {
-    setTheme((t) => (t === "dark" ? "light" : "dark"));
+    setTheme(theme === "dark" ? "light" : "dark");
   };
 
   return (

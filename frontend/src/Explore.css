@@ -627,3 +627,58 @@
   .explore-root .page-head{ padding-top:130px; }
   .explore-root .card-grid{ grid-template-columns:1fr; }
 }
+
+/* ================= LIGHT MODE EXPLORE ================= */
+:root[data-theme="light"] .explore-root {
+  --bg: #f8f8fa;
+  --ink: #111114;
+  --muted: #52525b;
+  --dim: #71717a;
+  --glass: rgba(255, 255, 255, 0.9);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  background: #f8f8fa;
+  color: #111114;
+}
+
+:root[data-theme="light"] .explore-root .card {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 20px -8px rgba(0, 0, 0, 0.08);
+}
+
+:root[data-theme="light"] .explore-root .card h3 {
+  color: #111114;
+}
+
+:root[data-theme="light"] .explore-root .card .desc {
+  color: #52525b;
+}
+
+:root[data-theme="light"] .explore-root .filter-pill {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(0, 0, 0, 0.09);
+  color: #52525b;
+}
+
+:root[data-theme="light"] .explore-root .filter-pill:hover {
+  color: #111114;
+}
+
+:root[data-theme="light"] .explore-root .filter-pill.active {
+  background: #ff98a2;
+  color: #0a0a0a;
+}
+
+:root[data-theme="light"] .suggested-panel {
+  background: rgba(255, 255, 255, 0.88);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+:root[data-theme="light"] .suggested-name {
+  color: #111114;
+}
+
+:root[data-theme="light"] .suggested-item-card {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(0, 0, 0, 0.06);
+}

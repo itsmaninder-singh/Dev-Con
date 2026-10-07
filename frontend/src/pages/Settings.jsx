@@ -401,7 +401,7 @@ export default function Settings() {
                       {u.initials || 'U'}
                     </div>
                     <div>
-                      <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text, #fff)' }}>
+                      <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--ink)' }}>
                         {u.name}
                       </div>
                       <div style={{ fontSize: '12px', color: 'var(--dim)' }}>
@@ -420,7 +420,7 @@ export default function Settings() {
                     style={{
                       background: 'rgba(255, 255, 255, 0.06)',
                       border: '1px solid rgba(255, 255, 255, 0.14)',
-                      color: 'var(--text, #fff)',
+                      color: 'var(--ink)',
                       padding: '6px 14px',
                       fontSize: '12px',
                       borderRadius: '20px',
