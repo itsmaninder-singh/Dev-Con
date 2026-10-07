@@ -531,7 +531,7 @@ const connectGithubWithOAuth = asyncHandler(async (req, res) => {
 
   const clientId = process.env.GITHUB_CLIENT_ID;
   const clientSecret = process.env.GITHUB_CLIENT_SECRET;
-  const redirectUri = process.env.GITHUB_REDIRECT_URI || "http://localhost:5173/auth/github/callback";
+  const redirectUri = req.body.redirect_uri || process.env.GITHUB_REDIRECT_URI || "http://localhost:5173/auth/github/callback";
 
   if (!clientId || !clientSecret) {
     throw new ApiError(500, "GitHub OAuth credentials are not configured on the server");
@@ -550,8 +550,14 @@ const connectGithubWithOAuth = asyncHandler(async (req, res) => {
       },
       { headers: { Accept: "application/json" } }
     );
+
+    if (tokenRes.data?.error) {
+      throw new ApiError(401, tokenRes.data.error_description || tokenRes.data.error || "GitHub verification failed");
+    }
+
     accessToken = tokenRes.data?.access_token;
   } catch (err) {
+    if (err instanceof ApiError) throw err;
     throw new ApiError(401, "Failed to exchange GitHub authorization code: " + err.message);
   }
 

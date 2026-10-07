@@ -291,10 +291,12 @@ const googleAuth = asyncHandler(async (req, res) => {
 });
 
 const githubAuth = asyncHandler(async (req, res) => {
-  const { code } = req.body;
+  const { code, redirect_uri } = req.body;
   if (!code) {
     throw new ApiError(400, "code is required");
   }
+
+  const effectiveRedirectUri = redirect_uri || process.env.GITHUB_REDIRECT_URI;
 
   let accessToken;
   try {
@@ -304,13 +306,24 @@ const githubAuth = asyncHandler(async (req, res) => {
         client_id: process.env.GITHUB_CLIENT_ID,
         client_secret: process.env.GITHUB_CLIENT_SECRET,
         code,
-        redirect_uri: process.env.GITHUB_REDIRECT_URI,
+        ...(effectiveRedirectUri ? { redirect_uri: effectiveRedirectUri } : {}),
       },
       { headers: { Accept: "application/json" } }
     );
+
+    if (tokenRes.data?.error) {
+      console.error("[githubAuth] GitHub token error:", tokenRes.data);
+      throw new ApiError(
+        401,
+        tokenRes.data.error_description || tokenRes.data.error || "GitHub authentication failed"
+      );
+    }
+
     accessToken = tokenRes.data.access_token;
   } catch (err) {
-    throw new ApiError(401, "Failed to exchange GitHub code");
+    if (err instanceof ApiError) throw err;
+    console.error("[githubAuth] Exchange error:", err.response?.data || err.message);
+    throw new ApiError(401, "Failed to exchange GitHub code: " + (err.response?.data?.message || err.message));
   }
 
   if (!accessToken) {
@@ -337,7 +350,8 @@ const githubAuth = asyncHandler(async (req, res) => {
     emailsList.find((e) => e.primary && e.verified)?.email ||
     emailsList.find((e) => e.verified)?.email ||
     emailsList[0]?.email ||
-    profile.email;
+    profile.email ||
+    (profile.login ? `${profile.login.toLowerCase()}@users.noreply.github.com` : null);
 
   if (!primaryEmail) {
     throw new ApiError(401, "GitHub account has no accessible verified email");

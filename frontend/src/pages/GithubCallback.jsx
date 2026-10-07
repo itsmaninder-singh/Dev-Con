@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useProfile } from "../context/ProfileContext.jsx";
@@ -14,6 +14,7 @@ export default function GithubCallback() {
   const [error, setError] = useState("");
   const [status, setStatus] = useState("Authenticating with GitHub...");
   const [callbackMode, setCallbackMode] = useState("login");
+  const hasFiredRef = useRef(false);
 
   useEffect(() => {
     const code = searchParams.get("code");
@@ -30,9 +31,13 @@ export default function GithubCallback() {
       return;
     }
 
+    if (hasFiredRef.current) return;
+    hasFiredRef.current = true;
+
     let isMounted = true;
     const mode = localStorage.getItem("oauth_auth_mode") || "login";
     setCallbackMode(mode);
+    const redirect_uri = `${window.location.origin}/auth/github/callback`;
 
     // Flow 1: Connecting GitHub from Profile page
     if (mode === "connect_github") {
@@ -40,7 +45,7 @@ export default function GithubCallback() {
       setStatus("Verifying GitHub login & syncing profile...");
 
       userApi
-        .connectGithub({ code, targetUsername })
+        .connectGithub({ code, targetUsername, redirect_uri })
         .then((result) => {
           localStorage.removeItem("oauth_auth_mode");
           localStorage.removeItem("target_github_username");
@@ -80,7 +85,7 @@ export default function GithubCallback() {
     }
 
     // Flow 2: General OAuth login / registration
-    loginWithGithub({ code, mode })
+    loginWithGithub({ code, mode, redirect_uri })
       .then((loggedUser) => {
         localStorage.removeItem("oauth_auth_mode");
         if (!isMounted) return;
