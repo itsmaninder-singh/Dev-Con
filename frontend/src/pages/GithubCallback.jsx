@@ -34,7 +34,6 @@ export default function GithubCallback() {
     if (hasFiredRef.current) return;
     hasFiredRef.current = true;
 
-    let isMounted = true;
     const mode = localStorage.getItem("oauth_auth_mode") || "login";
     setCallbackMode(mode);
     const redirect_uri = `${window.location.origin}/auth/github/callback`;
@@ -49,7 +48,6 @@ export default function GithubCallback() {
         .then((result) => {
           localStorage.removeItem("oauth_auth_mode");
           localStorage.removeItem("target_github_username");
-          if (!isMounted) return;
 
           if (result?.user) {
             updateUser?.(result.user);
@@ -72,30 +70,24 @@ export default function GithubCallback() {
         .catch((err) => {
           localStorage.removeItem("oauth_auth_mode");
           localStorage.removeItem("target_github_username");
-          if (!isMounted) return;
           setError(
             err.message ||
               "Failed to connect GitHub account. Please ensure you log in with the correct GitHub account."
           );
         });
 
-      return () => {
-        isMounted = false;
-      };
+      return;
     }
 
     // Flow 2: General OAuth login / registration
     const timeoutTimer = setTimeout(() => {
-      if (isMounted) {
-        setError("The server took longer than expected to respond. Please try signing in again.");
-      }
+      setError("The server took longer than expected to respond. Please try signing in again.");
     }, 25000);
 
     loginWithGithub({ code, mode, redirect_uri })
       .then((loggedUser) => {
         clearTimeout(timeoutTimer);
         localStorage.removeItem("oauth_auth_mode");
-        if (!isMounted) return;
         const destination = loggedUser && !loggedUser.isProfileComplete ? "/onboarding" : "/workspace";
         setStatus(
           destination === "/onboarding"
@@ -104,12 +96,12 @@ export default function GithubCallback() {
         );
         setTimeout(() => {
           navigate(destination, { replace: true });
-        }, 600);
+        }, 500);
       })
       .catch((err) => {
         clearTimeout(timeoutTimer);
         localStorage.removeItem("oauth_auth_mode");
-        if (!isMounted) return;
+        console.error("[GithubCallback] Login error:", err);
         setError(
           err.message ||
             "Failed to complete GitHub sign-in. Please ensure GitHub OAuth credentials are configured."
@@ -118,7 +110,6 @@ export default function GithubCallback() {
 
     return () => {
       clearTimeout(timeoutTimer);
-      isMounted = false;
     };
   }, [searchParams, loginWithGithub, updateUser, setGithubProfileData, navigate]);
 

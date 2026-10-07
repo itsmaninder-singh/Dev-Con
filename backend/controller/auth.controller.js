@@ -368,17 +368,35 @@ const githubAuth = asyncHandler(async (req, res) => {
 
   if (!user) {
     // Auto-create account on the spot without separate registration step
-    const username = await deriveUniqueUsernameFromEmail(normalizedEmail);
-    user = await User.create({
-      name: (profile.name && profile.name.trim()) || profile.login || username,
-      username,
-      email: normalizedEmail,
-      githubId,
-      githubUsername: (profile.login || "").toLowerCase() || null,
-      authProvider: "github",
-      profilePicture: profile.avatar_url || "",
-      isProfileComplete: false,
-    });
+    let username;
+    const preferredLogin = (profile.login || "")
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9_.-]/g, "")
+      .replace(/^[._-]+|[._-]+$/g, "")
+      .slice(0, 24);
+
+    if (preferredLogin && preferredLogin.length >= 2 && !(await User.exists({ username: preferredLogin }))) {
+      username = preferredLogin;
+    } else {
+      username = await deriveUniqueUsernameFromEmail(normalizedEmail);
+    }
+
+    try {
+      user = await User.create({
+        name: (profile.name && profile.name.trim()) || profile.login || username,
+        username,
+        email: normalizedEmail,
+        githubId,
+        githubUsername: (profile.login || "").toLowerCase() || null,
+        authProvider: "github",
+        profilePicture: profile.avatar_url || "",
+        isProfileComplete: false,
+      });
+    } catch (createErr) {
+      console.error("[githubAuth] User creation error:", createErr);
+      throw new ApiError(400, "Failed to create user account: " + (createErr.message || "Database validation failed"));
+    }
   } else {
     // Existing user -> Link OAuth details
     let needsSave = false;
