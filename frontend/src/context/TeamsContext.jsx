@@ -52,8 +52,11 @@ export function TeamsProvider({ children }) {
   const [joinedTeamIds, setJoinedTeamIds] = useState(() => new Set());
   const [projects, setProjects] = useState(() => loadInitial(PROJECTS_STORAGE_KEY, SEED_PROJECTS));
 
-  // Sync teams and projects from backend API
+  // Sync teams and projects from backend API — only when authenticated
+  const [hasFetched, setHasFetched] = useState(false);
   useEffect(() => {
+    if (!authUser || hasFetched) return;
+
     teamApi
       .getTeams({ limit: 50 })
       .then((res) => {
@@ -73,7 +76,9 @@ export function TeamsProvider({ children }) {
       .catch(() => {
         // Backend offline or network error
       });
-  }, []);
+
+    setHasFetched(true);
+  }, [authUser]);
 
   useEffect(() => {
     try {

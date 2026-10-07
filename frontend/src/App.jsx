@@ -7,7 +7,7 @@ import { ChatUIProvider } from "./context/ChatUIContext.jsx";
 import Layout from "./components/Layout.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
-import Landing from "./pages/Landing.jsx";
+const Landing = lazy(() => import("./pages/Landing.jsx"));
 
 // Code-splitting secondary routes with React.lazy
 const Login = lazy(() => import("./pages/Login.jsx"));

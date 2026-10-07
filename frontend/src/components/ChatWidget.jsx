@@ -239,7 +239,7 @@ const GlobalStyle = () => (
     .chat-header .who .name{ font-family:'Fraunces',serif; font-style:italic; font-weight:450; font-size:15.5px; }
     .chat-header .who .status{ font-size:11.5px; margin-top:1px; }
 
-    .messages{ flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:10px; position:relative; }
+    .messages{ flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:10px; position:relative; justify-content:flex-end; }
     .messages::-webkit-scrollbar{ width:6px; }
     .messages::-webkit-scrollbar-thumb{ background:rgba(255,152,162,.35); border-radius:3px; }
 

@@ -17,16 +17,18 @@ import helmet from "helmet";
 import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
 import mongoSanitize from "express-mongo-sanitize";
+import compression from "compression";
 import { router } from "./routes/routes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 const app = express();
+app.use(compression());
 app.use(
   helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" },
   })
 );
-app.use("/uploads", express.static(path.resolve("public/uploads")));
+app.use("/uploads", express.static(path.resolve("public/uploads"), { maxAge: "7d", immutable: true }));
 
 const defaultOrigins = [
   "http://localhost:5173",
