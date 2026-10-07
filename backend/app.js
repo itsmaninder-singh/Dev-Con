@@ -67,7 +67,17 @@ const globalLimiter = rateLimit({
 });
 app.use(globalLimiter);
 app.get("/api/health", (req, res) => {
-  res.status(200).json({ success: true, message: "DevConnect API running" });
+  res.status(200).json({
+    success: true,
+    message: "DevConnect API running",
+    env: {
+      githubId: Boolean(process.env.GITHUB_CLIENT_ID),
+      githubSecret: Boolean(process.env.GITHUB_CLIENT_SECRET),
+      jwtSecret: Boolean(process.env.JWT_SECRET),
+      redis: Boolean(process.env.REDIS_URL),
+      clientUrl: process.env.CLIENT_URL || "default",
+    },
+  });
 });
 
 app.use("/api/v1", router);
