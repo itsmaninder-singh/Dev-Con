@@ -85,8 +85,15 @@ export default function GithubCallback() {
     }
 
     // Flow 2: General OAuth login / registration
+    const timeoutTimer = setTimeout(() => {
+      if (isMounted) {
+        setError("The server took longer than expected to respond. Please try signing in again.");
+      }
+    }, 25000);
+
     loginWithGithub({ code, mode, redirect_uri })
       .then((loggedUser) => {
+        clearTimeout(timeoutTimer);
         localStorage.removeItem("oauth_auth_mode");
         if (!isMounted) return;
         const destination = loggedUser && !loggedUser.isProfileComplete ? "/onboarding" : "/workspace";
@@ -100,6 +107,7 @@ export default function GithubCallback() {
         }, 600);
       })
       .catch((err) => {
+        clearTimeout(timeoutTimer);
         localStorage.removeItem("oauth_auth_mode");
         if (!isMounted) return;
         setError(
@@ -109,6 +117,7 @@ export default function GithubCallback() {
       });
 
     return () => {
+      clearTimeout(timeoutTimer);
       isMounted = false;
     };
   }, [searchParams, loginWithGithub, updateUser, setGithubProfileData, navigate]);
