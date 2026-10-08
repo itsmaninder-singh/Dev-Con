@@ -17,9 +17,36 @@ export const setAccessToken = (token) => {
   accessToken = token;
 };
 
+export const getStoredAccessToken = () => {
+  if (accessToken) return accessToken;
+  try {
+    const raw = localStorage.getItem("devconnect_auth_session");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.accessToken) {
+        accessToken = parsed.accessToken;
+        return parsed.accessToken;
+      }
+    }
+  } catch {}
+  return null;
+};
+
+export const getStoredRefreshToken = () => {
+  try {
+    const raw = localStorage.getItem("devconnect_auth_session");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return parsed?.refreshToken || null;
+    }
+  } catch {}
+  return null;
+};
+
 api.interceptors.request.use((config) => {
-  if (accessToken) {
-    config.headers.Authorization = `Bearer ${accessToken}`;
+  const token = getStoredAccessToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
@@ -51,6 +78,7 @@ api.interceptors.response.use(
     }
 
     const originalRequest = error.config;
+    const currentToken = getStoredAccessToken();
 
     if (
       !error.response ||
@@ -61,7 +89,7 @@ api.interceptors.response.use(
       originalRequest.url?.includes("/auth/register") ||
       originalRequest.url?.includes("/auth/refresh") ||
       originalRequest.url?.includes("/auth/logout") ||
-      !accessToken
+      !currentToken
     ) {
       return Promise.reject(error);
     }
@@ -81,9 +109,10 @@ api.interceptors.response.use(
     isRefreshing = true;
 
     try {
+      const storedRefresh = getStoredRefreshToken();
       const { data } = await axios.post(
         `${BASE_URL}/auth/refresh`,
-        {},
+        { refreshToken: storedRefresh },
         { withCredentials: true }
       );
       const newSession = data?.data;
@@ -92,6 +121,15 @@ api.interceptors.response.use(
         throw new Error("No token returned on refresh");
       }
       setAccessToken(newToken);
+      try {
+        const raw = localStorage.getItem("devconnect_auth_session");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          parsed.accessToken = newToken;
+          if (newSession?.refreshToken) parsed.refreshToken = newSession.refreshToken;
+          localStorage.setItem("devconnect_auth_session", JSON.stringify(parsed));
+        }
+      } catch {}
       processQueue(null, newToken);
       originalRequest.headers.Authorization = `Bearer ${newToken}`;
       return api(originalRequest);
@@ -149,7 +187,12 @@ export const authApi = {
   },
 
   refresh: async () => {
-    const { data } = await axios.post(`${BASE_URL}/auth/refresh`, {}, { withCredentials: true });
+    const storedRefresh = getStoredRefreshToken();
+    const { data } = await axios.post(
+      `${BASE_URL}/auth/refresh`,
+      { refreshToken: storedRefresh },
+      { withCredentials: true }
+    );
     return data.data;
   },
 

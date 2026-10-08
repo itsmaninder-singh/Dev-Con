@@ -63,6 +63,7 @@ const sendAuthResponse = (res, statusCode, user, message) => {
     new ApiResponse(statusCode, message, {
       user: toSafeUser(user),
       accessToken,
+      refreshToken,
     })
   );
 };
@@ -429,7 +430,7 @@ const githubAuth = asyncHandler(async (req, res) => {
 
 
 const refreshAccessToken = asyncHandler(async (req, res) => {
-  const incomingToken = req.cookies?.[REFRESH_COOKIE_NAME];
+  const incomingToken = req.body?.refreshToken || req.cookies?.[REFRESH_COOKIE_NAME];
   if (!incomingToken) {
     throw new ApiError(401, "No refresh token provided");
   }
