@@ -4,7 +4,13 @@ import { useAuth } from "../context/AuthContext.jsx";
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID;
-const GITHUB_REDIRECT_URI = import.meta.env.VITE_GITHUB_REDIRECT_URI || `${window.location.origin}/auth/github/callback`;
+
+const getGithubRedirectUri = () => {
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return `${window.location.origin}/auth/github/callback`;
+  }
+  return import.meta.env.VITE_GITHUB_REDIRECT_URI || "http://localhost:5173/auth/github/callback";
+};
 
 export default function OAuthButtons({ mode = "login", onError, onSuccess }) {
   const { loginWithGoogle, login } = useAuth();
@@ -173,7 +179,7 @@ export default function OAuthButtons({ mode = "login", onError, onSuccess }) {
 
     const params = new URLSearchParams({
       client_id: GITHUB_CLIENT_ID,
-      redirect_uri: GITHUB_REDIRECT_URI,
+      redirect_uri: getGithubRedirectUri(),
       scope: "read:user user:email",
     });
     window.location.href = `https://github.com/login/oauth/authorize?${params.toString()}`;
