@@ -59,7 +59,7 @@ export default function TagInput({
     const trimmed = (val || '').trim();
     if (!trimmed) return;
 
-    if (allowedList) {
+    if (allowedList && !allowCustom) {
       const lower = trimmed.toLowerCase();
       // Check aliases first (e.g. 'postgres' -> 'PostgreSQL')
       const aliasTarget = aliases[lower];
@@ -71,25 +71,14 @@ export default function TagInput({
         match = allowedList.find((item) => item.toLowerCase() === lower);
       }
 
-      if (!match && !allowCustom) {
-        // Only if custom is strictly disabled, check prefix match
-        const prefixMatches = allowedList.filter(
-          (item) => !values.includes(item) && item.toLowerCase().startsWith(lower)
-        );
-        if (prefixMatches.length === 1) {
-          match = prefixMatches[0];
-        }
-      }
-
-      const finalVal = match || (allowCustom ? trimmed : null);
-      if (!finalVal) {
+      if (!match) {
         setError(`"${trimmed}" is not a recognized skill. Please choose from verified skills.`);
         setTimeout(() => setError(''), 4000);
         return;
       }
 
-      if (!values.includes(finalVal)) {
-        onAdd(finalVal);
+      if (!values.includes(match)) {
+        onAdd(match);
       }
     } else {
       if (!values.includes(trimmed)) {
@@ -109,14 +98,19 @@ export default function TagInput({
 
       const lower = trimmed.toLowerCase();
       // If there is an exact or alias match, prefer that
-      const exactMatch = filteredAllowed.find((item) => item.toLowerCase() === lower || aliases[lower] === item);
+      const exactMatch = (allowedList || []).find(
+        (item) => item.toLowerCase() === lower || aliases[lower] === item
+      );
       if (exactMatch) {
         tryAdd(exactMatch);
-      } else if (filteredAllowed.length > 0 && filteredAllowed[0].toLowerCase().startsWith(lower)) {
-        // Strong prefix match
+      } else if (
+        filteredAllowed.length > 0 &&
+        lower.length >= 3 &&
+        filteredAllowed[0].toLowerCase().startsWith(lower)
+      ) {
+        // Strong prefix match only if user typed at least 3 letters
         tryAdd(filteredAllowed[0]);
       } else {
-        // Fall back to what user actually typed
         tryAdd(trimmed);
       }
     } else if (e.key === 'Backspace' && !inputVal) {

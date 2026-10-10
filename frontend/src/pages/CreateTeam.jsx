@@ -69,7 +69,8 @@ export default function CreateTeam() {
     if (!val || typeof val !== 'string') return;
     const trimmed = val.trim();
     if (!trimmed) return;
-    const valid = resolveValidSkill(trimmed) || trimmed;
+    const valid = resolveValidSkill(trimmed) || (PREDEFINED_SKILLS.includes(trimmed) ? trimmed : null);
+    if (!valid) return;
     setSkills((prev) => (prev.includes(valid) ? prev : [...prev, valid]));
     setSkillsInvalid(false);
   }
@@ -78,7 +79,8 @@ export default function CreateTeam() {
     if (!val || typeof val !== 'string') return;
     const trimmed = val.trim();
     if (!trimmed) return;
-    const valid = resolveValidSkill(trimmed) || trimmed;
+    const valid = resolveValidSkill(trimmed) || (PREDEFINED_SKILLS.includes(trimmed) ? trimmed : null);
+    if (!valid) return;
     setSkills((prev) => (prev.includes(valid) ? prev.filter((s) => s !== valid) : [...prev, valid]));
     setSkillsInvalid(false);
   }
