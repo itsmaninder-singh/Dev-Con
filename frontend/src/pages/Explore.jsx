@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import AuroraField from './explore/AuroraField.jsx';
 import ParticleCanvas from './explore/ParticleCanvas.jsx';
 import CursorFX from './explore/CursorFX.jsx';
@@ -20,16 +21,11 @@ import '../Explore.css';
 let toastId = 0;
 
 export default function Explore() {
+  const navigate = useNavigate();
   const { user } = useAuth() || {};
   const {
     teams: contextTeams,
     projects: contextProjects,
-    joinTeam,
-    isMember,
-    isCreator,
-    isProjectMember,
-    isProjectCreator,
-    joinedTeamIds,
   } = useTeams();
   const currentUserId = String(user?._id || user?.id || '');
   const currentUsername = String(user?.username || '').toLowerCase();
@@ -44,6 +40,35 @@ export default function Explore() {
   const [notifs, setNotifs] = useState(INITIAL_NOTIFICATIONS);
   const [liveTeams, setLiveTeams] = useState(null);
   const [liveProjects, setLiveProjects] = useState(null);
+  const [pendingReqTargetIds, setPendingReqTargetIds] = useState(() => new Set());
+
+  // Fetch pending join requests sent by the logged-in user
+  useEffect(() => {
+    if (!user) {
+      setPendingReqTargetIds(new Set());
+      return;
+    }
+    let mounted = true;
+    joinRequestApi
+      .getSentRequests()
+      .then((res) => {
+        if (!mounted) return;
+        const list = Array.isArray(res) ? res : (res?.requests || []);
+        const pendingIds = new Set();
+        list.forEach((r) => {
+          if (r.status === 'pending') {
+            const targetId = String(r.team?._id || r.team || r.project?._id || r.project || '');
+            if (targetId) pendingIds.add(targetId);
+          }
+        });
+        setPendingReqTargetIds(pendingIds);
+      })
+      .catch(() => {});
+
+    return () => {
+      mounted = false;
+    };
+  }, [user?._id]);
 
   useEffect(() => {
     let mounted = true;
@@ -105,6 +130,20 @@ export default function Explore() {
       const creatorUsername = creatorObj.username || (creatorName ? creatorName.toLowerCase().replace(/\s+/g, '') : 'builder');
       const creatorInitials = creatorObj.initials || getInitials(creatorName);
 
+      const tid = String(t?._id || t?.id || '');
+      const isActuallyMember = Boolean(
+        Array.isArray(t?.members) && t.members.some((m) => {
+          const u = m?.user || m;
+          const uid = String(u?._id || u?.id || u || '');
+          const uusername = String(u?.username || '').toLowerCase();
+          return (
+            (currentUserId && uid && currentUserId === uid) ||
+            (currentUsername && uusername && currentUsername === uusername)
+          );
+        })
+      );
+      const isReq = Boolean(tid && pendingReqTargetIds.has(tid));
+
       return {
         ...t,
         id: t?._id || t?.id || `team_${Math.random()}`,
@@ -119,20 +158,8 @@ export default function Explore() {
         maxMembers: Number(t?.maxMembers) || 4,
         matchScore: Number(t?.matchScore) || 82,
         postedAgo: t?.postedAgo || 'recently',
-        isJoined: Boolean(
-          (isMember && isMember(t)) ||
-          (isCreator && isCreator(t)) ||
-          (joinedTeamIds && joinedTeamIds.has(String(t._id || t.id))) ||
-          (Array.isArray(t?.members) && t.members.some((m) => {
-            const u = m?.user || m;
-            const uid = String(u?._id || u?.id || u || '');
-            const uusername = String(u?.username || '').toLowerCase();
-            return (
-              (currentUserId && uid && currentUserId === uid) ||
-              (currentUsername && uusername && currentUsername === uusername)
-            );
-          }))
-        ),
+        isJoined: isActuallyMember,
+        isRequested: isReq,
         creator: {
           _id: creatorObj._id || t?.creator,
           name: creatorName,
@@ -142,7 +169,7 @@ export default function Explore() {
         },
       };
     });
-  }, [teams, isMember, isCreator, joinedTeamIds, currentUserId, currentUsername]);
+  }, [teams, pendingReqTargetIds, currentUserId, currentUsername]);
 
   const normalizedProjects = useMemo(() => {
     return (projects || []).map((p) => {
@@ -165,6 +192,29 @@ export default function Explore() {
         ? p.members.length
         : (Array.isArray(p?.collaborators) ? p.collaborators.length : (Number(p?.membersCount) || 1));
 
+      const pid = String(p?._id || p?.id || '');
+      const isActuallyProjectMember = Boolean(
+        (Array.isArray(p?.collaborators) && p.collaborators.some((c) => {
+          const u = c?.user || c;
+          const cid = String(u?._id || u?.id || u || '');
+          const cusername = String(u?.username || '').toLowerCase();
+          return (
+            (currentUserId && cid && currentUserId === cid) ||
+            (currentUsername && cusername && currentUsername === cusername)
+          );
+        })) ||
+        (Array.isArray(p?.members) && p.members.some((m) => {
+          const u = m?.user || m;
+          const mid = String(u?._id || u?.id || u || '');
+          const musername = String(u?.username || '').toLowerCase();
+          return (
+            (currentUserId && mid && currentUserId === mid) ||
+            (currentUsername && musername && currentUsername === musername)
+          );
+        }))
+      );
+      const isReq = Boolean(pid && pendingReqTargetIds.has(pid));
+
       return {
         ...p,
         id: p?._id || p?.id || `proj_${Math.random()}`,
@@ -177,28 +227,8 @@ export default function Explore() {
         maxMembers: Number(p?.maxTeamSize || p?.maxMembers) || 5,
         matchScore: Number(p?.matchScore) || 80,
         postedAgo: p?.postedAgo || 'recently',
-        isJoined: Boolean(
-          (isProjectMember && isProjectMember(p)) ||
-          (isProjectCreator && isProjectCreator(p)) ||
-          (Array.isArray(p?.collaborators) && p.collaborators.some((c) => {
-            const u = c?.user || c;
-            const cid = String(u?._id || u?.id || u || '');
-            const cusername = String(u?.username || '').toLowerCase();
-            return (
-              (currentUserId && cid && currentUserId === cid) ||
-              (currentUsername && cusername && currentUsername === cusername)
-            );
-          })) ||
-          (Array.isArray(p?.members) && p.members.some((m) => {
-            const u = m?.user || m;
-            const mid = String(u?._id || u?.id || u || '');
-            const musername = String(u?.username || '').toLowerCase();
-            return (
-              (currentUserId && mid && currentUserId === mid) ||
-              (currentUsername && musername && currentUsername === musername)
-            );
-          }))
-        ),
+        isJoined: isActuallyProjectMember,
+        isRequested: isReq,
         creator: {
           _id: ownerObj._id || p?.owner || p?.creator?._id,
           name: ownerName,
@@ -208,7 +238,7 @@ export default function Explore() {
         },
       };
     });
-  }, [projects, isProjectMember, isProjectCreator, currentUserId, currentUsername]);
+  }, [projects, pendingReqTargetIds, currentUserId, currentUsername]);
 
   const allItems = useMemo(() => {
     return [...normalizedTeams, ...normalizedProjects];
@@ -253,6 +283,10 @@ export default function Explore() {
   }
 
   function handleJoin(item) {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
     const creatorId = String(item?.creator?._id || item?.creator?.id || item?.creator || item?.owner?._id || item?.owner?.id || item?.owner || '');
     const creatorUsername = String(item?.creator?.username || item?.owner?.username || '').toLowerCase();
 
@@ -266,113 +300,38 @@ export default function Explore() {
       return;
     }
 
-    const isAlreadyMember = Boolean(
-      item?.isJoined ||
-      (Array.isArray(item?.members) && item.members.some((m) => {
-        const u = m?.user || m;
-        const uid = String(u?._id || u?.id || u || '');
-        const uusername = String(u?.username || '').toLowerCase();
-        return (
-          (currentUserId && uid && currentUserId === uid) ||
-          (currentUsername && uusername && currentUsername === uusername)
-        );
-      }))
-    );
-
-    if (isAlreadyMember) {
+    if (item?.isJoined) {
       showToast(`You have already joined ${item.name}!`);
       return;
     }
 
-    const tid = item._id || item.id;
+    const tid = String(item?._id || item?.id || '');
+    if (item?.isRequested || pendingReqTargetIds.has(tid)) {
+      showToast(`You have already requested to join ${item.name}. Waiting for owner approval!`);
+      return;
+    }
+
     const isProj = item.kind === 'project';
 
-    const updateLocalJoinedTeam = () => {
-      setLiveTeams((prev) => {
-        if (!prev) return prev;
-        return prev.map((t) => {
-          if (String(t._id || t.id) === String(tid)) {
-            const alreadyIn = (t.members || []).some((m) => {
-              const u = m?.user || m;
-              const uid = String(u?._id || u?.id || u || '');
-              return currentUserId && uid && currentUserId === uid;
-            });
-            if (alreadyIn) return t;
-            const newMembers = [
-              ...(t.members || []),
-              {
-                user: {
-                  _id: currentUserId,
-                  name: user?.name || 'Developer',
-                  username: user?.username || 'builder',
-                  profilePicture: user?.profilePicture || '',
-                },
-                role: 'Member',
-              },
-            ];
-            return {
-              ...t,
-              members: newMembers,
-              membersCount: newMembers.length,
-            };
-          }
-          return t;
+    if (tid && tid.length === 24) {
+      joinRequestApi
+        .sendJoinReq({
+          targetType: isProj ? 'project' : 'team',
+          targetId: tid,
+          message: isProj ? 'Interested in contributing to this project!' : 'I would love to collaborate with the team!',
+        })
+        .then(() => {
+          showToast(`Join request sent to ${item.name}! Waiting for owner approval.`);
+          setPendingReqTargetIds((prev) => new Set(prev).add(tid));
+          setModalItem((prev) => (prev && String(prev._id || prev.id) === tid ? { ...prev, isRequested: true } : prev));
+        })
+        .catch((err) => {
+          showToast(err?.message || `Could not send request to ${item.name}`);
         });
-      });
-
-      setModalItem((prev) => {
-        if (!prev || String(prev._id || prev.id) !== String(tid)) return prev;
-        const newMembers = [
-          ...(prev.members || []),
-          {
-            user: {
-              _id: currentUserId,
-              name: user?.name || 'Developer',
-              username: user?.username || 'builder',
-              profilePicture: user?.profilePicture || '',
-            },
-            role: 'Member',
-          },
-        ];
-        return {
-          ...prev,
-          isJoined: true,
-          members: newMembers,
-          membersCount: newMembers.length,
-        };
-      });
-    };
-
-    if (!isProj) {
-      if (tid && String(tid).length === 24) {
-        joinRequestApi
-          .sendJoinReq({ targetType: 'team', targetId: tid, message: 'I would love to collaborate with the team!' })
-          .then(() => {
-            showToast(`Join request sent to ${item.name}!`);
-            joinTeam(tid);
-            updateLocalJoinedTeam();
-          })
-          .catch((err) => {
-            showToast(err?.message || `Could not join ${item.name}`);
-          });
-      } else {
-        joinTeam(tid);
-        updateLocalJoinedTeam();
-        showToast(`Joined ${item.name}!`);
-      }
     } else {
-      if (tid && String(tid).length === 24) {
-        joinRequestApi
-          .sendJoinReq({ targetType: 'project', targetId: tid, message: 'Interested in contributing to this project!' })
-          .then(() => {
-            showToast(`Request sent to ${item.name}`);
-          })
-          .catch((err) => {
-            showToast(err?.message || `Could not send request to ${item.name}`);
-          });
-      } else {
-        showToast(`Request sent to ${item.name}`);
-      }
+      setPendingReqTargetIds((prev) => new Set(prev).add(tid));
+      setModalItem((prev) => (prev && String(prev._id || prev.id) === tid ? { ...prev, isRequested: true } : prev));
+      showToast(`Join request sent to ${item.name}! Waiting for owner approval.`);
     }
   }
 

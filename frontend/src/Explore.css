@@ -511,6 +511,15 @@
   background: rgba(74, 222, 128, 0.22) !important;
   box-shadow: 0 0 20px rgba(74, 222, 128, 0.3) !important;
 }
+.explore-root .join-btn.is-requested,
+.explore-root .join-btn.is-requested:disabled {
+  background: rgba(255, 152, 162, 0.12) !important;
+  border: 1px solid rgba(255, 152, 162, 0.35) !important;
+  color: var(--coral, #ff98a2) !important;
+  cursor: default;
+  opacity: 1 !important;
+  box-shadow: none !important;
+}
 .explore-root .join-btn.pop{ transform:scale(0.92); }
 .explore-root .score-text{ font-weight:700; }
 

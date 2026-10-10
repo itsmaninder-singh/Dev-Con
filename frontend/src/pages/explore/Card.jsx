@@ -26,7 +26,7 @@ export default function Card({ item, saved, onToggleSave, onJoin, onOpen }) {
     (currentUsername && creatorUsername && currentUsername === creatorUsername)
   );
 
-  const isMember = Boolean(
+  const isMember = !isOwner && Boolean(
     item?.isJoined ||
     (Array.isArray(item?.members) && item.members.some((m) => {
       const u = m?.user || m;
@@ -46,6 +46,10 @@ export default function Card({ item, saved, onToggleSave, onJoin, onOpen }) {
         (currentUsername && cUsername && currentUsername === cUsername)
       );
     }))
+  );
+
+  const isRequested = !isOwner && !isMember && Boolean(
+    joined || item?.isRequested
   );
 
   const maxMembers = Math.max(1, Math.min(Number(item?.maxMembers) || 4, 12));
@@ -137,7 +141,7 @@ export default function Card({ item, saved, onToggleSave, onJoin, onOpen }) {
 
   function handleJoinClick(e) {
     e.stopPropagation();
-    if (isOwner || isMember || full) return;
+    if (isOwner || isMember || isRequested || full) return;
     setJoinPop(true);
     setTimeout(() => setJoinPop(false), 450);
     spawnParticles(10);
@@ -245,19 +249,36 @@ export default function Card({ item, saved, onToggleSave, onJoin, onOpen }) {
               Joined
             </span>
           </button>
+        ) : isRequested ? (
+          <button
+            className="join-btn is-requested"
+            disabled
+            style={{
+              opacity: 0.9,
+              cursor: 'default',
+              background: 'rgba(255, 152, 162, 0.12)',
+              border: '1px solid rgba(255, 152, 162, 0.35)',
+              color: 'var(--coral, #ff98a2)',
+            }}
+            title="Join request sent. Waiting for owner approval."
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span className="btn-label" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              Requested
+            </span>
+          </button>
         ) : (
           <button
             className={`join-btn ${joinPop ? 'pop' : ''}`}
-            disabled={full || joined}
+            disabled={full}
             onClick={handleJoinClick}
           >
             <span className="btn-label">
-              {joined ? (
-                <>
-                  <svg className="check-draw" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6" /></svg>
-                  Requested
-                </>
-              ) : (full ? 'Full' : 'Join')}
+              {full ? 'Full' : 'Join'}
             </span>
             {particles.map(p => (
               <span

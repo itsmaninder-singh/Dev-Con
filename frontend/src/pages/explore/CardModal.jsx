@@ -74,7 +74,7 @@ export default function CardModal({ item, onClose, onJoin, showToast, onToast })
     (currentUsername && creatorUsernameVal && currentUsername === creatorUsernameVal)
   );
 
-  const isMember = Boolean(
+  const isMember = !isOwner && Boolean(
     item?.isJoined ||
     (Array.isArray(item?.members) && item.members.some((m) => {
       const u = m?.user || m;
@@ -94,6 +94,10 @@ export default function CardModal({ item, onClose, onJoin, showToast, onToast })
         (currentUsername && cUsername && currentUsername === cUsername)
       );
     }))
+  );
+
+  const isRequested = !isOwner && !isMember && Boolean(
+    joined || item?.isRequested
   );
 
   async function handleCheckFit() {
@@ -132,7 +136,7 @@ export default function CardModal({ item, onClose, onJoin, showToast, onToast })
   }
 
   function handleJoin() {
-    if (isOwner || isMember || full) return;
+    if (isOwner || isMember || isRequested || full) return;
     setJoined(true);
     onJoin(item);
   }
@@ -471,16 +475,30 @@ export default function CardModal({ item, onClose, onJoin, showToast, onToast })
                   <Check size={14} />
                   <span className="btn-label">Joined</span>
                 </button>
-              ) : (
-                <button className="join-btn" disabled={full || joined} onClick={handleJoin}>
-                  <span className="btn-label">
-                    {joined ? (
-                      <>
-                        <svg className="check-draw" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6" /></svg>
-                        Requested
-                      </>
-                    ) : (full ? 'Full' : 'Join')}
+              ) : isRequested ? (
+                <button
+                  className="join-btn is-requested"
+                  disabled
+                  style={{
+                    opacity: 0.9,
+                    cursor: 'default',
+                    background: 'rgba(255, 152, 162, 0.12)',
+                    border: '1px solid rgba(255, 152, 162, 0.35)',
+                    color: 'var(--coral, #ff98a2)',
+                  }}
+                  title="Join request sent. Waiting for owner's approval."
+                >
+                  <span className="btn-label" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" />
+                      <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                    Requested
                   </span>
+                </button>
+              ) : (
+                <button className="join-btn" disabled={full} onClick={handleJoin}>
+                  <span className="btn-label">{full ? 'Full' : 'Join'}</span>
                 </button>
               )}
             </div>
