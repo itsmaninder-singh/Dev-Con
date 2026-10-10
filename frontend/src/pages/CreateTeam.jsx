@@ -66,15 +66,19 @@ export default function CreateTeam() {
   }
 
   function addSkill(val) {
-    const valid = resolveValidSkill(val) || (PREDEFINED_SKILLS.includes(val) ? val : null);
-    if (!valid) return;
+    if (!val || typeof val !== 'string') return;
+    const trimmed = val.trim();
+    if (!trimmed) return;
+    const valid = resolveValidSkill(trimmed) || trimmed;
     setSkills((prev) => (prev.includes(valid) ? prev : [...prev, valid]));
     setSkillsInvalid(false);
   }
   function removeSkill(val) { setSkills((prev) => prev.filter((s) => s !== val)); }
   function toggleSkill(val) {
-    const valid = resolveValidSkill(val) || (PREDEFINED_SKILLS.includes(val) ? val : null);
-    if (!valid) return;
+    if (!val || typeof val !== 'string') return;
+    const trimmed = val.trim();
+    if (!trimmed) return;
+    const valid = resolveValidSkill(trimmed) || trimmed;
     setSkills((prev) => (prev.includes(valid) ? prev.filter((s) => s !== valid) : [...prev, valid]));
     setSkillsInvalid(false);
   }

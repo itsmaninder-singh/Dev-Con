@@ -125,7 +125,7 @@ export default function Step2SkillsTags({
     <div className="step-panel" key="step-2">
       <div className="field">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-          <label style={{ margin: 0 }}>Skills needed <span style={{ color: '#ff98a2', fontSize: '11px' }}>* (Required · Choose from verified skills)</span></label>
+          <label style={{ margin: 0 }}>Skills needed <span style={{ color: '#ff98a2', fontSize: '11px' }}>* (Required)</span></label>
           <span style={{ fontSize: '11px', color: skills.length > 0 ? '#81c784' : 'var(--muted)' }}>
             {skills.length} selected
           </span>
@@ -138,8 +138,7 @@ export default function Step2SkillsTags({
           onToggleSuggestion={onToggleSkill}
           allowedList={PREDEFINED_SKILLS}
           aliases={SKILL_ALIASES}
-          allowCustom={false}
-          validationErrorMsg="Please select a recognized skill from the verified skills list (e.g. React, Python, MongoDB)."
+          allowCustom={true}
           placeholder="Search and select a skill (e.g. React, Python)…"
         />
         {skillsInvalid && skills.length === 0 && (

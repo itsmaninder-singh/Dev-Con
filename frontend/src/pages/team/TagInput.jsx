@@ -28,22 +28,38 @@ export default function TagInput({
   }, []);
 
   const filteredAllowed = allowedList
-    ? allowedList.filter(
-        (item) =>
-          !values.includes(item) &&
-          (inputVal.trim() === '' ||
-            item.toLowerCase().includes(inputVal.trim().toLowerCase()) ||
-            Object.keys(aliases).some(
-              (al) => al.includes(inputVal.trim().toLowerCase()) && aliases[al] === item
-            ))
-      )
+    ? allowedList
+        .filter((item) => {
+          if (values.includes(item)) return false;
+          const q = inputVal.trim().toLowerCase();
+          if (!q) return true;
+          const lower = item.toLowerCase();
+          if (lower.startsWith(q)) return true;
+          if (aliases[q] === item) return true;
+          if (item.split(/[\s/]/).some((w) => w.toLowerCase().startsWith(q))) return true;
+          if (q.length >= 2 && lower.includes(q)) return true;
+          return Object.keys(aliases).some((al) => al.startsWith(q) && aliases[al] === item);
+        })
+        .sort((a, b) => {
+          const q = inputVal.trim().toLowerCase();
+          if (!q) return 0;
+          const aLower = a.toLowerCase();
+          const bLower = b.toLowerCase();
+          if (aLower === q) return -1;
+          if (bLower === q) return 1;
+          const aStarts = aLower.startsWith(q);
+          const bStarts = bLower.startsWith(q);
+          if (aStarts && !bStarts) return -1;
+          if (!aStarts && bStarts) return 1;
+          return 0;
+        })
     : [];
 
   function tryAdd(val) {
     const trimmed = (val || '').trim();
     if (!trimmed) return;
 
-    if (allowedList && !allowCustom) {
+    if (allowedList) {
       const lower = trimmed.toLowerCase();
       // Check aliases first (e.g. 'postgres' -> 'PostgreSQL')
       const aliasTarget = aliases[lower];
@@ -55,24 +71,25 @@ export default function TagInput({
         match = allowedList.find((item) => item.toLowerCase() === lower);
       }
 
-      if (!match) {
-        // Check if there is an unambiguous prefix/contains match
-        const partialMatches = allowedList.filter(
+      if (!match && !allowCustom) {
+        // Only if custom is strictly disabled, check prefix match
+        const prefixMatches = allowedList.filter(
           (item) => !values.includes(item) && item.toLowerCase().startsWith(lower)
         );
-        if (partialMatches.length === 1) {
-          match = partialMatches[0];
+        if (prefixMatches.length === 1) {
+          match = prefixMatches[0];
         }
       }
 
-      if (!match) {
+      const finalVal = match || (allowCustom ? trimmed : null);
+      if (!finalVal) {
         setError(`"${trimmed}" is not a recognized skill. Please choose from verified skills.`);
         setTimeout(() => setError(''), 4000);
         return;
       }
 
-      if (!values.includes(match)) {
-        onAdd(match);
+      if (!values.includes(finalVal)) {
+        onAdd(finalVal);
       }
     } else {
       if (!values.includes(trimmed)) {
@@ -87,10 +104,20 @@ export default function TagInput({
   function handleKeyDown(e) {
     if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault();
-      if (filteredAllowed.length > 0 && inputVal.trim()) {
+      const trimmed = inputVal.trim();
+      if (!trimmed) return;
+
+      const lower = trimmed.toLowerCase();
+      // If there is an exact or alias match, prefer that
+      const exactMatch = filteredAllowed.find((item) => item.toLowerCase() === lower || aliases[lower] === item);
+      if (exactMatch) {
+        tryAdd(exactMatch);
+      } else if (filteredAllowed.length > 0 && filteredAllowed[0].toLowerCase().startsWith(lower)) {
+        // Strong prefix match
         tryAdd(filteredAllowed[0]);
       } else {
-        tryAdd(inputVal);
+        // Fall back to what user actually typed
+        tryAdd(trimmed);
       }
     } else if (e.key === 'Backspace' && !inputVal) {
       if (values.length) onRemove(values[values.length - 1]);
