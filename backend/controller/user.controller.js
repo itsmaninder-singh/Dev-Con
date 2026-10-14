@@ -494,8 +494,24 @@ const syncGithubProfile = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Invalid GitHub username provided");
   }
 
+  // 1. Debounce check: if profile was synced in the last 30 seconds, return immediately
+  const userRecord = await User.findById(userId).select("+githubAccessToken");
+  const lastSync = userRecord?.githubProfile?.lastSyncedAt;
+  const isRecentlySynced = lastSync && Date.now() - new Date(lastSync).getTime() < 30_000;
+
+  if (isRecentlySynced && !req.body?.force) {
+    return res.status(200).json(
+      new ApiResponse(200, "GitHub profile is already up to date.", {
+        githubProfile: userRecord.githubProfile,
+        badges: userRecord.badges,
+        githubUsername: userRecord.githubUsername,
+        user: toSafeUser(userRecord),
+      })
+    );
+  }
+
   try {
-    await syncGithubProfileForUser(userId, targetGithubUsername);
+    await syncGithubProfileForUser(userId, targetGithubUsername, userRecord?.githubAccessToken);
 
     const updatedUser = await User.findById(userId);
 
@@ -511,9 +527,21 @@ const syncGithubProfile = asyncHandler(async (req, res) => {
     if (err.code === "NOT_FOUND") {
       throw new ApiError(404, `GitHub user "${targetGithubUsername}" was not found.`);
     }
-    if (err.code === "RATE_LIMITED") {
-      throw new ApiError(429, "GitHub API rate limit reached. Please wait a moment and try again.");
+
+    // Graceful fallback: if user already has saved githubProfile in MongoDB, serve it without error
+    const fallbackUser = await User.findById(userId);
+    if (fallbackUser?.githubProfile?.topRepos?.length || fallbackUser?.githubProfile?.lastSyncedAt) {
+      console.warn(`[syncGithubProfile] Sync fallback notice for @${targetGithubUsername}: ${err.message}`);
+      return res.status(200).json(
+        new ApiResponse(200, "Showing latest saved GitHub profile data.", {
+          githubProfile: fallbackUser.githubProfile,
+          badges: fallbackUser.badges,
+          githubUsername: fallbackUser.githubUsername,
+          user: toSafeUser(fallbackUser),
+        })
+      );
     }
+
     if (err.code === "INVALID_INPUT") {
       throw new ApiError(400, err.message);
     }
@@ -619,12 +647,13 @@ const connectGithubWithOAuth = asyncHandler(async (req, res) => {
   // 5. Update user
   req.user.githubId = githubId;
   req.user.githubUsername = authenticatedLogin;
+  req.user.githubAccessToken = accessToken;
   await req.user.save({ validateModifiedOnly: true });
 
-  // 6. Run sync immediately
+  // 6. Run sync immediately with user's OAuth access token
   let syncedProfile = null;
   try {
-    syncedProfile = await syncGithubProfileForUser(userId, authenticatedLogin);
+    syncedProfile = await syncGithubProfileForUser(userId, authenticatedLogin, accessToken);
   } catch (syncErr) {
     console.warn(`[connectGithubWithOAuth] Initial sync warning for @${authenticatedLogin}:`, syncErr.message);
   }

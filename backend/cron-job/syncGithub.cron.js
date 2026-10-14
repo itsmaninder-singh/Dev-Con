@@ -20,9 +20,10 @@ const runDueSync = async()=>{
     console.log(`[github-sync-cron] Refreshing ${dueUsers.length} GitHub profile(s)...`);
 
     for(const user of dueUsers){
-        await syncGithubProfileForUser(user._id, user.githubUsername);
+        await syncGithubProfileForUser(user._id, user.githubUsername).catch((err) =>
+            console.warn(`[github-sync-cron] Skipped ${user.githubUsername}:`, err.message)
+        );
         await sleep(DELAY_BETWEEN_SYNCS_MS);
-
     }
     console.log(`[github-sync-cron] GitHub sync run finished.`);
 };
@@ -34,12 +35,5 @@ export const startGithubSyncCron = ()=>{
             console.error("[github-sync-cron] Scheduled sync error:", err.message);
         });
     });
-
-    setTimeout(()=>{
-        runDueSync()
-        .catch((err)=>{
-            console.error("[github-sync-cron] Initial sync error:", err.message);
-        });
-    },10_000);
-    console.log("[github-sync-cron] GitHub sync cron job initialized.");
-}
+    console.log("[github-sync-cron] GitHub sync cron job initialized (daily 03:00).");
+};

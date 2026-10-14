@@ -427,6 +427,7 @@ const githubAuth = asyncHandler(async (req, res) => {
         email: emailToUse,
         githubId,
         githubUsername: (profile.login || "").toLowerCase() || null,
+        githubAccessToken: accessToken,
         authProvider: "github",
         profilePicture: profile.avatar_url || "",
         bio: profile.bio ? profile.bio.slice(0, 200) : "",
@@ -439,6 +440,10 @@ const githubAuth = asyncHandler(async (req, res) => {
   } else {
     // Existing GitHub user -> keep GitHub details up to date
     let needsSave = false;
+    if (accessToken) {
+      user.githubAccessToken = accessToken;
+      needsSave = true;
+    }
     if (user.githubId !== githubId) {
       user.githubId = githubId;
       needsSave = true;
@@ -456,9 +461,9 @@ const githubAuth = asyncHandler(async (req, res) => {
     }
   }
 
-  // Automatically sync GitHub profile stats (repos, streak, badges) in background
+  // Automatically sync GitHub profile stats (repos, streak, badges) in background using user's OAuth access token
   if (user?.githubUsername) {
-    syncGithubProfileForUser(user._id, user.githubUsername).catch((err) =>
+    syncGithubProfileForUser(user._id, user.githubUsername, accessToken).catch((err) =>
       console.warn(`[githubAuth] Background sync notice for @${user.githubUsername}:`, err.message)
     );
   }

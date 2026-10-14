@@ -71,6 +71,11 @@ const userSchema = new mongoose.Schema(
         type:String,
         default:null,
     },
+    githubAccessToken:{
+        type:String,
+        default:null,
+        select:false,
+    },
     authProvider:{
         type:String,
         enum:["local","google","github"],
