@@ -45,7 +45,7 @@ export default function GithubCallback() {
     // Flow 1: Connecting GitHub from Profile page
     if (mode === "connect_github") {
       const targetUsername = localStorage.getItem("target_github_username") || "";
-      setStatus("Verifying GitHub login & syncing profile...");
+      setStatus("Connecting GitHub account & syncing repos...");
 
       userApi
         .connectGithub({ code, targetUsername, redirect_uri })
@@ -69,7 +69,7 @@ export default function GithubCallback() {
                 message: `Connected GitHub @${result?.githubUsername || targetUsername} and synced profile successfully!`,
               },
             });
-          }, 600);
+          }, 450);
         })
         .catch((err) => {
           localStorage.removeItem("oauth_auth_mode");
@@ -107,7 +107,7 @@ export default function GithubCallback() {
         );
         setTimeout(() => {
           navigate(destination, { replace: true });
-        }, 500);
+        }, 400);
       })
       .catch((err) => {
         clearTimeout(timeoutTimer);
@@ -126,6 +126,31 @@ export default function GithubCallback() {
 
   return (
     <div style={styles.container}>
+      <style>{`
+        @keyframes spinKf {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        @keyframes pulseGlow {
+          0%, 100% { transform: scale(1); opacity: 0.85; filter: drop-shadow(0 0 10px rgba(255, 152, 162, 0.3)); }
+          50% { transform: scale(1.06); opacity: 1; filter: drop-shadow(0 0 20px rgba(255, 152, 162, 0.6)); }
+        }
+        @keyframes progressBarAnim {
+          0% { transform: translateX(-100%); }
+          50% { transform: translateX(0%); }
+          100% { transform: translateX(100%); }
+        }
+        .github-spin-icon {
+          animation: spinKf 0.85s linear infinite !important;
+        }
+        .github-pulse-wrapper {
+          animation: pulseGlow 2s ease-in-out infinite;
+        }
+        .github-progress-bar {
+          animation: progressBarAnim 1.4s ease-in-out infinite;
+        }
+      `}</style>
+
       <div style={styles.card}>
         <div style={styles.logo}>
           <span style={{ color: "#ff98a2" }}>Dev</span>Connect
@@ -133,7 +158,7 @@ export default function GithubCallback() {
 
         {error ? (
           <div style={styles.errorBox}>
-            <AlertCircle size={28} color="#ff6b6b" style={{ marginBottom: "12px" }} />
+            <AlertCircle size={32} color="#ff6b6b" style={{ marginBottom: "12px" }} />
             <h2 style={styles.title}>Authentication Failed</h2>
             <p style={styles.desc}>{error}</p>
             <div style={{ display: "flex", gap: "10px", justifyContent: "center", flexWrap: "wrap" }}>
@@ -152,21 +177,27 @@ export default function GithubCallback() {
           </div>
         ) : status.includes("Success") ? (
           <div style={styles.successBox}>
-            <CheckCircle2 size={32} color="#51cf66" style={{ marginBottom: "12px" }} />
+            <CheckCircle2 size={36} color="#51cf66" style={{ marginBottom: "12px" }} />
             <h2 style={styles.title}>Connected!</h2>
             <p style={styles.desc}>{status}</p>
           </div>
         ) : (
           <div style={styles.loadingBox}>
-            <Loader2 size={32} color="#ff98a2" className="ai-spinner" style={{ marginBottom: "16px" }} />
+            <div style={styles.spinnerWrapper} className="github-pulse-wrapper">
+              <Loader2 size={36} color="#ff98a2" className="github-spin-icon" />
+            </div>
             <h2 style={styles.title}>
               {callbackMode === "connect_github"
                 ? "Connecting GitHub"
                 : callbackMode === "register"
-                ? "Signing Up with GitHub"
+                ? "Creating Account"
                 : "Signing In with GitHub"}
             </h2>
             <p style={styles.desc}>{status}</p>
+
+            <div style={styles.progressBarTrack}>
+              <div style={styles.progressBarFill} className="github-progress-bar" />
+            </div>
           </div>
         )}
       </div>
@@ -212,7 +243,33 @@ const styles = {
     fontSize: "13.5px",
     color: "#a1a1aa",
     lineHeight: "1.5",
-    marginBottom: "24px",
+    marginBottom: "20px",
+  },
+  spinnerWrapper: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "60px",
+    height: "60px",
+    borderRadius: "50%",
+    background: "rgba(255, 152, 162, 0.08)",
+    border: "1px solid rgba(255, 152, 162, 0.2)",
+    marginBottom: "18px",
+  },
+  progressBarTrack: {
+    width: "100%",
+    height: "4px",
+    background: "rgba(255, 255, 255, 0.08)",
+    borderRadius: "4px",
+    overflow: "hidden",
+    position: "relative",
+    marginTop: "8px",
+  },
+  progressBarFill: {
+    width: "50%",
+    height: "100%",
+    background: "linear-gradient(90deg, #ff98a2, #e17a92, #ff98a2)",
+    borderRadius: "4px",
   },
   errorBox: {
     display: "flex",
@@ -240,4 +297,4 @@ const styles = {
     textDecoration: "none",
     transition: "all 0.2s ease",
   },
-};
+};

@@ -17,6 +17,7 @@ export default function OAuthButtons({ mode = "login", onError, onSuccess }) {
   const navigate = useNavigate();
   const tokenClientRef = useRef(null);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [githubLoading, setGithubLoading] = useState(false);
 
   // Initialize Google Identity Services (GIS)
   useEffect(() => {
@@ -163,8 +164,10 @@ export default function OAuthButtons({ mode = "login", onError, onSuccess }) {
 
   const handleGithub = () => {
     localStorage.setItem("oauth_auth_mode", mode);
+    setGithubLoading(true);
 
     if (!GITHUB_CLIENT_ID) {
+      setGithubLoading(false);
       // Fallback: Inform user and provide quick dev bypass if needed
       const proceedDemo = window.confirm(
         "GitHub Client ID is not configured yet in .env.\n\nWould you like to sign in with a demo GitHub account instead?\n(To use real GitHub sign-in, add VITE_GITHUB_CLIENT_ID to frontend/.env)"
@@ -215,7 +218,7 @@ export default function OAuthButtons({ mode = "login", onError, onSuccess }) {
           style={styles.oauthButton}
           onMouseEnter={hoverIn}
           onMouseLeave={hoverOut}
-          disabled={googleLoading}
+          disabled={googleLoading || githubLoading}
         >
           <GoogleMark />
           <span>{googleLoading ? "Connecting to Google..." : "Continue with Google"}</span>
@@ -228,9 +231,10 @@ export default function OAuthButtons({ mode = "login", onError, onSuccess }) {
           style={styles.oauthButton}
           onMouseEnter={hoverIn}
           onMouseLeave={hoverOut}
+          disabled={googleLoading || githubLoading}
         >
           <GithubMark />
-          <span>Continue with GitHub</span>
+          <span>{githubLoading ? "Connecting to GitHub..." : "Continue with GitHub"}</span>
         </button>
       </div>
     </div>
