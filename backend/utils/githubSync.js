@@ -4,7 +4,14 @@ const GITHUB_REST_API = "https://api.github.com";
 const GITHUB_GRAPHQL_API = "https://api.github.com/graphql";
 const MAX_TOP_REPOS = 6;
 
-const hasToken = () => Boolean(process.env.GITHUB_TOKEN && process.env.GITHUB_TOKEN.trim());
+const hasToken = () => {
+  const token = process.env.GITHUB_TOKEN?.trim();
+  // Valid personal access tokens start with ghp_, github_pat_, or gho_
+  return Boolean(
+    token &&
+    (token.startsWith("ghp_") || token.startsWith("github_pat_") || token.startsWith("gho_"))
+  );
+};
 
 const restHeaders = () => ({
   Accept: "application/vnd.github+json",
@@ -13,7 +20,28 @@ const restHeaders = () => ({
 });
 
 const githubFetch = async (path) => {
-  const res = await fetch(`${GITHUB_REST_API}${path}`, { headers: restHeaders() });
+  let res;
+  try {
+    res = await fetch(`${GITHUB_REST_API}${path}`, { headers: restHeaders() });
+  } catch (netErr) {
+    const err = new Error(`Network error connecting to GitHub: ${netErr.message}`);
+    err.code = "NETWORK_ERROR";
+    throw err;
+  }
+
+  // If 401 Unauthorized (e.g. invalid/expired GITHUB_TOKEN), automatically retry without Authorization header
+  if (res.status === 401) {
+    console.warn(`[githubSync] GitHub token returned 401. Retrying path "${path}" without token.`);
+    try {
+      res = await fetch(`${GITHUB_REST_API}${path}`, {
+        headers: {
+          Accept: "application/vnd.github+json",
+          "User-Agent": "DevConnect-App",
+        },
+      });
+    } catch (_) {}
+  }
+
   if (res.status === 404) {
     const err = new Error("GitHub user or resource not found");
     err.code = "NOT_FOUND";

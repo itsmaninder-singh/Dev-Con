@@ -138,7 +138,11 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("devconnect_demo_session");
     localStorage.removeItem("dc_profile");
     localStorage.removeItem("dc_access_token");
-    sessionStorage.removeItem("dc_profile_banner_dismissed");
+    localStorage.removeItem("dc_joined_teams_v5");
+    localStorage.removeItem("dc_teams_v5");
+    localStorage.removeItem("dc_projects_v5");
+    localStorage.removeItem("dc_blocked_users_v1");
+    sessionStorage.clear();
     setAccessToken(null);
     setUser(null);
   }, []);

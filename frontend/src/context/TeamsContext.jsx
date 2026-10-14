@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useMemo } from 'react';
+import { createContext, useContext, useEffect, useState, useMemo, useRef } from 'react';
 import { useProfile } from './ProfileContext.jsx';
 import { useAuth } from './AuthContext.jsx';
 import { teamApi, projectApi } from '../lib/api.js';
@@ -53,32 +53,33 @@ export function TeamsProvider({ children }) {
   const [projects, setProjects] = useState(() => loadInitial(PROJECTS_STORAGE_KEY, SEED_PROJECTS));
 
   // Sync teams and projects from backend API — only when authenticated
-  const [hasFetched, setHasFetched] = useState(false);
+  const lastAuthUserIdRef = useRef(null);
   useEffect(() => {
-    if (!authUser || hasFetched) return;
+    if (!authUser?._id) {
+      lastAuthUserIdRef.current = null;
+      setJoinedTeamIds(new Set());
+      return;
+    }
 
-    teamApi
-      .getTeams({ limit: 50 })
-      .then((res) => {
-        const serverTeams = res?.teams || (Array.isArray(res) ? res : []);
-        setTeams(serverTeams);
-      })
-      .catch(() => {
-        // Backend offline or network error
-      });
+    if (lastAuthUserIdRef.current !== authUser._id) {
+      lastAuthUserIdRef.current = authUser._id;
+      teamApi
+        .getTeams({ limit: 50 })
+        .then((res) => {
+          const serverTeams = res?.teams || (Array.isArray(res) ? res : []);
+          setTeams(serverTeams);
+        })
+        .catch(() => {});
 
-    projectApi
-      .getProjects()
-      .then((serverProjects) => {
-        const list = Array.isArray(serverProjects) ? serverProjects : serverProjects?.projects || [];
-        setProjects(list);
-      })
-      .catch(() => {
-        // Backend offline or network error
-      });
-
-    setHasFetched(true);
-  }, [authUser]);
+      projectApi
+        .getProjects()
+        .then((serverProjects) => {
+          const list = Array.isArray(serverProjects) ? serverProjects : serverProjects?.projects || [];
+          setProjects(list);
+        })
+        .catch(() => {});
+    }
+  }, [authUser?._id]);
 
   useEffect(() => {
     try {

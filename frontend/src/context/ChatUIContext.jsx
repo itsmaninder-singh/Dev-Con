@@ -40,9 +40,18 @@ export function ChatUIProvider({ children }) {
 
   // Sync chats from backend on login
   useEffect(() => {
-    if (user?._id) {
-      chatApi
-        .getMyChats()
+    if (!user?._id) {
+      setConversations([]);
+      setActiveId(null);
+      setOpen(false);
+      return;
+    }
+
+    setConversations([]);
+    setActiveId(null);
+
+    chatApi
+      .getMyChats()
         .then((res) => {
           const serverChats = Array.isArray(res) ? res : res?.chats || [];
           if (serverChats.length > 0) {
@@ -111,7 +120,6 @@ export function ChatUIProvider({ children }) {
           }
         })
         .catch(() => {});
-    }
   }, [user?._id]);
 
   // Real-time Presence Listeners (WhatsApp-style Online/Offline tracking)
