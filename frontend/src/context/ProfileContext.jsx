@@ -37,23 +37,51 @@ function normalizePhone(val) {
 
 function loadInitial() {
   try {
+    // Purge old shared legacy key
+    localStorage.removeItem(STORAGE_KEY);
+
     const sessionRaw = localStorage.getItem("devconnect_auth_session");
-    const activeUserId = sessionRaw ? JSON.parse(sessionRaw)?.user?._id : null;
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_PROFILE;
-    const parsed = JSON.parse(raw);
-    if (parsed?.name === 'Arjun Sharma' || parsed?.username === 'arjun') {
-      localStorage.removeItem(STORAGE_KEY);
-      return DEFAULT_PROFILE;
+    if (!sessionRaw) return DEFAULT_PROFILE;
+    const session = JSON.parse(sessionRaw);
+    const u = session?.user;
+    if (!u?._id) return DEFAULT_PROFILE;
+
+    const userStorageKey = `dc_profile_${u._id}`;
+    const raw = localStorage.getItem(userStorageKey);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?._id === u._id) {
+        const merged = { ...DEFAULT_PROFILE, ...parsed };
+        merged.phone = normalizePhone(parsed?.phone || parsed?.phoneNumber);
+        merged.phoneNumber = merged.phone;
+        return merged;
+      }
     }
-    if (activeUserId && parsed?._id && parsed._id !== activeUserId) {
-      localStorage.removeItem(STORAGE_KEY);
-      return DEFAULT_PROFILE;
-    }
-    const merged = { ...DEFAULT_PROFILE, ...parsed };
-    merged.phone = normalizePhone(parsed?.phone || parsed?.phoneNumber);
-    merged.phoneNumber = merged.phone;
-    return merged;
+
+    return {
+      ...DEFAULT_PROFILE,
+      _id: u._id,
+      name: u.name || '',
+      username: u.username || '',
+      email: u.email || '',
+      avatarUrl: u.profilePicture || u.avatarUrl || '',
+      profilePicture: u.profilePicture || u.avatarUrl || '',
+      coverUrl: u.coverPicture || u.coverUrl || '',
+      coverPicture: u.coverPicture || u.coverUrl || '',
+      bio: u.bio || '',
+      college: u.college || '',
+      skills: Array.isArray(u.skills) ? u.skills : [],
+      openTo: Array.isArray(u.availableFor) ? u.availableFor : [],
+      experience: u.experience || 'Fresher',
+      experienceLevel: u.experienceLevel || u.experience || 'Fresher',
+      githubUsername: u.githubUsername || null,
+      githubProfile: u.githubProfile || null,
+      badges: u.badges || {},
+      authProvider: u.authProvider || 'local',
+      isProfileComplete: Boolean(u.isProfileComplete),
+      phone: normalizePhone(u.phoneNumber || u.phone),
+      phoneNumber: normalizePhone(u.phoneNumber || u.phone),
+    };
   } catch {
     return DEFAULT_PROFILE;
   }
@@ -171,7 +199,9 @@ export function ProfileProvider({ children }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
+      if (profile?._id) {
+        localStorage.setItem(`dc_profile_${profile._id}`, JSON.stringify(profile));
+      }
     } catch {
       // storage full/unavailable
     }
