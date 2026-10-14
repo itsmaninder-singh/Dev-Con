@@ -9,7 +9,13 @@ export function AuthProvider({ children }) {
 
   const applySession = useCallback((session) => {
     setAccessToken(session.accessToken);
-    setUser(session.user);
+    setUser((prevUser) => {
+      if (prevUser && session?.user && prevUser._id !== session.user._id) {
+        localStorage.removeItem("dc_profile");
+        sessionStorage.removeItem("dc_profile_banner_dismissed");
+      }
+      return session.user;
+    });
     if (session?.accessToken && session?.user) {
       localStorage.setItem("devconnect_auth_session", JSON.stringify(session));
     }
@@ -130,6 +136,9 @@ export function AuthProvider({ children }) {
     } catch {}
     localStorage.removeItem("devconnect_auth_session");
     localStorage.removeItem("devconnect_demo_session");
+    localStorage.removeItem("dc_profile");
+    localStorage.removeItem("dc_access_token");
+    sessionStorage.removeItem("dc_profile_banner_dismissed");
     setAccessToken(null);
     setUser(null);
   }, []);

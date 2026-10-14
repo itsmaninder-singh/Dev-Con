@@ -602,16 +602,17 @@ const connectGithubWithOAuth = asyncHandler(async (req, res) => {
     }
   }
 
-  // 4. Check if another user already linked this GitHub account
+  // 4. Check if another non-github user already linked this GitHub account
   const existingUser = await User.findOne({
     githubId,
     _id: { $ne: userId },
+    authProvider: { $ne: "github" },
   });
 
   if (existingUser) {
     throw new ApiError(
       409,
-      `This GitHub account (@${profile.login}) is already linked to another DevConnect user (@${existingUser.username}).`
+      `This GitHub account (@${profile.login}) is already connected to another DevConnect user (@${existingUser.username}).`
     );
   }
 

@@ -68,14 +68,17 @@ const sendAuthResponse = (res, statusCode, user, message) => {
   );
 };
 
-const deriveUniqueUsernameFromEmail = async (email) => {
-  if (!email || typeof email !== "string" || !email.includes("@")) {
-    email = "user@devconnect.local";
+const deriveUniqueUsername = async (candidate) => {
+  if (!candidate || typeof candidate !== "string") {
+    candidate = "dev";
   }
-  const rawPrefix = email.split("@")[0].toLowerCase().trim();
+  let raw = candidate.toLowerCase().trim();
+  if (raw.includes("@")) {
+    raw = raw.split("@")[0].trim();
+  }
 
   // Sanitize: lowercase, strip +, convert spaces, keep letters, numbers, dots, underscores, hyphens
-  let sanitized = rawPrefix
+  let sanitized = raw
     .replace(/\+/g, "")
     .replace(/\s+/g, "_")
     .replace(/[^a-z0-9_.-]/g, "")
@@ -94,9 +97,9 @@ const deriveUniqueUsernameFromEmail = async (email) => {
   // Handle collisions: append -2, -3, -4, etc.
   let suffixNum = 2;
   while (suffixNum <= 50) {
-    const candidate = `${sanitized}-${suffixNum}`;
-    if (!(await User.exists({ username: candidate }))) {
-      return candidate;
+    const candidateName = `${sanitized}-${suffixNum}`;
+    if (!(await User.exists({ username: candidateName }))) {
+      return candidateName;
     }
     suffixNum += 1;
   }
@@ -104,14 +107,15 @@ const deriveUniqueUsernameFromEmail = async (email) => {
   // Random fallback for extreme collisions
   while (true) {
     const randomSuffix = Math.random().toString(36).substring(2, 6);
-    const candidate = `${sanitized.slice(0, 18)}-${randomSuffix}`;
-    if (!(await User.exists({ username: candidate }))) {
-      return candidate;
+    const candidateName = `${sanitized.slice(0, 18)}-${randomSuffix}`;
+    if (!(await User.exists({ username: candidateName }))) {
+      return candidateName;
     }
   }
 };
 
-const generateUniqueUsername = deriveUniqueUsernameFromEmail;
+const deriveUniqueUsernameFromEmail = deriveUniqueUsername;
+const generateUniqueUsername = deriveUniqueUsername;
 
 const register = asyncHandler(async (req, res) => {
   const { name, username, email, password, phoneNumber } = req.body;
@@ -170,7 +174,7 @@ const register = asyncHandler(async (req, res) => {
     }
   }
 
-  const existingEmail = await User.findOne({ email: cleanEmail });
+  const existingEmail = await User.findOne({ email: cleanEmail, authProvider: "local" });
   if (existingEmail) {
     throw new ApiError(409, "An account with this email already exists");
   }
@@ -199,11 +203,24 @@ const login = asyncHandler(async (req, res) => {
     throw new ApiError(400, "email/username and password are required");
   }
 
-  const user = await User.findOne({
-    $or: [{ email: identifier.toLowerCase().trim() }, { username: identifier.toLowerCase().trim() }],
+  const cleanId = identifier.toLowerCase().trim();
+  let user = await User.findOne({
+    $or: [{ email: cleanId }, { username: cleanId }],
+    authProvider: "local",
   }).select("+password");
 
   if (!user) {
+    // Check if user exists via OAuth to provide a clear, helpful error
+    const oauthUser = await User.findOne({
+      $or: [{ email: cleanId }, { username: cleanId }],
+    });
+    if (oauthUser && oauthUser.authProvider !== "local") {
+      const providerName = oauthUser.authProvider === "github" ? "GitHub" : "Google";
+      throw new ApiError(
+        400,
+        `This account was created using ${providerName}. Please sign in using the "Continue with ${providerName}" button.`
+      );
+    }
     throw new ApiError(404, "Account does not exist. Please register first.");
   }
 
@@ -252,38 +269,41 @@ const googleAuth = asyncHandler(async (req, res) => {
   }
 
   const normalizedEmail = payload.email.toLowerCase().trim();
-  const googleId = payload.sub || payload.id;
+  const googleId = String(payload.sub || payload.id);
 
-  // Match on email first for linking, fallback to googleId
-  let user = await User.findOne({ email: normalizedEmail });
-  if (!user && googleId) {
-    user = await User.findOne({ googleId });
+  // Look strictly for an account created with Google OAuth
+  let user = await User.findOne({ googleId, authProvider: "google" });
+
+  if (!user) {
+    // Check if user was registered with googleId under google provider
+    const existingById = await User.findOne({ googleId });
+    if (existingById && existingById.authProvider === "google") {
+      user = existingById;
+    }
   }
 
   if (!user) {
-    // Auto-create account on the spot without separate registration step
-    const username = await deriveUniqueUsernameFromEmail(normalizedEmail);
+    // Auto-create a brand new, completely separate Google user account
+    let emailToUse = normalizedEmail;
+    const existingGoogle = await User.findOne({ email: emailToUse, authProvider: "google" });
+    if (existingGoogle) {
+      emailToUse = `${googleId}+${normalizedEmail}`;
+    }
+
+    const username = await deriveUniqueUsername(payload.name || normalizedEmail);
     user = await User.create({
       name: (payload.name && payload.name.trim()) || username,
       username,
-      email: normalizedEmail,
+      email: emailToUse,
       googleId,
       authProvider: "google",
       profilePicture: payload.picture || "",
       isProfileComplete: false,
     });
   } else {
-    // Existing user -> Link OAuth details
-    let needsSave = false;
-    if (!user.googleId && googleId) {
-      user.googleId = googleId;
-      needsSave = true;
-    }
+    // Existing user -> keep profile picture fresh if missing
     if (payload.picture && !user.profilePicture) {
       user.profilePicture = payload.picture;
-      needsSave = true;
-    }
-    if (needsSave) {
       await user.save({ validateModifiedOnly: true });
     }
   }
@@ -297,6 +317,12 @@ const githubAuth = asyncHandler(async (req, res) => {
     throw new ApiError(400, "code is required");
   }
 
+  const clientId = process.env.GITHUB_CLIENT_ID;
+  const clientSecret = process.env.GITHUB_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    throw new ApiError(500, "GitHub OAuth credentials are not configured on the server");
+  }
+
   const effectiveRedirectUri = redirect_uri || process.env.GITHUB_REDIRECT_URI;
 
   let accessToken;
@@ -304,8 +330,8 @@ const githubAuth = asyncHandler(async (req, res) => {
     const tokenRes = await axios.post(
       "https://github.com/login/oauth/access_token",
       {
-        client_id: process.env.GITHUB_CLIENT_ID,
-        client_secret: process.env.GITHUB_CLIENT_SECRET,
+        client_id: clientId,
+        client_secret: clientSecret,
         code,
         ...(effectiveRedirectUri ? { redirect_uri: effectiveRedirectUri } : {}),
       },
@@ -331,28 +357,33 @@ const githubAuth = asyncHandler(async (req, res) => {
     throw new ApiError(401, "GitHub did not return an access token");
   }
 
-  let githubProfile, githubEmails;
+  let profile;
+  let emailsList = [];
   try {
-    [githubProfile, githubEmails] = await Promise.all([
-      axios.get("https://api.github.com/user", {
+    const profileRes = await axios.get("https://api.github.com/user", {
+      headers: { Authorization: `Bearer ${accessToken}`, "User-Agent": "DevConnect-App" },
+    });
+    profile = profileRes.data;
+
+    try {
+      const emailsRes = await axios.get("https://api.github.com/user/emails", {
         headers: { Authorization: `Bearer ${accessToken}`, "User-Agent": "DevConnect-App" },
-      }),
-      axios.get("https://api.github.com/user/emails", {
-        headers: { Authorization: `Bearer ${accessToken}`, "User-Agent": "DevConnect-App" },
-      }),
-    ]);
+      });
+      emailsList = Array.isArray(emailsRes.data) ? emailsRes.data : [];
+    } catch (emailErr) {
+      console.warn("[githubAuth] Could not fetch /user/emails, falling back to profile email:", emailErr.message);
+    }
   } catch (err) {
     throw new ApiError(401, "Failed to fetch GitHub profile: " + (err.response?.data?.message || err.message));
   }
 
-  const profile = githubProfile.data;
-  const emailsList = Array.isArray(githubEmails.data) ? githubEmails.data : [];
   const primaryEmail =
     emailsList.find((e) => e.primary && e.verified)?.email ||
     emailsList.find((e) => e.verified)?.email ||
     emailsList[0]?.email ||
     profile.email ||
-    (profile.login ? `${profile.login.toLowerCase()}@users.noreply.github.com` : null);
+    (profile.login ? `${profile.login.toLowerCase()}@users.noreply.github.com` : null) ||
+    `${profile.id}@users.noreply.github.com`;
 
   if (!primaryEmail) {
     throw new ApiError(401, "GitHub account has no accessible verified email");
@@ -361,37 +392,44 @@ const githubAuth = asyncHandler(async (req, res) => {
   const normalizedEmail = primaryEmail.toLowerCase().trim();
   const githubId = String(profile.id);
 
-  // Match on email first for linking, fallback to githubId
-  let user = await User.findOne({ email: normalizedEmail });
-  if (!user && githubId) {
-    user = await User.findOne({ githubId });
+  // Look strictly for an account created with GitHub OAuth (separate from Google and local)
+  let user = await User.findOne({ githubId, authProvider: "github" });
+
+  if (!user && profile.login) {
+    // Check if user was previously created with authProvider "github" under this username
+    user = await User.findOne({
+      githubUsername: profile.login.toLowerCase(),
+      authProvider: "github",
+    });
   }
 
   if (!user) {
-    // Auto-create account on the spot without separate registration step
-    let username;
-    const preferredLogin = (profile.login || "")
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9_.-]/g, "")
-      .replace(/^[._-]+|[._-]+$/g, "")
-      .slice(0, 24);
+    // Clean up any non-github account that had this githubId accidentally attached due to previous merge bugs
+    await User.updateMany(
+      { githubId, authProvider: { $ne: "github" } },
+      { $set: { githubId: null, githubUsername: null } }
+    );
 
-    if (preferredLogin && preferredLogin.length >= 2 && !(await User.exists({ username: preferredLogin }))) {
-      username = preferredLogin;
-    } else {
-      username = await deriveUniqueUsernameFromEmail(normalizedEmail);
+    // Auto-create a brand new, completely separate GitHub user account
+    const username = await deriveUniqueUsername(profile.login || normalizedEmail);
+
+    // Ensure email is unique within authProvider "github"
+    let emailToUse = normalizedEmail;
+    const existingGithubEmail = await User.findOne({ email: emailToUse, authProvider: "github" });
+    if (existingGithubEmail) {
+      emailToUse = `${profile.id}+${profile.login ? profile.login.toLowerCase() : "dev"}@users.noreply.github.com`;
     }
 
     try {
       user = await User.create({
         name: (profile.name && profile.name.trim()) || profile.login || username,
         username,
-        email: normalizedEmail,
+        email: emailToUse,
         githubId,
         githubUsername: (profile.login || "").toLowerCase() || null,
         authProvider: "github",
         profilePicture: profile.avatar_url || "",
+        bio: profile.bio ? profile.bio.slice(0, 200) : "",
         isProfileComplete: false,
       });
     } catch (createErr) {
@@ -399,22 +437,22 @@ const githubAuth = asyncHandler(async (req, res) => {
       throw new ApiError(400, "Failed to create user account: " + (createErr.message || "Database validation failed"));
     }
   } else {
-    // Existing user -> Link OAuth details
+    // Existing GitHub user -> keep GitHub details up to date
     let needsSave = false;
-    if (!user.githubId) {
+    if (user.githubId !== githubId) {
       user.githubId = githubId;
       needsSave = true;
     }
-    if (profile.login && !user.githubUsername) {
+    if (profile.login && user.githubUsername !== profile.login.toLowerCase()) {
       user.githubUsername = profile.login.toLowerCase();
       needsSave = true;
     }
-    if (profile.avatar_url && !user.profilePicture) {
+    if (profile.avatar_url && (!user.profilePicture || user.profilePicture.includes("avatars.githubusercontent.com"))) {
       user.profilePicture = profile.avatar_url;
       needsSave = true;
     }
     if (needsSave) {
-      await user.save({ validateModifiedOnly: true });
+      await user.save({ validateBeforeSave: false });
     }
   }
 
@@ -485,11 +523,22 @@ const forgotPassword = asyncHandler(async (req, res) => {
   }
 
   const cleanId = identifier.trim().toLowerCase();
-  const user = await User.findOne({
+  let user = await User.findOne({
     $or: [{ email: cleanId }, { username: cleanId }],
+    authProvider: "local",
   });
 
   if (!user) {
+    const oauthUser = await User.findOne({
+      $or: [{ email: cleanId }, { username: cleanId }],
+    });
+    if (oauthUser && oauthUser.authProvider !== "local") {
+      const providerName = oauthUser.authProvider === "github" ? "GitHub" : "Google";
+      throw new ApiError(
+        400,
+        `This account was created using ${providerName}. Please sign in with ${providerName} instead of resetting a password.`
+      );
+    }
     throw new ApiError(404, "No account found with that email or username");
   }
 

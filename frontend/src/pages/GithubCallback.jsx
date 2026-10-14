@@ -13,7 +13,9 @@ export default function GithubCallback() {
   const navigate = useNavigate();
   const [error, setError] = useState("");
   const [status, setStatus] = useState("Authenticating with GitHub...");
-  const [callbackMode, setCallbackMode] = useState("login");
+  const [callbackMode, setCallbackMode] = useState(() => {
+    return localStorage.getItem("oauth_auth_mode") || "login";
+  });
   const hasFiredRef = useRef(false);
 
   useEffect(() => {
@@ -36,7 +38,9 @@ export default function GithubCallback() {
 
     const mode = localStorage.getItem("oauth_auth_mode") || "login";
     setCallbackMode(mode);
-    const redirect_uri = `${window.location.origin}/auth/github/callback`;
+    const redirect_uri =
+      import.meta.env.VITE_GITHUB_REDIRECT_URI ||
+      `${window.location.origin}/auth/github/callback`;
 
     // Flow 1: Connecting GitHub from Profile page
     if (mode === "connect_github") {
@@ -80,6 +84,12 @@ export default function GithubCallback() {
     }
 
     // Flow 2: General OAuth login / registration
+    setStatus(
+      mode === "register"
+        ? "Creating your account with GitHub..."
+        : "Signing in with GitHub..."
+    );
+
     const timeoutTimer = setTimeout(() => {
       setError("The server took longer than expected to respond. Please try signing in again.");
     }, 25000);
@@ -88,7 +98,8 @@ export default function GithubCallback() {
       .then((loggedUser) => {
         clearTimeout(timeoutTimer);
         localStorage.removeItem("oauth_auth_mode");
-        const destination = loggedUser && !loggedUser.isProfileComplete ? "/onboarding" : "/workspace";
+        const destination =
+          loggedUser && !loggedUser.isProfileComplete ? "/onboarding" : "/workspace";
         setStatus(
           destination === "/onboarding"
             ? "Success! Setting up your profile..."
@@ -125,15 +136,18 @@ export default function GithubCallback() {
             <AlertCircle size={28} color="#ff6b6b" style={{ marginBottom: "12px" }} />
             <h2 style={styles.title}>Authentication Failed</h2>
             <p style={styles.desc}>{error}</p>
-            <div style={{ display: "flex", gap: "10px", justifyContent: "center" }}>
-              <Link to={callbackMode === "connect_github" ? "/profile" : "/login"} style={styles.btn}>
-                {callbackMode === "connect_github" ? "Return to Profile" : "Return to Login"}
+            <div style={{ display: "flex", gap: "10px", justifyContent: "center", flexWrap: "wrap" }}>
+              <Link to="/login" style={styles.btn}>
+                Return to Login
               </Link>
-              {error.toLowerCase().includes("account does not exist") && (
-                <Link to="/register" style={{ ...styles.btn, background: "#fff", color: "#0a0a0c" }}>
-                  Register Here
+              {callbackMode === "connect_github" && (
+                <Link to="/profile" style={{ ...styles.btn, background: "rgba(255,255,255,0.1)", color: "#fff" }}>
+                  Return to Profile
                 </Link>
               )}
+              <Link to="/register" style={{ ...styles.btn, background: "#fff", color: "#0a0a0c" }}>
+                Register Here
+              </Link>
             </div>
           </div>
         ) : status.includes("Success") ? (
@@ -145,7 +159,13 @@ export default function GithubCallback() {
         ) : (
           <div style={styles.loadingBox}>
             <Loader2 size={32} color="#ff98a2" className="ai-spinner" style={{ marginBottom: "16px" }} />
-            <h2 style={styles.title}>Connecting GitHub</h2>
+            <h2 style={styles.title}>
+              {callbackMode === "connect_github"
+                ? "Connecting GitHub"
+                : callbackMode === "register"
+                ? "Signing Up with GitHub"
+                : "Signing In with GitHub"}
+            </h2>
             <p style={styles.desc}>{status}</p>
           </div>
         )}

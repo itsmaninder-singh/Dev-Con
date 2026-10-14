@@ -354,9 +354,9 @@ export const userApi = {
       throw new Error(extractMessage(err));
     }
   },
-  connectGithub: async ({ code, targetUsername } = {}) => {
+  connectGithub: async ({ code, targetUsername, redirect_uri } = {}) => {
     try {
-      const { data } = await api.post("/users/connect-github", { code, targetUsername });
+      const { data } = await api.post("/users/connect-github", { code, targetUsername, redirect_uri });
       return data.data;
     } catch (err) {
       throw new Error(extractMessage(err));

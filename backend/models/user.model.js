@@ -12,7 +12,6 @@ const userSchema = new mongoose.Schema(
         type:String,
         required:true,
         lowercase:true,
-        unique:true,
         trim:true,
     },
     phoneNumber:{
@@ -195,6 +194,11 @@ const userSchema = new mongoose.Schema(
 },{
     timestamps:true
 });
+
+userSchema.index({ email: 1, authProvider: 1 }, { unique: true });
+userSchema.index({ githubId: 1, authProvider: 1 }, { sparse: true });
+userSchema.index({ googleId: 1, authProvider: 1 }, { sparse: true });
+
 userSchema.methods.calculateIsProfileComplete = function () {
     const hasName = Boolean(this.name && String(this.name).trim().length >= 2);
     const hasBio = Boolean(this.bio && String(this.bio).trim().length >= 10);

@@ -37,10 +37,16 @@ function normalizePhone(val) {
 
 function loadInitial() {
   try {
+    const sessionRaw = localStorage.getItem("devconnect_auth_session");
+    const activeUserId = sessionRaw ? JSON.parse(sessionRaw)?.user?._id : null;
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_PROFILE;
     const parsed = JSON.parse(raw);
     if (parsed?.name === 'Arjun Sharma' || parsed?.username === 'arjun') {
+      localStorage.removeItem(STORAGE_KEY);
+      return DEFAULT_PROFILE;
+    }
+    if (activeUserId && parsed?._id && parsed._id !== activeUserId) {
       localStorage.removeItem(STORAGE_KEY);
       return DEFAULT_PROFILE;
     }
@@ -74,26 +80,66 @@ export function ProfileProvider({ children }) {
 
   const updateTimerRef = useRef(null);
   const pendingPatchRef = useRef({});
+  const lastUserIdRef = useRef(null);
 
-  // Sync profile immediately from user and fetch fresh server profile
+  // Sync profile cleanly when user changes and fetch fresh server profile
   useEffect(() => {
-    if (!user?._id) return;
+    if (!user?._id) {
+      lastUserIdRef.current = null;
+      setProfile(DEFAULT_PROFILE);
+      return;
+    }
 
-    setProfile((prev) => ({
-      ...prev,
-      name: user.name || prev.name,
-      username: user.username || prev.username,
-      email: user.email || prev.email,
-      avatarUrl: user.profilePicture || prev.avatarUrl,
-      profilePicture: user.profilePicture || prev.profilePicture,
-    }));
+    const isNewUser = lastUserIdRef.current !== user._id;
+    lastUserIdRef.current = user._id;
+
+    if (isNewUser) {
+      // Clean slate for new user — never inherit old user's bio, skills, or github data
+      setProfile({
+        ...DEFAULT_PROFILE,
+        _id: user._id,
+        name: user.name || '',
+        username: user.username || '',
+        email: user.email || '',
+        avatarUrl: user.profilePicture || user.avatarUrl || '',
+        profilePicture: user.profilePicture || user.avatarUrl || '',
+        coverUrl: user.coverPicture || user.coverUrl || '',
+        coverPicture: user.coverPicture || user.coverUrl || '',
+        bio: user.bio || '',
+        college: user.college || '',
+        skills: Array.isArray(user.skills) ? user.skills : [],
+        openTo: Array.isArray(user.availableFor) ? user.availableFor : [],
+        experience: user.experience || 'Fresher',
+        experienceLevel: user.experienceLevel || user.experience || 'Fresher',
+        githubUsername: user.githubUsername || null,
+        githubProfile: user.githubProfile || null,
+        badges: user.badges || {},
+        authProvider: user.authProvider || 'local',
+        isProfileComplete: Boolean(user.isProfileComplete),
+        phone: normalizePhone(user.phoneNumber || user.phone),
+        phoneNumber: normalizePhone(user.phoneNumber || user.phone),
+      });
+    } else {
+      // In-place updates for same user
+      setProfile((prev) => ({
+        ...prev,
+        name: user.name || prev.name,
+        username: user.username || prev.username,
+        email: user.email || prev.email,
+        avatarUrl: user.profilePicture || prev.avatarUrl,
+        profilePicture: user.profilePicture || prev.profilePicture,
+        githubUsername: user.githubUsername !== undefined ? user.githubUsername : prev.githubUsername,
+        githubProfile: user.githubProfile !== undefined ? user.githubProfile : prev.githubProfile,
+        badges: user.badges ? { ...(prev.badges || {}), ...user.badges } : prev.badges,
+      }));
+    }
 
     userApi
       .getMe()
       .then((serverUser) => {
-        if (serverUser?._id) {
+        if (serverUser?._id && serverUser._id === user._id) {
           setProfile((prev) => ({
-            ...prev,
+            ...DEFAULT_PROFILE,
             ...serverUser,
             name: serverUser.name || user.name || prev.name,
             bio: serverUser.bio !== undefined ? serverUser.bio : prev.bio,
@@ -110,6 +156,9 @@ export function ProfileProvider({ children }) {
             preferredRole: serverUser.preferredRole || prev.preferredRole,
             personality: serverUser.personality || prev.personality,
             isAvailable: serverUser.isAvailable !== undefined ? serverUser.isAvailable : prev.isAvailable,
+            githubUsername: serverUser.githubUsername !== undefined ? serverUser.githubUsername : prev.githubUsername,
+            githubProfile: serverUser.githubProfile !== undefined ? serverUser.githubProfile : prev.githubProfile,
+            badges: serverUser.badges || prev.badges || {},
             phone: normalizePhone(serverUser.phoneNumber || serverUser.phone || prev.phone),
             phoneNumber: normalizePhone(serverUser.phoneNumber || serverUser.phone || prev.phoneNumber),
           }));
