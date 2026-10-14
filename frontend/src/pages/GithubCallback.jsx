@@ -69,7 +69,7 @@ export default function GithubCallback() {
                 message: `Connected GitHub @${result?.githubUsername || targetUsername} and synced profile successfully!`,
               },
             });
-          }, 450);
+          }, 950);
         })
         .catch((err) => {
           localStorage.removeItem("oauth_auth_mode");
@@ -107,7 +107,7 @@ export default function GithubCallback() {
         );
         setTimeout(() => {
           navigate(destination, { replace: true });
-        }, 400);
+        }, 950);
       })
       .catch((err) => {
         clearTimeout(timeoutTimer);
@@ -140,14 +140,88 @@ export default function GithubCallback() {
           50% { transform: translateX(0%); }
           100% { transform: translateX(100%); }
         }
-        .github-spin-icon {
-          animation: spinKf 0.85s linear infinite !important;
+        @keyframes successPop {
+          0% { transform: scale(0.3); opacity: 0; }
+          50% { transform: scale(1.18); }
+          75% { transform: scale(0.94); }
+          100% { transform: scale(1); opacity: 1; }
         }
-        .github-pulse-wrapper {
-          animation: pulseGlow 2s ease-in-out infinite;
+        @keyframes drawCircle {
+          0% { stroke-dashoffset: 140; }
+          100% { stroke-dashoffset: 0; }
         }
-        .github-progress-bar {
-          animation: progressBarAnim 1.4s ease-in-out infinite;
+        @keyframes drawCheck {
+          0% { stroke-dashoffset: 35; }
+          100% { stroke-dashoffset: 0; }
+        }
+        @keyframes pulseRipple {
+          0% { transform: scale(0.85); opacity: 0.9; }
+          100% { transform: scale(1.65); opacity: 0; }
+        }
+        @keyframes glowBurst {
+          0% { transform: scale(0.5); opacity: 0; }
+          50% { transform: scale(1.2); opacity: 0.75; }
+          100% { transform: scale(1); opacity: 0.4; }
+        }
+        @keyframes textSlideUp {
+          0% { transform: translateY(12px); opacity: 0; }
+          100% { transform: translateY(0); opacity: 1; }
+        }
+        .success-badge-container {
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 84px;
+          height: 84px;
+          margin-bottom: 16px;
+        }
+        .success-pulse-ring {
+          position: absolute;
+          inset: -4px;
+          border-radius: 50%;
+          border: 2px solid rgba(74, 222, 128, 0.5);
+          animation: pulseRipple 1.9s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
+        }
+        .success-pulse-ring.ring-2 {
+          animation-delay: 0.6s;
+        }
+        .success-glow {
+          position: absolute;
+          width: 74px;
+          height: 74px;
+          border-radius: 50%;
+          background: radial-gradient(circle, rgba(74, 222, 128, 0.4) 0%, rgba(74, 222, 128, 0) 70%);
+          animation: glowBurst 0.9s ease-out forwards;
+        }
+        .success-circle {
+          position: relative;
+          width: 66px;
+          height: 66px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, rgba(34, 197, 94, 0.22), rgba(16, 185, 129, 0.08));
+          border: 1.5px solid rgba(74, 222, 128, 0.45);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 0 25px rgba(74, 222, 128, 0.3), inset 0 0 15px rgba(74, 222, 128, 0.18);
+          animation: successPop 0.65s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        .success-svg-circle {
+          stroke-dasharray: 140;
+          stroke-dashoffset: 140;
+          animation: drawCircle 0.55s cubic-bezier(0.65, 0, 0.45, 1) 0.1s forwards;
+        }
+        .success-svg-check {
+          stroke-dasharray: 35;
+          stroke-dashoffset: 35;
+          animation: drawCheck 0.45s cubic-bezier(0.65, 0, 0.45, 1) 0.45s forwards;
+        }
+        .success-title-anim {
+          animation: textSlideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.35s both;
+        }
+        .success-desc-anim {
+          animation: textSlideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.45s both;
         }
       `}</style>
 
@@ -177,9 +251,34 @@ export default function GithubCallback() {
           </div>
         ) : status.includes("Success") ? (
           <div style={styles.successBox}>
-            <CheckCircle2 size={36} color="#51cf66" style={{ marginBottom: "12px" }} />
-            <h2 style={styles.title}>Connected!</h2>
-            <p style={styles.desc}>{status}</p>
+            <div className="success-badge-container">
+              <div className="success-pulse-ring ring-1" />
+              <div className="success-pulse-ring ring-2" />
+              <div className="success-glow" />
+              <div className="success-circle">
+                <svg width="44" height="44" viewBox="0 0 48 48" fill="none">
+                  <circle
+                    cx="24"
+                    cy="24"
+                    r="21"
+                    className="success-svg-circle"
+                    stroke="#4ade80"
+                    strokeWidth="3.2"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="M14 24.5L21 31.5L34 17"
+                    className="success-svg-check"
+                    stroke="#4ade80"
+                    strokeWidth="3.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
+            </div>
+            <h2 style={styles.title} className="success-title-anim">Connected!</h2>
+            <p style={styles.desc} className="success-desc-anim">{status}</p>
           </div>
         ) : (
           <div style={styles.loadingBox}>

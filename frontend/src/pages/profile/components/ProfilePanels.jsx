@@ -315,6 +315,10 @@ export function ProfilePanels({
                   @{linkedGithubUsername}
                   <ExternalLink size={10} style={{ opacity: 0.6 }} />
                 </a>
+                <span className="gh-connected-badge">
+                  <span className="gh-dot-pulse" />
+                  Connected
+                </span>
                 {lastSyncedAt && (
                   <span>· Last synced {formatLastSynced(lastSyncedAt)}</span>
                 )}
@@ -517,6 +521,30 @@ export function ProfilePanels({
         }
         .spin-sync-icon {
           animation: spinSync 1s linear infinite;
+        }
+        .gh-connected-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          padding: 2px 8px;
+          background: rgba(74, 222, 128, 0.1);
+          border: 1px solid rgba(74, 222, 128, 0.28);
+          border-radius: 12px;
+          color: #4ade80;
+          font-size: 10.5px;
+          font-weight: 600;
+        }
+        .gh-dot-pulse {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: #4ade80;
+          box-shadow: 0 0 8px #4ade80;
+          animation: greenDotPulse 1.8s ease-in-out infinite;
+        }
+        @keyframes greenDotPulse {
+          0%, 100% { transform: scale(0.9); opacity: 0.75; box-shadow: 0 0 4px #4ade80; }
+          50% { transform: scale(1.35); opacity: 1; box-shadow: 0 0 10px #4ade80, 0 0 16px rgba(74, 222, 128, 0.5); }
         }
       `}</style>
     </div>
