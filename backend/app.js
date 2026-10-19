@@ -44,8 +44,12 @@ app.use(
         .split(",")
         .map((o) => o.trim())
         .filter(Boolean);
-      const allowedOrigins = [...new Set([...envOrigins, ...defaultOrigins])];
-      if (!origin || allowedOrigins.includes(origin)) {
+      const isAllowedVercel =
+        typeof origin === "string" &&
+        origin.endsWith(".vercel.app") &&
+        (origin.includes("devconnect") || origin.includes("frontend"));
+
+      if (!origin || allowedOrigins.includes(origin) || isAllowedVercel) {
         return callback(null, true);
       }
       return callback(new Error(`Not allowed by CORS: ${origin}`));
