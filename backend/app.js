@@ -44,6 +44,7 @@ app.use(
         .split(",")
         .map((o) => o.trim())
         .filter(Boolean);
+      const allowedOrigins = [...new Set([...envOrigins, ...defaultOrigins])];
       const isAllowedVercel =
         typeof origin === "string" &&
         origin.endsWith(".vercel.app") &&

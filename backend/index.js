@@ -60,7 +60,16 @@ const startServer = async () => {
   const httpServer = http.createServer(app);
   const io = new Server(httpServer, {
     cors: {
-      origin: clientOrigins,
+      origin: (origin, callback) => {
+        const isAllowedVercel =
+          typeof origin === "string" &&
+          origin.endsWith(".vercel.app") &&
+          (origin.includes("devconnect") || origin.includes("frontend"));
+        if (!origin || clientOrigins.includes(origin) || isAllowedVercel) {
+          return callback(null, true);
+        }
+        return callback(new Error(`Not allowed by CORS: ${origin}`));
+      },
       credentials: true,
     },
     ...(socketAdapter ? { adapter: socketAdapter } : {}),
