@@ -30,19 +30,8 @@ Connect • Collaborate • Build • Network • Ship 🚀
 
 ---
 
-### 🌐 Live Demo
-
-Coming Soon
-
 ### 📷 Screenshots
 <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/60a2e3ab-6ffd-4557-9d15-be9f2becb238" />
-
-
-Coming Soon
-
-### 📖 Documentation
-
-Coming Soon
 
 </div>
 
